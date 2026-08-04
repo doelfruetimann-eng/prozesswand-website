@@ -294,6 +294,7 @@ table.ph-tab { width:100%; border-collapse:collapse; }
   <textarea id="goalInput" rows="1" placeholder="Was soll am Ende des Projekts erreicht sein? (SMART)" title="Dein Ziel in einem Satz: Was genau soll erreicht sein, bis wann &ndash; und woran merkst du, dass es geschafft ist?"></textarea>
   <button id="smartBtn">SMART-Check</button>
   <button id="swarmBtn">&#129302; KI-Struktur</button>
+  <button id="prioBtn" title="Handlungs-Karten in eine Rangfolge bringen (P1, P2, &hellip;) &ndash; ohne KI, nur du entscheidest">&#128202; Priorisieren</button>
 </div>
 
 <div id="previewBar">
@@ -338,7 +339,7 @@ table.ph-tab { width:100%; border-collapse:collapse; }
 <script>
 "use strict";
 
-const APP_VERSION = 'V56';
+const APP_VERSION = 'V57';
 /* V49: einheitlicher Wegweiser nach jedem «An Claude kopieren» */
 function claudeHinweis() {
   sysMsg('📋 Kopiert! Jetzt: 1. Claude öffnen (claude.ai bzw. deine Prozesswand-Sitzung) → 2. ins Schreibfeld klicken → 3. Cmd+V (einfügen) → 4. Senden. Mehr braucht es nicht.', true);
@@ -555,8 +556,10 @@ function render() {
     const persTag = Array.isArray(p.personen) && p.personen.length ? '<span class="todoTag" title="hinterlegte Personen (nur in der Wand gespeichert)">&#128101; ' + p.personen.length + '</span>' : '';
     const owTag = (p.owner || '').trim() && laneKeyOfY(p.y) === 'handlung'
       ? '<span class="todoTag" title="Verantwortlich: ' + esc(ownerLabel(p.owner)) + '">' + ownerKurz(p.owner) + '</span>' : '';
+    const rgTag = (typeof p.rang === 'number' && p.rang > 0 && laneKeyOfY(p.y) === 'handlung')
+      ? '<span class="todoTag" title="Priorit&auml;t (vergeben &uuml;ber &#128202; Priorisieren)" style="' + (p.rang === 1 ? 'background:#651B32;color:#fff;border-radius:6px;padding:0 5px;' : 'color:#651B32;font-weight:700;') + '">P' + p.rang + '</span>' : '';
     const prio = mode === 'lean' && laneKeyOfY(p.y) === 'handlung' && depsOk(p);
-    h += '<div class="postit st-' + st + (prio ? ' prio' : '') + (connectSrc === p.id ? ' sel' : '') + '" data-pid="' + p.id + '" style="left:' + (LABEL_W + p.x) + 'px;top:' + (HEADER_H + p.y) + 'px;background:' + (p.color || PALETTE[0]) + '"><span class="dot ' + st + '"></span>' + esc(p.text) + (prio ? '<span class="prioTag">&#10148; als N&auml;chstes</span>' : '') + tds + typTag + persTag + owTag + '</div>';
+    h += '<div class="postit st-' + st + (prio ? ' prio' : '') + (connectSrc === p.id ? ' sel' : '') + '" data-pid="' + p.id + '" style="left:' + (LABEL_W + p.x) + 'px;top:' + (HEADER_H + p.y) + 'px;background:' + (p.color || PALETTE[0]) + '"><span class="dot ' + st + '"></span>' + esc(p.text) + (prio ? '<span class="prioTag">&#10148; als N&auml;chstes</span>' : '') + tds + typTag + persTag + owTag + rgTag + '</div>';
   });
 
   h += '<svg id="conns" width="' + (LABEL_W + W) + '" height="' + (HEADER_H + H) + '"><defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#1f5fae"/></marker></defs>';
@@ -1178,6 +1181,7 @@ const GLOSSAR = [
   ['Import', 'Eine fertige Projekt-Datei (JSON) einlesen – die Wand übernimmt sie eins zu eins, mit Vorschau.'],
   ['Lupe 🔍', 'Eine einzelne Phase gross anschauen: Ziel, Aufgaben und Risiken an einem Ort.'],
   ['Tasks → GitHub', 'Die Aufgaben der Wand werden in deinen Aufgaben-Speicher gelegt, wo die KI sie abarbeitet – die Wand hakt Erledigtes automatisch ab.'],
+  ['Priorisieren (P1, P2, …)', 'Du bringst die Aufgaben-Karten in eine Rangfolge – P1 ist das Wichtigste. Ohne KI, nur dein Urteil.'],
   ['SSOT', 'Das eine Dokument, das gilt, wenn sich zwei Angaben widersprechen.']
 ];
 function openGlossar() {
@@ -1188,6 +1192,55 @@ function openGlossar() {
   document.getElementById('mCancel').onclick = closeModal;
 }
 document.getElementById('glossarBtn').onclick = () => { if (!previewState) openGlossar(); };
+
+/* ---------- Priorisieren (V57): Rangfolge der Handlungs-Karten ----------
+   Ohne KI. Reihenfolge per Pfeile, «Übernehmen» schreibt P1, P2, … auf die
+   Karten (Feld rang, gespeichert wie alle Kartenwerte) und legt einen
+   Schnappschuss als Karte auf die Dokumentationsebene. */
+function prioKarten() {
+  const hc = state.postits.filter(p => laneKeyOfY(p.y) === 'handlung');
+  hc.sort((a, b) => {
+    const ra = typeof a.rang === 'number' ? a.rang : 9999;
+    const rb = typeof b.rang === 'number' ? b.rang : 9999;
+    return ra !== rb ? ra - rb : (a.x - b.x || a.y - b.y);
+  });
+  return hc.map(c => ({ id: c.id, titel: cleanTxt(c.text).slice(0, 70), untertitel: 'Phase ' + (phaseIndexOfX(c.x) + 1) + (state.phases[phaseIndexOfX(c.x)] && state.phases[phaseIndexOfX(c.x)].name ? ' – ' + state.phases[phaseIndexOfX(c.x)].name : '') }));
+}
+function openPrio() {
+  if (previewState) return;
+  let liste = prioKarten();
+  if (!liste.length) { sysMsg('📊 Zum Priorisieren braucht es Karten auf der Handlungsebene («Was zu tun ist»).', true); return; }
+  const zeilen = () => liste.map((k, i) =>
+    '<div style="display:flex;align-items:center;gap:8px;margin:5px 0;padding:8px 10px;background:' + (i === 0 ? '#f7edf0' : '#f6f7f9') + ';border:1px solid var(--line);border-radius:8px">'
+    + '<b style="min-width:34px;color:#651B32">P' + (i + 1) + '</b>'
+    + '<div style="flex:1;font-size:13px">' + esc(k.titel) + '<br><span style="font-size:11px;color:var(--muted)">' + esc(k.untertitel) + '</span></div>'
+    + '<button class="pr-up" data-i="' + i + '" ' + (i === 0 ? 'disabled' : '') + ' style="font:inherit;font-size:14px;cursor:pointer;border:1px solid var(--line);border-radius:6px;background:#fff;padding:2px 9px">&uarr;</button>'
+    + '<button class="pr-dn" data-i="' + i + '" ' + (i === liste.length - 1 ? 'disabled' : '') + ' style="font:inherit;font-size:14px;cursor:pointer;border:1px solid var(--line);border-radius:6px;background:#fff;padding:2px 9px">&darr;</button></div>').join('');
+  const zeichnen = () => {
+    document.getElementById('prListe').innerHTML = zeilen();
+    modalBox.querySelectorAll('.pr-up').forEach(b => b.onclick = () => { const i = +b.dataset.i; [liste[i - 1], liste[i]] = [liste[i], liste[i - 1]]; zeichnen(); });
+    modalBox.querySelectorAll('.pr-dn').forEach(b => b.onclick = () => { const i = +b.dataset.i; [liste[i], liste[i + 1]] = [liste[i + 1], liste[i]]; zeichnen(); });
+  };
+  openModal('<h3>&#128202; Priorisieren &ndash; was ist am wichtigsten?</h3>'
+    + '<p style="font-size:12.5px;color:var(--muted);margin:0 0 8px">Mit den Pfeilen ordnen: P1 = das Wichtigste. &laquo;&Uuml;bernehmen&raquo; schreibt die R&auml;nge auf die Karten und legt einen Schnappschuss auf die Dokumentationsebene. Keine KI &ndash; nur dein Urteil.</p>'
+    + '<div id="prListe"></div>'
+    + '<div class="btnrow"><button class="go" id="prGo">R&auml;nge &uuml;bernehmen</button><button id="mCancel">Abbrechen</button></div>', true);
+  zeichnen();
+  document.getElementById('mCancel').onclick = closeModal;
+  document.getElementById('prGo').onclick = () => {
+    const raenge = liste.map((k, i) => ({ id: k.id, rang: i + 1 }));
+    raenge.forEach(r => { const c = getPostit(r.id); if (c) c.rang = r.rang; });
+    const datum = new Date().toLocaleDateString('de-CH');
+    const snapshotText = 'Priorisierung vom ' + datum + '\n\n'
+      + liste.map((k, i) => 'P' + (i + 1) + ' – ' + k.titel + ' (' + k.untertitel + ')').join('\n')
+      + '\n\nFestgelegt von Hand über «📊 Priorisieren» – ohne KI.';
+    const nc = addCard(0, 'doku', '📄 Priorisierung vom ' + datum, 'offen');
+    nc.doc = snapshotText;
+    save(); render(); closeModal();
+    sysMsg('📊 Ränge übernommen: P1–P' + liste.length + ' stehen auf den Karten. Schnappschuss liegt auf der Dokumentationsebene.', true);
+  };
+}
+document.getElementById('prioBtn').onclick = () => openPrio();
 
 function startBigBtn(id, icon, titel, satz) {
   return '<button id="' + id + '" style="display:block;width:100%;text-align:left;margin:8px 0;padding:14px 16px;font:inherit;cursor:pointer;border:1px solid var(--line);border-radius:10px;background:#fff">'
