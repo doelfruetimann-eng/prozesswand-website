@@ -340,7 +340,7 @@ table.ph-tab { width:100%; border-collapse:collapse; }
 <script>
 "use strict";
 
-const APP_VERSION = 'V60';
+const APP_VERSION = 'V61';
 /* V49: einheitlicher Wegweiser nach jedem «An Claude kopieren» */
 function claudeHinweis() {
   sysMsg('📋 Kopiert! Jetzt: 1. Claude öffnen (claude.ai bzw. deine Prozesswand-Sitzung) → 2. ins Schreibfeld klicken → 3. Cmd+V (einfügen) → 4. Senden. Mehr braucht es nicht.', true);
@@ -1118,10 +1118,10 @@ const WEGWEISER = [
       'Ohne GitHub-Anschluss geht es klassisch: «Tasks (.zip)» herunterladen und den Ordner tasks/ ins Repo legen'],
     tipp: 'Harte Regel: Mails, Publikationen, Käufe und Löschungen brauchen immer deine Freigabe – auch wenn «auto» eingestellt ist.',
     aktion: 'Dokumente/Tasks öffnen', run: () => document.getElementById('docsBtn').click() },
-  { icon: '📄', t: 'Dokumente erzeugen', kurz: 'Auftragsbeschrieb · Termine · Kosten · Landkarte – in deinem CI',
-    wofuer: 'Für Gremien und Auftraggeber: fertige Word- und Excel-Dokumente direkt aus den Karten – ohne KI-Aufruf, jederzeit reproduzierbar, nie veraltet.',
+  { icon: '📄', t: 'Dokumente erzeugen', kurz: 'Management-Zusammenfassung · Zwischenrapport · Auftrag · Termine – in deinem CI',
+    wofuer: 'Für Gremien und Auftraggeber: fertige Word- und Excel-Dokumente direkt aus den Karten. Bei 🤖-Knöpfen schreibt die KI einen Entwurf, den du liest und freigibst – exportiert wird nur Bestätigtes.',
     schritte: ['«Dokumente» klicken',
-      'Word: Auftragsbeschrieb, Beschaffungsantrag · Excel: Terminprogramm, Kostenvoranschlag',
+      'Word: Management-Zusammenfassung, Zwischenrapport, Auftragsbeschrieb, Abschlussbericht, Wissenschaftliche Arbeit · Excel: Terminprogramm',
       'Landkarte (SVG/PNG) für Präsentation und Druck',
       'Referenzdokument (SSOT) eintragen – erscheint in jedem Export als «Bei Widerspruch gilt: …»'],
     tipp: 'Leere Felder werden weggelassen. «Erledigt» mit offenen Teilaufgaben wird im Export ehrlich gewarnt.',
@@ -2160,23 +2160,31 @@ function ulOrPlatz(items, platz) {
 }
 function txtOrPlatz(t, platz) { return t ? '<p>' + esc(t).replace(/\n/g,'<br>') + '</p>' : '<p class="platz">[' + platz + ']</p>'; }
 
-function genAuftrag() {
+function genAuftrag(entwurf) {
   const p0 = state.phases[0] || {};
   const ms = state.milestones.length ? state.milestones[state.milestones.length-1].label.split(/\s[–-]\sKriterien/)[0] : '';
+  const anspruch1 = (state.postits.find(c => laneKeyOfY(c.y) === 'anspruch') || {}).text;
   let n2 = 0;
   const num = () => { n2++; return n2 + '. '; };
   let b = '<table class="kopf">'
     + kopfRow('Projekt', boardName())
     + kopfRow('Projektkoordination', state.solo ? '' : p0.wer)
+    + kopfRow('Wichtigste Anspruchsgruppe', anspruch1 ? cleanTxt(anspruch1) : '')
     + kopfRow('Stand', 'Entwurf aus Prozesswand, ' + heute())
     + kopfRow('Kritischer Meilenstein', ms)
     + '</table>';
-  if (p0.input) b += '<h2>' + num() + 'Ausgangslage</h2><p>' + esc(p0.input).replace(/\n/g, '<br>') + '</p>';
+  b += '<h2>' + num() + 'Ausgangslage</h2>' + txtOrPlatz(entwurf || p0.input, 'offen – Ausgangslage über den KI-Entwurf ergänzen');
   const ziele = [state.goal].concat(state.phases.map(p => p.ziel && (p.name + ': ' + p.ziel))).filter(Boolean);
   if (ziele.length) {
     b += '<h2>' + num() + 'Zielbild / Nutzung</h2><p>Nach Abschluss des Projekts soll Folgendes erreicht sein:</p><ul>'
       + ziele.map(t => '<li>' + esc(t) + '</li>').join('') + '</ul>';
   }
+  b += '<h2>' + num() + 'Vorgehen und Entscheid-Tore</h2>'
+    + '<table><tr><th style="width:120pt">Phase</th><th>Tor am Phasenende (mit Kriterien)</th><th style="width:70pt">Termin</th></tr>'
+    + state.phases.map((p, i) => {
+        const g = gateOfPhase(i);
+        return '<tr><td><b>' + (i+1) + ' &middot; ' + esc(p.name) + '</b></td><td>' + (g ? esc(g.label) : '<span class="platz">[offen]</span>') + '</td><td>' + (g && g.due ? esc(g.due) : '') + '</td></tr>';
+      }).join('') + '</table>';
   b += '<h2>' + num() + 'Projektumfang</h2>'
     + '<p>Der Projektumfang umfasst die nachstehenden, in der Prozesswand erfassten Phasen und Aufgaben. Die Detailplanung und verbindliche Beauftragung erfolgen nach Freigabe.</p>'
     + '<table><tr><th style="width:36pt">Phase</th><th style="width:150pt">Bezeichnung</th><th>Ergebnis / Output</th><th style="width:80pt">Termin</th></tr>';
@@ -2193,7 +2201,159 @@ function genAuftrag() {
     });
   });
   b += '</table><p class="platz">Priorität (hoch / mittel / tief) je Massnahme in den gelben Feldern ergänzen.</p>';
+  b += '<h2>' + num() + 'Lieferergebnisse</h2>'
+    + ulOrPlatz(state.postits.filter(c => laneKeyOfY(c.y) === 'doku').map(c => cleanTxt(c.text) + (c.status === 'erledigt' ? ' (liegt vor)' : '')), 'offen – Dokumentationsebene der Wand füllen');
+  const letztesTor = state.milestones.filter(m => m.due).slice(-1)[0];
+  b += '<h2>' + num() + 'Rahmenbedingungen</h2><ul>'
+    + '<li>Termin: ' + (letztesTor ? 'letztes Entscheid-Tor am ' + esc(letztesTor.due) : '<span class="platz">[offen]</span>') + '</li>'
+    + '<li>Budget: <span class="platz">[offen]</span></li>'
+    + (state.postits.some(c => laneKeyOfY(c.y) === 'mgmt2') ? '<li>Arbeitsweise: ' + esc(cleanTxt(state.postits.find(c => laneKeyOfY(c.y) === 'mgmt2').text)) + '</li>' : '')
+    + '</ul>';
+  b += '<h2>' + num() + 'Freigabe</h2>'
+    + '<p>Ort / Datum: <span class="platz">[offen]</span></p>'
+    + '<p style="margin-top:14pt">Auftraggeber: ____________________ &nbsp;&nbsp; Projektleitung: ____________________</p>';
   return docShell('Auftragsbeschrieb', b);
+}
+
+/* ================================================================
+   V61: BERICHTE MIT KI-ENTWURF – Management-Zusammenfassung,
+   Zwischenrapport, Auftragsbeschrieb-Ausgangslage + wiss. Arbeit.
+   Eiserne Regel bleibt: KEIN LLM im Exportpfad. Die KI schreibt nur
+   einen ENTWURF; er wird dir gezeigt, du änderst/gibst frei – erst
+   dann entsteht die 📄-Karte auf der Wand und daraus das Word-File.
+   ================================================================ */
+function fortschrittZahlen() {
+  const t = state.postits.filter(c => laneKeyOfY(c.y) === 'handlung');
+  const e = t.filter(c => c.status === 'erledigt');
+  return { erledigt: e.length, total: t.length, pct: t.length ? Math.round(e.length / t.length * 100) : 0 };
+}
+function phaseStand(i) {
+  const t = tasksOfPhase(i);
+  if (!t.length) return { stand: 'keine Aufgaben erfasst', bem: '' };
+  const e = t.filter(c => c.status === 'erledigt').length;
+  const laufend = t.some(c => c.status === 'arbeit');
+  const stand = e === t.length ? 'abgeschlossen' : (e > 0 || laufend) ? 'in Arbeit' : 'noch nicht begonnen';
+  return { stand, bem: e + ' von ' + t.length + ' Aufgaben erledigt' };
+}
+function risikenListe() {
+  return state.postits.filter(c => laneKeyOfY(c.y) === 'reflexion' && c.status !== 'erledigt').map(c => cleanTxt(c.text));
+}
+function wallFaktenText() {
+  const f = fortschrittZahlen(), g = nextGate(), warte = wartetAufDich();
+  const phasen = state.phases.map((p, i) => { const s = phaseStand(i); return (i+1) + '. ' + p.name + ': ' + s.stand + (s.bem ? ' (' + s.bem + ')' : ''); }).join('\n');
+  return 'Projekt: ' + boardName()
+    + '\nZiel: ' + (state.goal || '[offen]')
+    + '\nFortschritt: ' + f.pct + ' % (' + f.erledigt + ' von ' + f.total + ' Aufgaben erledigt)'
+    + '\nPhasen:\n' + phasen
+    + '\nNächstes Entscheid-Tor: ' + (g ? g.label + (g.due ? ' am ' + g.due : '') : '[offen]')
+    + (state.milestones.length ? '\nTor-Kriterien: ' + state.milestones.map(m => m.label).join(' | ') : '')
+    + '\nWartet auf Entscheid/Eingabe: ' + (warte.length ? warte.map(w => w.art + ': ' + cleanTxt(w.c ? w.c.text : w.txt)).join('; ') : 'nichts')
+    + '\nRisiken (Reflexionsebene): ' + (risikenListe().join('; ') || 'keine erfasst')
+    + '\nHeute: ' + heute();
+}
+function berichtKarte(titel, text) {
+  const g = nextGate();
+  const i = Math.min(g ? g.phase : 0, state.phases.length - 1);
+  const nc = addCard(i, 'doku', '📄 ' + titel);
+  nc.doc = text;
+  save(); render();
+  return nc;
+}
+function genMgmtZsf(entwurf) {
+  const f = fortschrittZahlen(), g = nextGate(), warte = wartetAufDich(), risiken = risikenListe();
+  let b = '<h2>Das Wichtigste in Kürze</h2>'
+    + '<table><tr><td class="ph">' + esc(entwurf).replace(/\n/g, '<br>') + '<br><span style="font-size:8pt;color:#666666">Zusammenfassung freigegeben am ' + heute() + ' (KI-Entwurf, von Hand geprüft)</span></td></tr></table>';
+  b += '<h2>Kennzahlen</h2><table class="kopf">'
+    + kopfRow('Fortschritt', f.pct + ' % (' + f.erledigt + ' von ' + f.total + ' Aufgaben erledigt)')
+    + kopfRow('Nächstes Entscheid-Tor', g ? g.label + (g.due ? ' · ' + g.due : '') : '[offen]')
+    + kopfRow('Wartet auf Entscheid/Eingabe', warte.length + ' Punkt(e)')
+    + kopfRow('Offene Risiken', String(risiken.length))
+    + '</table>';
+  b += '<h2>Wartet auf dich</h2>' + ulOrPlatz(warte.slice(0, 6).map(w => w.art + ': ' + cleanTxt(w.c ? w.c.text : w.txt)), 'nichts – alles läuft');
+  b += '<h2>Risiken</h2>' + ulOrPlatz(risiken.map(r => r + ' – Gegenmassnahme: [offen]'), 'keine Risiken auf der Reflexionsebene erfasst');
+  return docShell('Management-Zusammenfassung', b);
+}
+function genZwischenrapport(entwurf) {
+  const g = nextGate(), warte = wartetAufDich(), risiken = risikenListe();
+  let b = '<h2>1. Ziel und Auftrag</h2>' + txtOrPlatz(state.goal, 'offen – Zielleiste ausfüllen');
+  b += '<h2>2. Stand je Phase</h2><table><tr><th style="width:130pt">Phase</th><th style="width:110pt">Stand</th><th>Bemerkung</th></tr>'
+    + state.phases.map((p, i) => { const s = phaseStand(i); return '<tr><td><b>' + (i+1) + ' &middot; ' + esc(p.name) + '</b></td><td>' + s.stand + '</td><td>' + s.bem + '</td></tr>'; }).join('')
+    + '</table>';
+  const erledigt = state.postits.filter(c => c.status === 'erledigt').map(c => cleanTxt(c.text) + (c.erledigtAm ? ' (' + c.erledigtAm + ')' : ''));
+  b += '<h2>3. Bisher erledigt</h2>' + ulOrPlatz(erledigt, 'noch nichts erledigt');
+  b += '<h2>4. Anstehende Entscheide</h2>'
+    + (g ? '<p><b>' + esc(g.label) + (g.due ? ' · ' + esc(g.due) : '') + '</b></p>' : '')
+    + ulOrPlatz(warte.map(w => w.art + ': ' + cleanTxt(w.c ? w.c.text : w.txt)), 'keine offenen Freigaben oder Eingaben');
+  b += '<h2>5. Risiken und Gegenmassnahmen</h2>' + ulOrPlatz(risiken.map(r => r + ' – Gegenmassnahme: [offen]'), 'keine Risiken erfasst');
+  b += '<h2>6. Ausblick auf die nächste Periode</h2>'
+    + '<table><tr><td class="ph">' + esc(entwurf).replace(/\n/g, '<br>') + '<br><span style="font-size:8pt;color:#666666">Ausblick freigegeben am ' + heute() + ' (KI-Entwurf, von Hand geprüft)</span></td></tr></table>';
+  const beilagen = state.postits.filter(c => laneKeyOfY(c.y) === 'doku' && c.status === 'erledigt').map(c => cleanTxt(c.text));
+  b += '<h2>7. Beilagen</h2>' + ulOrPlatz(beilagen, 'keine – Dokumentationsebene der Wand füllen');
+  return docShell('Zwischenrapport', b);
+}
+function genWissArbeit() {
+  const g = nextGate();
+  let b = '<h2>1. Ausgangslage und Problemstellung</h2>'
+    + txtOrPlatz(state.phases[0] && state.phases[0].input, 'offen – Ausgangslage beschreiben (Input der ersten Phase)')
+    + '<h2>2. Zielsetzung</h2>'
+    + '<p>Projektziel (SMART formuliert): ' + (state.goal ? '<b>' + esc(state.goal) + '</b>' : '<span class="platz">[offen]</span>') + '</p>'
+    + '<p>Ziel der Arbeit: <span class="platz">[offen – z. B. «prüfen, ob die Methode die Steuerung des Projekts messbar erleichtert»]</span></p>';
+  b += '<h2>3. Methodik</h2>'
+    + '<p><b>3.1 Das OSTO-Systemmodell.</b> Die Arbeit stützt sich auf das OSTO-Systemmodell, das ein Projekt als offenes, soziales, technisches und ökonomisches System versteht: mit einer klaren Systemgrenze, mit Input und Output je Phase und mit Wechselwirkungen zum Umfeld (Quellen: Kapitel 7).</p>'
+    + '<p><b>3.2 Die Zeitachse: Phasen, System-Eier und Tore.</b> Auf der Prozesswand läuft die Zeit von links nach rechts. Jede Phase ist als «System-Ei» beschrieben: Was geht hinein (Input), was kommt heraus (Output) – der Output einer Phase ist der Input der nächsten. Am Ende jeder Phase steht ein Entscheid-Tor mit vorab messbaren Kriterien; erst wenn sie erfüllt sind, geht das Projekt weiter.'
+    + (g ? ' Im vorliegenden Projekt: ' + esc(g.label) + (g.due ? ' am ' + esc(g.due) : '') + '.' : '') + '</p>'
+    + '<p><b>3.3 Die acht Ebenen der Wand.</b></p>'
+    + '<table><tr><th style="width:120pt">Ebene</th><th>Leitfrage</th><th style="width:130pt">Einfach gesagt</th></tr>'
+    + LANES.map(l => '<tr><td><b>' + esc(l.title) + '</b></td><td>' + esc(l.desc) + '</td><td>' + esc((LANE_EINFACH[l.key] || '').replace('Einfach gesagt: ', '')) + '</td></tr>').join('')
+    + '</table>'
+    + '<p><b>3.4 Arbeitsweise mit KI.</b> Sechs KI-Agenten (Architekt, Planer, Kritiker, Verbinder, Lean, Optimierer) entwerfen die Wand; übernommen wird ausschliesslich per Vorschau durch den Menschen. Es gelten drei Regeln: (1) Evidenz – nichts erfinden, Fehlendes wird als [offen] markiert; (2) Freigabe – Mails, Käufe und Löschungen geschehen nie ohne menschliches Ja; (3) Nachvollziehbarkeit – Exporte geben nur wieder, was auf der Wand steht.</p>';
+  b += '<h2>4. Vorgehen im Projekt</h2>'
+    + '<p>' + state.phases.map((p, i) => (i+1) + '. ' + esc(p.name)).join(' &rarr; ') + '. Je Phase werden die Ebenen der Wand gefüllt; die Steuerung erfolgt über das Dashboard («Wartet auf dich», höchstens drei Punkte) und die Entscheid-Tore.</p>';
+  const erledigt = state.postits.filter(c => c.status === 'erledigt').map(c => cleanTxt(c.text));
+  b += '<h2>5. Zwischenergebnisse (Stand ' + heute() + ')</h2>'
+    + ulOrPlatz(erledigt.concat(risikenListe().map(r => 'Erkanntes Risiko: ' + r)), 'offen – noch keine Ergebnisse')
+    + '<p>Endergebnisse: <span class="platz">[offen – nach Projektabschluss zu ergänzen]</span></p>';
+  const retro = state.postits.filter(c => laneKeyOfY(c.y) === 'reflexion' && /retro/i.test(c.text)).map(c => cleanTxt(c.text));
+  b += '<h2>6. Reflexion</h2>'
+    + (retro.length ? '<p>Die Wand führt die Retrospektive als eigene Karte mit: «' + esc(retro[0]) + '»</p>' : '')
+    + '<p>Erkenntnisse: <span class="platz">[offen – nach Projektabschluss zu ergänzen]</span></p>';
+  b += '<h2>7. Quellen</h2><ul>'
+    + '<li>OSTO-Systemmodell – Übersichtsartikel, de.wikipedia.org/wiki/OSTO-Systemmodell (abgerufen am ' + heute() + ')</li>'
+    + '<li>henning4future.com/osto-systemmodell – Hintergrund zum Modell (abgerufen am ' + heute() + ')</li>'
+    + '<li>prozesswand.ch – die verwendete digitale Prozesswand</li></ul>';
+  return docShell('Projektarbeit (Gerüst)', b);
+}
+const BERICHT_ARTEN = {
+  mgmt: { titel: 'Management-Zusammenfassung', karte: 'Management-Zusammenfassung vom ', gen: genMgmtZsf,
+    anweisung: 'Schreibe 3 bis 5 Sätze für Entscheider: (1) Ziel und aktueller Stand, (2) was als Nächstes ansteht (Tor mit Datum und Kriterien), (3) das grösste Risiko, (4) eine klare Empfehlung.' },
+  rapport: { titel: 'Zwischenrapport', karte: 'Zwischenrapport vom ', gen: genZwischenrapport,
+    anweisung: 'Schreibe den AUSBLICK auf die nächste Berichtsperiode in 2 bis 4 Sätzen: was jetzt zu tun ist, damit das nächste Tor passiert werden kann, und was dafür entschieden werden muss.' },
+  auftrag: { titel: 'Auftragsbeschrieb', karte: 'Ausgangslage (Auftragsbeschrieb) vom ', gen: genAuftrag,
+    anweisung: 'Schreibe die AUSGANGSLAGE des Projekts in 3 bis 4 Sätzen: warum es das Projekt gibt, was belegt ist, wer die wichtigste Anspruchsgruppe ist.' },
+};
+async function kiBericht(artKey) {
+  if (!kiBereit()) { openKeyModal(() => kiBericht(artKey)); return; }
+  const art = BERICHT_ARTEN[artKey];
+  sysMsg('🤖 ' + art.titel + ': Die KI schreibt einen Entwurf aus den Wand-Daten …');
+  let text = '';
+  try {
+    text = (await callClaude(
+      'Du schreibst für die OSTO/SYMA-Prozesswand einen kurzen Berichts-Entwurf in einfachem Deutsch (Schweizer Schreibweise, ss statt ß). Regeln: NUR die gelieferten Fakten verwenden, nichts erfinden, Unbekanntes als [offen] markieren. Keine Markdown-Zeichen, keine Aufzählungszeichen – nur Fliesstext. ' + art.anweisung,
+      wallFaktenText(), CHAT_MODEL, 700)).trim();
+  } catch (e) { sysMsg('⚠️ KI-Entwurf fehlgeschlagen: ' + e.message, true); return; }
+  openModal('<h3>' + art.titel + ' – KI-Entwurf prüfen</h3>'
+    + '<p style="font-size:12px;color:var(--muted)">Vorschlag-Prinzip: Erst «Übernehmen &amp; exportieren» schreibt den Text als 📄-Karte auf die Wand und erzeugt das Word-Dokument. Du kannst den Text hier direkt ändern.</p>'
+    + '<textarea id="bEnt" rows="9" style="font-size:13px">' + esc(text) + '</textarea>'
+    + '<div class="btnrow"><button class="go" id="bOk">Übernehmen &amp; exportieren</button><button id="bWeg">Verwerfen</button></div>');
+  document.getElementById('bWeg').onclick = closeModal;
+  document.getElementById('bOk').onclick = () => {
+    const t = document.getElementById('bEnt').value.trim();
+    if (!t) { closeModal(); return; }
+    berichtKarte(art.karte + heute(), t);
+    downloadDoc(art.titel + ' - ' + boardName() + '.doc', art.gen(t));
+    closeModal();
+    sysMsg('📄 ' + art.titel + ' exportiert – der freigegebene Text liegt als Karte auf der Dokumentationsebene (Berichts-Chronik).', true);
+  };
 }
 
 /* Umfrage-Auswertung als Klartext für die Anzeige im Fenster (T-016) */
@@ -3148,16 +3308,21 @@ document.getElementById('docsBtn').onclick = () => {
     ? '<img src="' + collection.logo + '" style="max-height:40px;vertical-align:middle"> <button id="logoDel" style="font-size:11px">Logo entfernen</button>'
     : '<input type="file" id="logoFile" accept="image/*"> <span style="font-size:11px;color:var(--muted)">wird oben in jedem Dokument platziert</span>';
   openModal('<h3>Dokumente aus der Prozesswand</h3>'
-    + '<p style="font-size:12px;color:var(--muted);margin:0 0 6px">Erzeugt Dokumente direkt aus den Karten-Daten der Wand «' + esc(boardName()) + '» – ohne KI-Aufruf, jederzeit reproduzierbar.</p>'
+    + '<p style="font-size:12px;color:var(--muted);margin:0 0 6px">Erzeugt Dokumente direkt aus den Karten-Daten der Wand «' + esc(boardName()) + '». Knöpfe mit 🤖 holen zuerst einen KI-Entwurf, den du liest und freigibst – exportiert wird immer nur, was du bestätigt hast.</p>'
     + '<label>Logo (zentral gespeichert)</label><div>' + logoRow + '</div>'
     + '<label style="margin-top:12px">Standard-Anweisung f&uuml;r alle KI-Dokumente <span style="font-weight:400;text-transform:none">(im Konto gespeichert, gilt immer und &uuml;berall)</span></label>'
     + '<textarea id="docStyleTa" rows="3" style="font-size:12px">' + esc(docStyle()) + '</textarea>'
     + '<label style="margin-top:12px">Referenzdokument (SSOT) <span style="font-weight:400;text-transform:none">(pro Wand &ndash; erscheint in jedem Export als &laquo;Bei Widerspruch gilt: &hellip;&raquo;)</span></label>'
     + '<input type="text" id="ssotTa" value="' + esc(state.ssot || '') + '" placeholder="z.B. Entscheidungsstand v2 vom 17.07.2026">'
     + '<label style="margin-top:12px">Berichte (Word)</label>'
-    + '<div class="btnrow" style="margin-top:4px"><button class="go" id="dAuftrag">Auftragsbeschrieb (.doc)</button><button class="go" id="dAbschluss" title="Zwischen- oder Abschlussbericht: Ziel, Tore, Phasen, Erledigtes, Offenes, Risiken &ndash; direkt aus den Karten">Abschlussbericht (.doc)</button></div>'
+    + '<div class="btnrow" style="margin-top:4px">'
+    + '<button class="go" id="dMgmt" title="Eine Seite f&uuml;r Entscheider: Lage, Kennzahlen, n&auml;chste Entscheide, Risiken &ndash; die KI schreibt den Entwurf, du gibst frei">&#129302; Management-Zusammenfassung (.doc)</button>'
+    + '<button class="go" id="dRapport" title="Stand je Phase, Erledigtes, anstehende Entscheide, Risiken + KI-Ausblick (du gibst frei) &ndash; der freigegebene Text bleibt als Karte erhalten">&#129302; Zwischenrapport (.doc)</button>'
+    + '<button class="go" id="dAuftrag" title="Ausgangslage als KI-Entwurf (du gibst frei), Ziele, Tore, Massnahmen, Lieferergebnisse, Freigabe-Block">&#129302; Auftragsbeschrieb (.doc)</button>'
+    + '<button class="go" id="dAbschluss" title="Zwischen- oder Abschlussbericht: Ziel, Tore, Phasen, Erledigtes, Offenes, Risiken &ndash; direkt aus den Karten">Abschlussbericht (.doc)</button>'
+    + '<button class="go" id="dWiss" title="Ger&uuml;st einer Projektarbeit: Methodik-Kapitel (OSTO, acht Ebenen, Zeitachse, KI-Regeln) + Stand aus der Wand &ndash; ohne KI">Wissenschaftliche Arbeit (.doc)</button></div>'
     + '<label style="margin-top:12px">Arbeitsblätter (Excel)</label>'
-    + '<div class="btnrow" style="margin-top:4px"><button class="go" id="dTermin">Terminprogramm (.xls)</button><button class="go" id="dKosten">Kostenvoranschlag (.xls)</button></div>'
+    + '<div class="btnrow" style="margin-top:4px"><button class="go" id="dTermin">Terminprogramm (.xls)</button></div>'
     + '<label style="margin-top:12px">Auftrag &amp; Tasks f&uuml;r LLMs <span style="font-weight:400;text-transform:none">(Auftrag = ein MD-Gesamtdokument &middot; Tasks = pro Schritt eine MD-Datei mit Frontmatter, f&uuml;rs Repo)</span></label>'
     + '<div class="btnrow" style="margin-top:4px"><select id="ccPhase" style="font:inherit;font-size:12px;padding:6px 8px;border:1px solid var(--line);border-radius:6px"><option value="">Gesamter Prozess</option>'
     + state.phases.map((p, i) => '<option value="' + i + '">Phase ' + (i + 1) + ' &ndash; ' + esc(p.name.slice(0, 34)) + '</option>').join('')
@@ -3238,7 +3403,14 @@ document.getElementById('docsBtn').onclick = () => {
     const w = exportWarnings();
     if (w.length) sysMsg('⚠️ Export-Warnung: ' + w.length + ' Karte(n) sind «erledigt», haben aber offene Teilaufgaben – im Dokument markiert.', true);
   };
-  document.getElementById('dAuftrag').onclick = () => { downloadDoc('Auftragsbeschrieb - ' + boardName() + '.doc', genAuftrag()); warnIfNeeded(); sysMsg('📄 Auftragsbeschrieb erzeugt (rein aus Karten-Daten).', true); };
+  document.getElementById('dMgmt').onclick = () => kiBericht('mgmt');
+  document.getElementById('dRapport').onclick = () => kiBericht('rapport');
+  document.getElementById('dAuftrag').onclick = () => {
+    if (kiBereit()) { kiBericht('auftrag'); return; }
+    downloadDoc('Auftragsbeschrieb - ' + boardName() + '.doc', genAuftrag(''));
+    warnIfNeeded(); sysMsg('📄 Auftragsbeschrieb erzeugt (ohne KI: Ausgangslage bleibt [offen]).', true);
+  };
+  document.getElementById('dWiss').onclick = () => { downloadDoc('Wissenschaftliche Arbeit - ' + boardName() + '.doc', genWissArbeit()); sysMsg('📄 Gerüst für die wissenschaftliche Arbeit erzeugt (rein aus Karten-Daten, Lücken als [offen]).', true); };
   document.getElementById('dBeschaffung').onclick = () => { downloadDoc('Beschaffungsantrag - ' + boardName() + '.doc', genBeschaffung()); sysMsg('📄 Beschaffungsantrag erzeugt (rein aus Karten-Daten).', true); };
   document.getElementById('dAbschluss').onclick = () => { downloadDoc('Abschlussbericht - ' + boardName() + '.doc', genAbschluss()); sysMsg('📄 Abschluss-/Zwischenbericht erzeugt (rein aus Karten-Daten).', true); warnIfNeeded(); };
   document.getElementById('dCC').onclick = async () => {
@@ -3325,7 +3497,9 @@ document.getElementById('docsBtn').onclick = () => {
   document.getElementById('dLandS').onclick = () => { downloadLandkarte('svg'); sysMsg('🗺️ Landkarte (SVG) erzeugt.', true); };
   document.getElementById('dLandP').onclick = () => { downloadLandkarte('png'); sysMsg('🗺️ Landkarte (PNG) erzeugt.', true); };
   document.getElementById('dTermin').onclick = () => { downloadXls('Terminprogramm - ' + boardName() + '.xls', genTermin()); sysMsg('📄 Terminprogramm erzeugt.', true); };
-  document.getElementById('dKosten').onclick = () => { downloadXls('Kostenvoranschlag - ' + boardName() + '.xls', genKosten()); sysMsg('📄 Kostenvoranschlag erzeugt.', true); };
+  /* V61: Kostenvoranschlag-Knopf ausgeblendet (Entscheid 04.08.2026) – die Wand kennt
+     keine Kosten je Karte, das Dokument wäre ein leeres Gerüst. genKosten() bleibt
+     im Code, bis ein Kostenfeld auf den Karten existiert. */
 };
 
 /* ================================================================
