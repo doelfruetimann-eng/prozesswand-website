@@ -339,7 +339,7 @@ table.ph-tab { width:100%; border-collapse:collapse; }
 <script>
 "use strict";
 
-const APP_VERSION = 'V57';
+const APP_VERSION = 'V58';
 /* V49: einheitlicher Wegweiser nach jedem «An Claude kopieren» */
 function claudeHinweis() {
   sysMsg('📋 Kopiert! Jetzt: 1. Claude öffnen (claude.ai bzw. deine Prozesswand-Sitzung) → 2. ins Schreibfeld klicken → 3. Cmd+V (einfügen) → 4. Senden. Mehr braucht es nicht.', true);
@@ -4371,6 +4371,18 @@ async function startApp(user) {
   startAutoAnzeigen();
 }
 async function initAuth() {
+  /* Übungs-Modus (V58): ?beispiel öffnet die Wand ohne Anmeldung mit dem
+     Beispielprojekt – für Besucher von prozesswand.ch. Gespeichert wird nur
+     lokal auf dem Gerät; fürs richtige Speichern braucht es ein Konto. */
+  if (new URLSearchParams(location.search).has('beispiel')) {
+    loadCollection(null);
+    ladeBeispiel();
+    document.getElementById('pvNeu').click();
+    state.goal = 'Bis Ende Oktober 2026 verwandeln wir die Brachfläche in einen Gemeinschaftsgarten mit 20 Beeten – eröffnet mit einem Quartierfest.';
+    goalInput.value = state.goal; autoResizeGoal(); save(); render();
+    sysMsg('🧪 Übungs-Modus: Das Beispielprojekt «Quartier-Gemeinschaftsgarten» ist geladen – klick dich frei durch, kaputt geht nichts. Alles bleibt nur auf diesem Gerät. Zum richtigen Speichern: Seite ohne Zusatz öffnen und ein Konto erstellen.', true);
+    return;
+  }
   if (!window.supabase) {
     let local = null; try { local = JSON.parse(localStorage.getItem(STORE)); } catch (e) {}
     loadCollection(local);
