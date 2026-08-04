@@ -339,7 +339,7 @@ table.ph-tab { width:100%; border-collapse:collapse; }
 <script>
 "use strict";
 
-const APP_VERSION = 'V58';
+const APP_VERSION = 'V59';
 /* V49: einheitlicher Wegweiser nach jedem «An Claude kopieren» */
 function claudeHinweis() {
   sysMsg('📋 Kopiert! Jetzt: 1. Claude öffnen (claude.ai bzw. deine Prozesswand-Sitzung) → 2. ins Schreibfeld klicken → 3. Cmd+V (einfügen) → 4. Senden. Mehr braucht es nicht.', true);
@@ -852,7 +852,7 @@ function openPostitModal(id) {
   document.getElementById('mTodoAdd').onclick = () => { const el = document.getElementById('mTodoNew'); addTodo(el.value.trim()); el.value = ''; };
   document.getElementById('mTodoNew').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); document.getElementById('mTodoAdd').click(); } });
   document.getElementById('mAuftragAI').onclick = async function () {
-    if (!getKey()) { openKeyModal(null); return; }
+    if (!kiBereit()) { openKeyModal(null); return; }
     this.disabled = true; this.textContent = '… denkt …';
     try {
       const out = await callClaude(
@@ -869,7 +869,7 @@ function openPostitModal(id) {
     this.disabled = false; this.innerHTML = '&#129302; ausformulieren';
   };
   document.getElementById('mTodoAI').onclick = async function () {
-    if (!getKey()) { openKeyModal(null); return; }
+    if (!kiBereit()) { openKeyModal(null); return; }
     this.disabled = true; this.textContent = '… denkt …';
     try {
       const out = await callClaude(
@@ -893,7 +893,7 @@ function openPostitModal(id) {
   renderDlg();
   document.getElementById('mSend').onclick = async () => {
     const v = document.getElementById('mAsk').value.trim(); if (!v) return;
-    if (!getKey()) { openKeyModal(null); return; }
+    if (!kiBereit()) { openKeyModal(null); return; }
     document.getElementById('mAsk').value = '';
     dlg.push({ role: 'user', text: v }); const think = { role: 'ai', text: '… denkt nach …' }; dlg.push(think); renderDlg();
     try {
@@ -925,7 +925,7 @@ function openPostitModal(id) {
     setTimeout(() => { this.innerHTML = '&rarr; An Claude kopieren'; }, 2000);
   };
   document.getElementById('mMakeDoc').onclick = async function () {
-    if (!getKey()) { openKeyModal(null); return; }
+    if (!kiBereit()) { openKeyModal(null); return; }
     this.disabled = true; this.textContent = '… erstellt Dokument …';
     dlg.push({ role: 'user', text: '[Dokument erzeugen]' }); const think = { role: 'ai', text: '📄 Dokument wird erstellt …' }; dlg.push(think); renderDlg();
     try {
@@ -1407,7 +1407,7 @@ function getKey() {
   return '';
 }
 function openKeyModal(then) {
-  openModal('<h3>Anthropic API-Schl&uuml;ssel</h3><p style="font-size:12px;color:var(--muted)">Wird in deinem Konto gespeichert und gilt auf allen Ger&auml;ten. Schl&uuml;ssel gibt es unter console.anthropic.com &rarr; API Keys.</p><label>Schl&uuml;ssel</label><input type="password" id="mKey" value="' + esc(getKey()) + '" placeholder="sk-ant-..."><div class="btnrow"><button class="go" id="mSave">Speichern</button><button id="mCancel">Abbrechen</button><button class="del" id="mKeyDel">Schl&uuml;ssel l&ouml;schen</button></div>');
+  openModal('<h3>Anthropic API-Schl&uuml;ssel</h3><p style="font-size:12px;color:var(--muted)">Ein eigener Schl&uuml;ssel ist freiwillig: Ohne Schl&uuml;ssel l&auml;uft die KI &uuml;ber das Start-Guthaben deines Prozesswand-Kontos. Ein eigener Schl&uuml;ssel wird in deinem Konto gespeichert und gilt auf allen Ger&auml;ten; Schl&uuml;ssel gibt es unter console.anthropic.com &rarr; API Keys.</p><label>Schl&uuml;ssel</label><input type="password" id="mKey" value="' + esc(getKey()) + '" placeholder="sk-ant-..."><div class="btnrow"><button class="go" id="mSave">Speichern</button><button id="mCancel">Abbrechen</button><button class="del" id="mKeyDel">Schl&uuml;ssel l&ouml;schen</button></div>');
   document.getElementById('mKeyDel').onclick = () => {
     [KEY_STORE, 'anthropic-key', 'anthropic-api-key', 'claude-api-key', 'osto-api-key'].forEach(k => localStorage.removeItem(k));
     if (collection) { delete collection.apiKey; save(); }
@@ -1428,8 +1428,36 @@ function openKeyModal(then) {
 document.getElementById('keyBtn').onclick = () => openKeyModal(null);
 
 function cleanKey(s) { return (s || '').replace(/[^\x20-\x7E]/g, '').trim(); }
-/* Modell-Wahl: Fable 5 für anspruchsvolle Denk-Rollen, automatischer Rückfall auf Sonnet */
-const CHAT_MODEL = 'claude-opus-4-8'; // Alltag: Opus 4.8 · Denk-Rollen (Architekt/Kritiker): Fable 5
+
+/* V59: Vermittler-Dienst – KI ohne eigenen Schlüssel. Angemeldete Nutzer ohne
+   Schlüssel laufen über die Supabase-Funktion ki-vermittler (Schlüssel liegt
+   NUR dort als Server-Geheimnis); sie zählt den Verbrauch pro Konto und stoppt
+   beim Start-Guthaben. Eigener Schlüssel hat immer Vorrang (Direkt-Weg). */
+const KI_VERMITTLER_URL = SUPABASE_URL + '/functions/v1/ki-vermittler';
+let vermittlerWarnung = false;
+function kiBereit() { return !!getKey() || !!currentUser; }
+async function vermittlerClaude(system, user, model, maxTok, temperature) {
+  let tok = '';
+  try { const { data } = await sb.auth.getSession(); tok = (data && data.session && data.session.access_token) || ''; } catch (e) {}
+  if (!tok) throw new Error('Bitte zuerst anmelden – oder unter «API-Schlüssel» einen eigenen Schlüssel hinterlegen.');
+  const body = { model, system, user, maxTok: maxTok || 2000 };
+  if (typeof temperature === 'number') body.temperature = temperature;
+  let res, data;
+  try {
+    res = await fetch(KI_VERMITTLER_URL, { method: 'POST', headers: { 'content-type': 'application/json', 'authorization': 'Bearer ' + tok }, body: JSON.stringify(body) });
+    data = await res.json().catch(() => null);
+  } catch (e) { throw new Error('KI-Dienst nicht erreichbar – Internetverbindung prüfen oder unter «API-Schlüssel» einen eigenen Schlüssel hinterlegen.'); }
+  if (res.status === 402) throw new Error('Dein Start-Guthaben ist aufgebraucht. Hinterlege unter «API-Schlüssel» einen eigenen Schlüssel – oder melde dich für ein Abo (siehe prozesswand.ch).');
+  if (!res.ok) throw new Error((data && data.error) || ('KI-Dienst: HTTP ' + res.status));
+  if (data && typeof data.rest_rappen === 'number' && data.rest_rappen < 30 && !vermittlerWarnung) {
+    vermittlerWarnung = true;
+    sysMsg('💰 Hinweis: Dein Start-Guthaben ist bald aufgebraucht (noch etwa ' + Math.round(data.rest_rappen) + ' Rappen).', true);
+  }
+  return (data && data.text) || '';
+}
+
+/* Modell-Wahl (V59, Kostenentscheid 04.08.2026): Denk-Rollen auf Opus 5, automatischer Rückfall auf Sonnet */
+const CHAT_MODEL = 'claude-opus-4-8'; // Alltag: Opus 4.8 · Denk-Rollen (Architekt/Kritiker/Optimierer): Opus 5
 async function callClaude(system, user, model, maxTok, temperature) {
   try { return await rawClaude(system, user, model, maxTok, temperature); }
   catch (e) {
@@ -1439,7 +1467,10 @@ async function callClaude(system, user, model, maxTok, temperature) {
 }
 async function rawClaude(system, user, model, maxTok, temperature) {
   const key = cleanKey(getKey());
-  if (!key) throw new Error('Kein API-Schlüssel hinterlegt.');
+  if (!key) {
+    if (currentUser) return vermittlerClaude(system, user, model, maxTok, temperature);
+    throw new Error('Kein API-Schlüssel hinterlegt.');
+  }
   if (!/^sk-ant-/.test(key)) throw new Error('Der gespeicherte API-Schlüssel sieht unvollständig aus – bitte über «API-Schlüssel» komplett neu einfügen (beginnt mit sk-ant-…).');
   const body = { model, max_tokens: maxTok || 2000, system, messages: [{ role: 'user', content: user }] };
   // Neuere Modelle (Opus 4.7/4.8, Sonnet 5, Fable/Mythos) akzeptieren temperature nicht mehr (API-Fehler) – dort weglassen.
@@ -1512,7 +1543,7 @@ async function runChat(prompt, label) {
     convo.push({ role: 'user', content: prompt });
     if (convo.length > 12) convo = convo.slice(-12);
     const key = getKey();
-    if (!key) { wait.remove(); openKeyModal(() => runChat(prompt, label)); return; }
+    if (!key && !currentUser) { wait.remove(); openKeyModal(() => runChat(prompt, label)); return; }
     const hist = convo.map(m => (m.role === 'user' ? 'Nutzer: ' : 'Moderator: ') + m.content).join('\n\n');
     const out = await callClaude(MODERATOR_SYS + wallContext(), hist, CHAT_MODEL, 1500);
     convo.push({ role: 'assistant', content: out });
@@ -1568,7 +1599,7 @@ const METHODIK = 'PHASENMODELL (Basis: Systems Engineering / Wiegand «Handbuch 
 
 /* V52: Kritiker bewusst auf ANDEREM Modell als der Architekt (unabhängigere Sicht, halber Preis);
    Lean ist eine Einordnungs-Aufgabe → günstiges Modell reicht (Schutz-Regeln + Klick-Pflicht sichern ab) */
-const MODELS = { architekt: 'claude-fable-5', planer: 'claude-haiku-4-5-20251001', kritiker: 'claude-opus-4-8', verbinder: 'claude-haiku-4-5-20251001', lean: 'claude-haiku-4-5-20251001', optimierer: 'claude-fable-5' };
+const MODELS = { architekt: 'claude-opus-5', planer: 'claude-haiku-4-5-20251001', kritiker: 'claude-opus-5', verbinder: 'claude-haiku-4-5-20251001', lean: 'claude-haiku-4-5-20251001', optimierer: 'claude-opus-5' };
 const MODEL_FALLBACK = 'claude-sonnet-5';
 
 /* Strukturläufe (Schwarm) deterministisch: Temperature 0.2 */
@@ -1633,7 +1664,7 @@ document.getElementById('swarmBtn').onclick = () => {
       cfg.unterlagen = texts.join('\n\n').slice(0, 24000);
     }
     closeModal();
-    if (!getKey()) { openKeyModal(() => runSwarm(cfg)); return; }
+    if (!kiBereit()) { openKeyModal(() => runSwarm(cfg)); return; }
     runSwarm(cfg);
   };
 };
@@ -3299,7 +3330,7 @@ document.getElementById('docsBtn').onclick = () => {
    ================================================================ */
 document.getElementById('checkBtn').onclick = async () => {
   if (previewState) return;
-  if (!getKey()) { openKeyModal(() => document.getElementById('checkBtn').click()); return; }
+  if (!kiBereit()) { openKeyModal(() => document.getElementById('checkBtn').click()); return; }
   const cards = state.postits.filter(c => !c.checked).slice(0, 24);
   if (!cards.length) { sysMsg('Alles bereits geprüft – keine neuen oder geänderten Post-its.', true); return; }
   addMsg('user', '[Karten-Check] ' + cards.length + ' Post-it(s) prüfen');
@@ -3404,7 +3435,7 @@ function fkActionBar(res, karte) {
 
 async function runFragekatalog(scopeLabel, scopeHint) {
   if (previewState) return;
-  if (!getKey()) { openKeyModal(() => runFragekatalog(scopeLabel, scopeHint)); return; }
+  if (!kiBereit()) { openKeyModal(() => runFragekatalog(scopeLabel, scopeHint)); return; }
   addMsg('user', '[Fragekatalog] ' + scopeLabel);
   const wait = sysMsg('🗺️ analysiert selbständig – Ebenen, Belege, offene Punkte …', true);
   try {
@@ -3582,7 +3613,7 @@ function renderGuide() {
     setTimeout(() => { this.innerHTML = '&#128203; Prompt kopieren'; }, 2500);
   };
   document.getElementById('gMakeDoc').onclick = async function () {
-    if (!getKey()) { openKeyModal(null); return; }
+    if (!kiBereit()) { openKeyModal(null); return; }
     this.disabled = true; this.textContent = '… erstellt Dokument …';
     const el = document.getElementById('gExpl');
     try {
@@ -3603,7 +3634,7 @@ function renderGuide() {
   if (!c.guide) guideExplain(c, pi, lane);
 }
 async function guideExplain(c, pi, lane) {
-  if (!getKey()) { const el = document.getElementById('gExpl'); if (el) el.textContent = 'Kein API-Schlüssel – Knopf «API-Schlüssel» im KI-Panel.'; return; }
+  if (!kiBereit()) { const el = document.getElementById('gExpl'); if (el) el.textContent = 'Kein API-Schlüssel – Knopf «API-Schlüssel» im KI-Panel.'; return; }
   const p = state.phases[pi] || {};
   try {
     const out = await callClaude(
@@ -3745,7 +3776,7 @@ let todoWerFilter = '';
 /* V53: Kritiker fragen – 2–3 Sätze Einwand zu genau diesem Entscheid, nur auf Klick */
 async function fragKritiker(x, btn) {
   if (!x) return;
-  if (!getKey()) { openKeyModal(null); return; }
+  if (!kiBereit()) { openKeyModal(null); return; }
   const alt = btn.textContent;
   btn.disabled = true; btn.textContent = '… denkt …';
   try {
@@ -4236,7 +4267,7 @@ lupeBody.addEventListener('focusout', e => {
 /* KI-Dialog pro Aufgabe – Anweisungen geben, KI passt an */
 async function cardAI(id) {
   const c = getPostit(id); if (!c) return;
-  if (!getKey()) { openKeyModal(() => cardAI(id)); return; }
+  if (!kiBereit()) { openKeyModal(() => cardAI(id)); return; }
   const row = lupeBody.querySelector('.tk[data-id="' + id + '"]');
   if (!row) return;
   const existing = row.nextElementSibling;
@@ -4288,7 +4319,7 @@ async function phaseTool(kind) {
   const prop = document.getElementById('lupeProp');
   const p = state.phases[lupeIdx];
   document.querySelectorAll('.lupe-tool').forEach(b => b.disabled = true);
-  if (!getKey()) { document.querySelectorAll('.lupe-tool').forEach(b => b.disabled = false); openKeyModal(() => phaseTool(kind)); return; }
+  if (!kiBereit()) { document.querySelectorAll('.lupe-tool').forEach(b => b.disabled = false); openKeyModal(() => phaseTool(kind)); return; }
   const ctx = 'Projektziel: ' + (state.goal||'-') + '\nPhase ' + (lupeIdx+1) + ': ' + p.name
     + '\nBereits vorhanden – Schritte: ' + cardsInPhaseLane(lupeIdx,'handlung').map(c=>c.text).join('; ')
     + ' | Risiken: ' + cardsInPhaseLane(lupeIdx,'reflexion').map(c=>c.text).join('; ')
