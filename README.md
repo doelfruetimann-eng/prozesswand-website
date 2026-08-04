@@ -5,3 +5,4 @@ Veröffentlicht automatisch über GitHub Pages (Workflow in .github/workflows/pa
 
 Quell-Repo der App: doelfruetimann-eng-prozesswand (index.html → hier prozesswand.html).
 Bei Änderungen an der Wand: neue Version hierher kopieren und pushen.
+
