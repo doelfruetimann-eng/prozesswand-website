@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>OSTO/SYMA Prozesswand</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧱</text></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -339,7 +340,7 @@ table.ph-tab { width:100%; border-collapse:collapse; }
 <script>
 "use strict";
 
-const APP_VERSION = 'V59';
+const APP_VERSION = 'V60';
 /* V49: einheitlicher Wegweiser nach jedem «An Claude kopieren» */
 function claudeHinweis() {
   sysMsg('📋 Kopiert! Jetzt: 1. Claude öffnen (claude.ai bzw. deine Prozesswand-Sitzung) → 2. ins Schreibfeld klicken → 3. Cmd+V (einfügen) → 4. Senden. Mehr braucht es nicht.', true);
@@ -384,6 +385,7 @@ let convo = [];
 let connectMode = false, connectSrc = null;
 let undoBackup = null;
 let sb = null, currentUser = null, cloudTimer = null;
+let uebungsModus = false; // V60: ?beispiel = Wegwerf-Sitzung, es wird NICHTS gespeichert
 let collection = { boards: [], activeId: null };
 
 function defaultState() {
@@ -485,9 +487,10 @@ function save() {
     if (undoStack.length > 30) undoStack.shift();
   }
   lastSaved = cur; lastSavedBoard = bid;
-  localStorage.setItem(STORE, JSON.stringify(collection));
+  if (!uebungsModus) localStorage.setItem(STORE, JSON.stringify(collection));
   const t = document.getElementById('savedTag');
-  t.textContent = 'gespeichert'; setTimeout(() => { t.textContent = ''; }, 1300);
+  t.textContent = uebungsModus ? 'Übung – wird nicht gespeichert' : 'gespeichert';
+  setTimeout(() => { t.textContent = ''; }, 1300);
   scheduleCloudSave();
   updateUndoBtn();
 }
@@ -4406,12 +4409,15 @@ async function initAuth() {
      Beispielprojekt – für Besucher von prozesswand.ch. Gespeichert wird nur
      lokal auf dem Gerät; fürs richtige Speichern braucht es ein Konto. */
   if (new URLSearchParams(location.search).has('beispiel')) {
+    uebungsModus = true;
+    authGate.style.display = 'none'; // V60: hart ausblenden – nie ein Anmelde-Fenster in der Übung
+    document.getElementById('userTag').textContent = '🧪 Übungs-Modus (temporär)';
     loadCollection(null);
     ladeBeispiel();
     document.getElementById('pvNeu').click();
     state.goal = 'Bis Ende Oktober 2026 verwandeln wir die Brachfläche in einen Gemeinschaftsgarten mit 20 Beeten – eröffnet mit einem Quartierfest.';
     goalInput.value = state.goal; autoResizeGoal(); save(); render();
-    sysMsg('🧪 Übungs-Modus: Das Beispielprojekt «Quartier-Gemeinschaftsgarten» ist geladen – klick dich frei durch, kaputt geht nichts. Alles bleibt nur auf diesem Gerät. Zum richtigen Speichern: Seite ohne Zusatz öffnen und ein Konto erstellen.', true);
+    sysMsg('🧪 Übungs-Modus: Das Beispielprojekt «Quartier-Gemeinschaftsgarten» ist geladen – klick dich frei durch, kaputt geht nichts. Nichts wird gespeichert: Beim Neuladen beginnt die Übung frisch. Für richtiges Arbeiten die Seite ohne Zusatz öffnen und ein Konto erstellen.', true);
     return;
   }
   if (!window.supabase) {
