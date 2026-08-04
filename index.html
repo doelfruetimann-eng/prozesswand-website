@@ -75,8 +75,8 @@ a.btn-invert:hover { background:rgba(255,255,255,.16); }
 .hero p { margin:0 auto 28px; max-width:660px; font-size:clamp(17px,2.3vw,20px); opacity:.95; }
 .btnrow { display:flex; gap:12px; justify-content:center; flex-wrap:wrap; }
 .hero-bild { max-width:1080px; margin:38px auto -1px; padding:0; }
-.hero-bild img { display:block; width:100%; height:auto; border-radius:14px 14px 0 0;
-                 box-shadow:0 -6px 40px rgba(0,0,0,.35); }
+.hero-bild img, .hero-bild video { display:block; width:100%; height:auto; border-radius:14px 14px 0 0;
+                 box-shadow:0 -6px 40px rgba(0,0,0,.35); background:#000; }
 .hero-note { font-size:14.5px; opacity:.8; margin:14px 0 0; }
 
 main { max-width:1080px; margin:0 auto; padding:0 20px 60px; }
@@ -201,8 +201,9 @@ footer .flinks a { min-height:44px; display:inline-flex; align-items:center; tex
   <p class="hero-note">Läuft im Browser · nichts zu installieren · Übungs-Modus speichert nichts ·
   für die KI-Funktionen brauchst du zurzeit einen eigenen KI-Schlüssel</p>
   <div class="hero-bild">
-    <img src="bilder/wand-beispiel.png" width="1440" height="900" fetchpriority="high"
-         alt="Die Prozesswand im Browser: vier Projektphasen als Spalten, acht Ebenen als Zeilen, farbige Karten, ein rotes Entscheid-Tor und rechts der KI-Moderator.">
+    <video src="videos/werbevideo.mp4" controls preload="metadata" playsinline
+           poster="bilder/wand-beispiel.png" width="1280" height="720"
+           aria-label="Werbevideo: Die Prozesswand in einer Minute – vom Ziel zur fertigen Projektwand"></video>
   </div>
 </header>
 
