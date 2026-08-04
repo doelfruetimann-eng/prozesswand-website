@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>KI-Interview – Prozesswand</title>
+<style>
+:root { --bordeaux:#651B32; --rose:#F3EBEE; --line:#C9CCC4; --text:#333333; --muted:#666666; }
+* { box-sizing:border-box; }
+body { margin:0; font-family:Calibri,'Segoe UI',Arial,sans-serif; color:var(--text); background:var(--rose); }
+#kopf { background:var(--bordeaux); color:#fff; padding:14px 18px; }
+#kopf h1 { margin:0; font-size:20px; }
+#kopf small { opacity:.85; }
+.karte { max-width:720px; margin:18px auto; background:#fff; border-radius:10px; box-shadow:0 2px 10px rgba(0,0,0,.12); padding:18px 20px; }
+label { display:block; font-size:13px; font-weight:bold; color:var(--bordeaux); margin:12px 0 4px; }
+textarea, input[type=text], input[type=password] { width:100%; font:inherit; font-size:14px; padding:9px 11px; border:1px solid var(--line); border-radius:7px; }
+button { font:inherit; font-size:14px; padding:9px 16px; border:1px solid var(--line); border-radius:7px; background:#fff; cursor:pointer; margin:4px 6px 0 0; }
+button.go { background:var(--bordeaux); color:#fff; border-color:var(--bordeaux); }
+#chat { display:flex; flex-direction:column; gap:10px; margin:12px 0; max-height:55vh; overflow-y:auto; padding:4px; }
+.msg { max-width:88%; padding:10px 13px; border-radius:10px; font-size:15px; line-height:1.45; white-space:pre-wrap; }
+.msg.ki { align-self:flex-start; background:var(--rose); }
+.msg.mensch { align-self:flex-end; background:#FFF6D5; }
+.msg.sys { align-self:center; background:none; color:var(--muted); font-size:12.5px; text-align:center; }
+#eingabeZeile { display:flex; gap:8px; }
+#eingabe { flex:1; resize:none; }
+.hinweis { font-size:12.5px; color:var(--muted); }
+.screen { display:none; }
+.screen.aktiv { display:block; }
+</style>
+</head>
+<body>
+<div id="kopf"><h1>KI-Interview</h1><small id="kopfProjekt">geführtes Gespräch – Prozesswand</small></div>
+
+<!-- Schritt 1: Vorbereitung (macht der Projektinhaber) -->
+<div class="karte screen aktiv" id="sSetup">
+  <b>Vorbereitung</b> <span class="hinweis">(macht der Projektinhaber – die interviewte Person sieht diesen Schritt nicht, wenn der Link einen Leitfaden enthält)</span>
+  <label>Projekt / Thema</label>
+  <input type="text" id="projekt" placeholder="z.B. Screenshot-Brain – Nutzung im Alltag">
+  <label>Leitfaden (Fragen und Hinweise für die KI – z.B. aus dem Fragekatalog)</label>
+  <textarea id="leitfaden" rows="8" placeholder="1. Frage …&#10;2. Frage …&#10;Hinweis: bei Antwort X nachhaken zu Y"></textarea>
+  <label>Anthropic API-Schlüssel <span style="font-weight:normal;color:var(--muted)">(wird nur in diesem Browser gespeichert – gleicher Schlüssel wie in der Prozesswand)</span></label>
+  <input type="password" id="schluessel" placeholder="sk-ant-…">
+  <div style="margin-top:12px"><button class="go" id="startBtn">Interview vorbereiten</button>
+  <button id="linkBtn" title="Link mit eingebautem Leitfaden erzeugen – zum Weitergeben oder für ein anderes Gerät">Link erzeugen</button></div>
+  <p class="hinweis" id="linkOut" style="word-break:break-all"></p>
+</div>
+
+<!-- Schritt 2: Einverständnis (sieht die interviewte Person) -->
+<div class="karte screen" id="sConsent">
+  <b id="cTitel">Interview</b>
+  <p style="font-size:15px">Dieses Gespräch wird von einer KI geführt. Es wird <b>aufgezeichnet, gespeichert und für die Auswertung des Projekts verwendet</b>. Es dauert etwa 10–15 Minuten. Sie können jederzeit aufhören. Sind Sie damit einverstanden? Bei Nein wird das Gespräch nicht gestartet und nichts gespeichert. Löschung jederzeit möglich (Kontakt: doelf.ruetimann@gmail.com).</p>
+  <button class="go" id="einverstandenBtn">Einverstanden – Interview starten</button>
+</div>
+
+<!-- Schritt 3: das Gespräch -->
+<div class="karte screen" id="sChat">
+  <div id="chat"></div>
+  <div id="eingabeZeile">
+    <textarea id="eingabe" rows="2" placeholder="Ihre Antwort …"></textarea>
+    <button class="go" id="sendenBtn">Senden</button>
+  </div>
+  <div style="margin-top:8px"><button id="fertigBtn">Interview abschliessen</button></div>
+</div>
+
+<!-- Schritt 4: Abschluss -->
+<div class="karte screen" id="sEnde">
+  <b>Vielen Dank!</b>
+  <p id="endeText" class="hinweis">Die Zusammenfassung wird erstellt …</p>
+  <div id="zusammenfassung" style="white-space:pre-wrap;font-size:14px;background:var(--rose);border-radius:8px;padding:12px;display:none"></div>
+  <div style="margin-top:10px"><button class="go" id="downloadBtn" style="display:none">Ergebnis herunterladen (.md)</button></div>
+</div>
+
+<script>
+'use strict';
+const KEY_STORE = 'pw-anthropic-key';
+const MODEL = 'claude-opus-4-8';
+let projekt = '', leitfaden = '', verlauf = [], laeuft = false;
+
+function zeige(id) { document.querySelectorAll('.screen').forEach(s => s.classList.remove('aktiv')); document.getElementById(id).classList.add('aktiv'); }
+function addMsg(cls, text) {
+  const d = document.createElement('div'); d.className = 'msg ' + cls; d.textContent = text;
+  document.getElementById('chat').appendChild(d);
+  document.getElementById('chat').scrollTop = 1e9;
+  return d;
+}
+function b64uEnc(s) { return btoa(unescape(encodeURIComponent(s))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,''); }
+function b64uDec(s) { s = s.replace(/-/g,'+').replace(/_/g,'/'); while (s.length % 4) s += '='; return decodeURIComponent(escape(atob(s))); }
+
+const SYS = () => 'Du führst ein kurzes, freundliches Interview auf Deutsch (Schweizer Schreibweise, ss statt ß) zum Projekt «' + projekt + '». '
+  + 'Leitfaden:\n' + leitfaden + '\n\nRegeln: Stelle immer nur EINE Frage aufs Mal, kurz und in einfacher Sprache. '
+  + 'Hake nach, wenn eine Antwort unklar oder besonders wichtig ist (höchstens 1–2 Nachfragen pro Thema). '
+  + 'Folge dem Leitfaden; taucht etwas Wichtiges Neues auf, geh kurz darauf ein. Keine Bewertungen, kein Fachjargon. '
+  + 'Wenn alle Punkte des Leitfadens behandelt sind, bedanke dich und sage, dass das Interview abgeschlossen ist – die Person kann dann oben auf «Interview abschliessen» klicken.';
+
+async function ki(messages, maxTok) {
+  const key = (localStorage.getItem(KEY_STORE) || '').trim();
+  if (!key) throw new Error('Kein API-Schlüssel hinterlegt.');
+  const r = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
+    body: JSON.stringify({ model: MODEL, max_tokens: maxTok || 700, system: SYS(), messages })
+  });
+  const d = await r.json().catch(() => null);
+  if (!r.ok) throw new Error((d && d.error && d.error.message) || ('HTTP ' + r.status));
+  return (d.content || []).map(b => b.text || '').join('');
+}
+
+/* Link mit eingebautem Leitfaden (?g=…) – für andere Geräte oder zum Weitergeben */
+document.getElementById('linkBtn').onclick = () => {
+  merken();
+  if (!leitfaden) { alert('Bitte zuerst einen Leitfaden eintragen.'); return; }
+  const url = location.origin + location.pathname + '?g=' + b64uEnc(JSON.stringify({ p: projekt, l: leitfaden }));
+  document.getElementById('linkOut').textContent = url;
+  navigator.clipboard && navigator.clipboard.writeText(url);
+};
+function merken() {
+  projekt = document.getElementById('projekt').value.trim() || 'Projekt';
+  leitfaden = document.getElementById('leitfaden').value.trim();
+  const k = document.getElementById('schluessel').value.trim();
+  if (k) localStorage.setItem(KEY_STORE, k);
+}
+document.getElementById('startBtn').onclick = () => {
+  merken();
+  if (!leitfaden) { alert('Bitte zuerst einen Leitfaden eintragen.'); return; }
+  if (!(localStorage.getItem(KEY_STORE) || '').trim()) { alert('Bitte den API-Schlüssel eintragen (einmalig).'); return; }
+  document.getElementById('cTitel').textContent = 'Interview – ' + projekt;
+  zeige('sConsent');
+};
+document.getElementById('einverstandenBtn').onclick = async () => {
+  zeige('sChat');
+  const wait = addMsg('sys', '… die KI bereitet die erste Frage vor …');
+  try {
+    verlauf = [{ role: 'user', content: 'Beginne das Interview: begrüsse kurz und stelle die erste Frage aus dem Leitfaden.' }];
+    const antwort = await ki(verlauf);
+    verlauf.push({ role: 'assistant', content: antwort });
+    wait.remove(); addMsg('ki', antwort);
+  } catch (e) { wait.remove(); addMsg('sys', '❌ ' + e.message); }
+};
+async function senden() {
+  if (laeuft) return;
+  const t = document.getElementById('eingabe').value.trim();
+  if (!t) return;
+  document.getElementById('eingabe').value = '';
+  addMsg('mensch', t);
+  verlauf.push({ role: 'user', content: t });
+  laeuft = true;
+  const wait = addMsg('sys', '…');
+  try {
+    const antwort = await ki(verlauf);
+    verlauf.push({ role: 'assistant', content: antwort });
+    wait.remove(); addMsg('ki', antwort);
+  } catch (e) { wait.remove(); addMsg('sys', '❌ ' + e.message); }
+  laeuft = false;
+}
+document.getElementById('sendenBtn').onclick = senden;
+document.getElementById('eingabe').addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); senden(); } });
+
+document.getElementById('fertigBtn').onclick = async () => {
+  zeige('sEnde');
+  try {
+    const zsf = await ki(verlauf.concat([{ role: 'user', content: 'Das Interview ist beendet. Erstelle eine kurze Auswertung in einfachem Deutsch: 1. Kernaussagen (Stichpunkte), 2. wichtigste wörtliche Zitate, 3. offene Punkte / wo nachhaken. Nichts erfinden.' }]), 1200);
+    document.getElementById('endeText').textContent = 'Auswertung:';
+    const z = document.getElementById('zusammenfassung');
+    z.textContent = zsf; z.style.display = 'block';
+    const md = ['# KI-Interview – ' + projekt, '', 'Datum: ' + new Date().toLocaleDateString('de-CH'), '', '## Leitfaden', '', leitfaden, '', '## Transkript', '']
+      .concat(verlauf.filter(m => m.content && !m.content.startsWith('Beginne das Interview')).map(m => (m.role === 'assistant' ? '**KI:** ' : '**Antwort:** ') + m.content + '\n'))
+      .concat(['## Auswertung', '', zsf, '']).join('\n');
+    const btn = document.getElementById('downloadBtn');
+    btn.style.display = 'inline-block';
+    btn.onclick = () => {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([md], { type: 'text/markdown' }));
+      a.download = ('interview - ' + projekt + ' - ' + new Date().toISOString().slice(0, 10)).replace(/[\\/:*?"<>|]/g, '-') + '.md';
+      a.click(); URL.revokeObjectURL(a.href);
+    };
+  } catch (e) { document.getElementById('endeText').textContent = '❌ ' + e.message; }
+};
+
+/* Direktaufruf mit Leitfaden im Link */
+(function () {
+  const g = new URLSearchParams(location.search).get('g');
+  if (!g) return;
+  try {
+    const d = JSON.parse(b64uDec(g));
+    projekt = d.p || 'Projekt'; leitfaden = d.l || '';
+    if (leitfaden) { document.getElementById('cTitel').textContent = 'Interview – ' + projekt; zeige('sConsent'); }
+  } catch (e) { /* ungültiger Link → Setup zeigen */ }
+})();
+</script>
+</body>
+</html>

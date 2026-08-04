@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Umfrage – Prozesswand</title>
+<style>
+:root { --bordeaux:#651B32; --rose:#F3EBEE; --line:#C9CCC4; --text:#333333; --muted:#666666; }
+* { box-sizing:border-box; }
+body { margin:0; font-family:Calibri,'Segoe UI',Arial,sans-serif; color:var(--text); background:var(--rose); }
+#kopf { background:var(--bordeaux); color:#fff; padding:14px 18px; }
+#kopf h1 { margin:0; font-size:20px; }
+.karte { max-width:680px; margin:18px auto; background:#fff; border-radius:10px; box-shadow:0 2px 10px rgba(0,0,0,.12); padding:18px 20px; }
+label { display:block; font-size:13px; font-weight:bold; color:var(--bordeaux); margin:12px 0 4px; }
+textarea, input[type=text] { width:100%; font:inherit; font-size:14px; padding:9px 11px; border:1px solid var(--line); border-radius:7px; }
+button { font:inherit; font-size:14px; padding:9px 16px; border:1px solid var(--line); border-radius:7px; background:#fff; cursor:pointer; margin:6px 6px 0 0; }
+button.go { background:var(--bordeaux); color:#fff; border-color:var(--bordeaux); }
+.frage { margin:16px 0; padding:12px; background:var(--rose); border-radius:8px; }
+.frage b { display:block; margin-bottom:8px; font-size:15px; }
+.skala { display:flex; gap:6px; }
+.skala button { flex:1; margin:0; }
+.skala button.sel, .wahl button.sel { background:var(--bordeaux); color:#fff; border-color:var(--bordeaux); }
+.wahl button { display:block; width:100%; text-align:left; margin:4px 0 0; }
+.hinweis { font-size:12.5px; color:var(--muted); }
+.kmsg { margin:8px 0; padding:9px 12px; border-radius:8px; max-width:88%; white-space:pre-wrap; }
+.kmsg.ki { background:var(--rose); }
+.kmsg.ich { background:#e8eef5; margin-left:auto; }
+.screen { display:none; }
+.screen.aktiv { display:block; }
+#qr { margin-top:10px; }
+</style>
+</head>
+<body>
+<div id="kopf"><h1 id="kopfTitel">Umfrage</h1></div>
+
+<!-- Ersteller-Ansicht (ohne ?u= im Link) -->
+<div class="karte screen" id="sBau">
+  <b>Neue Umfrage erstellen</b> <span class="hinweis">(für den Projektinhaber)</span>
+  <label>Titel</label>
+  <input type="text" id="bTitel" placeholder="z.B. Rückmeldung zur Prozesswand">
+  <label>Einleitung (1–2 Sätze für die Befragten)</label>
+  <input type="text" id="bIntro" placeholder="z.B. Ihre Antworten helfen uns, das Werkzeug zu verbessern. Dauert 2 Minuten.">
+  <label>Fragen (eine pro Zeile)</label>
+  <textarea id="bFragen" rows="7" placeholder="Wie zufrieden sind Sie? | skala&#10;Was fehlt Ihnen am meisten?&#10;Welches Gefäss passt Ihnen? | wahl: Umfrage; Interview; Telefon"></textarea>
+  <p class="hinweis">Ohne Zusatz = Textantwort &middot; «| skala» = Note 1–6 &middot; «| wahl: A; B; C» = Auswahl</p>
+  <button class="go" id="bErzeugen">Link und QR-Code erzeugen</button>
+  <div id="bAusgabe" style="display:none">
+    <label>Link zum Weitergeben (kopiert)</label>
+    <p class="hinweis" id="bLink" style="word-break:break-all"></p>
+    <div id="qr"></div>
+    <p class="hinweis">Antworten landen gesammelt in Supabase (Umfrage-ID unten auf dieser Karte). Auswertung: in der Prozesswand bzw. über Claude im Chat.</p>
+    <p class="hinweis" id="bId"></p>
+    <label>Mail-Entwürfe erzeugen <span style="font-weight:normal;color:var(--muted)">(eine Person pro Zeile: «Anna Muster &lt;anna@beispiel.ch&gt;» oder nur die Adresse)</span></label>
+    <textarea id="bEmpf" rows="3" placeholder="Anna Muster <anna@beispiel.ch>&#10;beat@beispiel.ch"></textarea>
+    <button id="bMails">Mail-Entwürfe erzeugen</button>
+    <div id="bMailListe"></div>
+    <p class="hinweis">Es wird nichts automatisch verschickt: Jeder Knopf öffnet nur einen fertigen Entwurf in deinem Mail-Programm &ndash; gesendet wird erst, wenn du dort auf «Senden» klickst.</p>
+  </div>
+</div>
+
+<!-- Ausfüll-Ansicht (mit ?u= im Link) -->
+<div class="karte screen" id="sForm">
+  <p id="fIntro" style="font-size:15px"></p>
+  <div id="fFragen"></div>
+  <label>Name <span style="font-weight:normal;color:var(--muted)">(freiwillig &ndash; ohne Name bleiben Ihre Antworten anonym)</span></label>
+  <input type="text" id="fName" placeholder="">
+  <label style="display:flex;gap:8px;align-items:flex-start;font-weight:normal;font-size:13px;margin:12px 0 4px;cursor:pointer">
+    <input type="checkbox" id="fEinw" style="margin-top:3px">
+    <span>Ich bin einverstanden, dass meine Antworten gespeichert und f&uuml;r die Auswertung dieses Projekts verwendet werden. Die Namensangabe ist freiwillig; ohne Name bleiben meine Antworten anonym. Ich kann die L&ouml;schung meiner Antworten jederzeit verlangen (Kontakt: doelf.ruetimann@gmail.com).</span>
+  </label>
+  <button class="go" id="fSenden">Antworten absenden</button>
+  <p class="hinweis" id="fFehler" style="color:#a02020"></p>
+</div>
+
+<!-- Dynamische KI-Umfrage (Definition mit «ki»: Vermittler-Adresse, T-021) -->
+<div class="karte screen" id="sKi">
+  <p id="kIntro" style="font-size:15px"></p>
+  <label style="display:flex;gap:8px;align-items:flex-start;font-weight:normal;font-size:13px;margin:6px 0 4px;cursor:pointer" id="kEinwBox">
+    <input type="checkbox" id="kEinw" style="margin-top:3px">
+    <span>Ich bin einverstanden, dass meine Antworten gespeichert und f&uuml;r die Auswertung dieses Projekts verwendet werden. Die Namensangabe ist freiwillig; ohne Name bleiben meine Antworten anonym. Ich kann die L&ouml;schung meiner Antworten jederzeit verlangen (Kontakt: doelf.ruetimann@gmail.com). Die Fragen stellt eine k&uuml;nstliche Intelligenz; meine Antworten werden daf&uuml;r w&auml;hrend des Gespr&auml;chs an einen KI-Dienst (Anthropic) &uuml;bermittelt und dort nicht zu Trainingszwecken verwendet.</span>
+  </label>
+  <div id="kLog"></div>
+  <div style="display:flex;gap:6px;margin-top:8px">
+    <textarea id="kEingabe" rows="2" style="flex:1" placeholder="Ihre Antwort …"></textarea>
+    <button class="go" id="kSenden" style="margin:0">Senden</button>
+  </div>
+  <label>Name <span style="font-weight:normal;color:var(--muted)">(freiwillig &ndash; ohne Name bleiben Ihre Antworten anonym)</span></label>
+  <input type="text" id="kName">
+  <p class="hinweis" id="kFehler" style="color:#a02020"></p>
+</div>
+
+<!-- Danke -->
+<div class="karte screen" id="sDanke">
+  <b>Vielen Dank!</b>
+  <p>Ihre Antworten sind gespeichert. Sie können dieses Fenster schliessen.</p>
+</div>
+
+<script>
+'use strict';
+/* Gleiche Supabase-Instanz wie die Prozesswand (öffentlicher Publishable Key, Schreiben erlaubt, Lesen nur angemeldet – siehe docs/supabase-umfragen.sql) */
+const SUPABASE_URL = 'https://bvbjxofdcugpfsccwlzv.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_eK2xQpV8jfkeMKcC40QDhQ_4Oj2ip--';
+
+function b64uEnc(s) { return btoa(unescape(encodeURIComponent(s))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,''); }
+function b64uDec(s) { s = s.replace(/-/g,'+').replace(/_/g,'/'); while (s.length % 4) s += '='; return decodeURIComponent(escape(atob(s))); }
+function zeige(id) { document.querySelectorAll('.screen').forEach(s => s.classList.remove('aktiv')); document.getElementById(id).classList.add('aktiv'); }
+function esc(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+/* ---------- Ersteller ---------- */
+document.getElementById('bErzeugen').onclick = () => {
+  const titel = document.getElementById('bTitel').value.trim();
+  const zeilen = document.getElementById('bFragen').value.split('\n').map(z => z.trim()).filter(Boolean);
+  if (!titel || !zeilen.length) { alert('Bitte Titel und mindestens eine Frage eintragen.'); return; }
+  const fragen = zeilen.map(z => {
+    const m = z.split('|');
+    const f = m[0].trim(); const zusatz = (m[1] || '').trim().toLowerCase();
+    if (zusatz.startsWith('skala')) return { f, typ: 'skala' };
+    if (zusatz.startsWith('wahl')) return { f, typ: 'wahl', o: (m[1].split(':')[1] || '').split(';').map(x => x.trim()).filter(Boolean) };
+    return { f, typ: 'text' };
+  });
+  const id = titel.toLowerCase().replace(/[^a-z0-9äöü]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) + '-' + Math.random().toString(36).slice(2, 6);
+  const def = { id, t: titel, i: document.getElementById('bIntro').value.trim(), q: fragen };
+  const url = location.origin + location.pathname + '?u=' + b64uEnc(JSON.stringify(def));
+  letzterLink = url; letzterTitel = titel; letzteIntro = def.i;
+  document.getElementById('bLink').textContent = url;
+  document.getElementById('bId').textContent = 'Umfrage-ID: ' + id;
+  const qr = document.getElementById('qr');
+  qr.innerHTML = '<img alt="QR-Code" width="180" height="180" src="https://api.qrserver.com/v1/create-qr-code/?size=360x360&data=' + encodeURIComponent(url) + '" onerror="this.outerHTML=\'<span class=hinweis>(QR-Dienst nicht erreichbar – der Link oben funktioniert trotzdem)</span>\'">';
+  document.getElementById('bAusgabe').style.display = 'block';
+  navigator.clipboard && navigator.clipboard.writeText(url);
+};
+
+/* ---------- Mail-Entwürfe (T-011): nur Entwürfe, Versand bleibt Handklick (harte Freigabe-Regel) ---------- */
+let letzterLink = '', letzterTitel = '', letzteIntro = '';
+document.getElementById('bMails').onclick = () => {
+  if (!letzterLink) { alert('Bitte zuerst oben «Link und QR-Code erzeugen» drücken.'); return; }
+  const zeilen = document.getElementById('bEmpf').value.split('\n').map(z => z.trim()).filter(Boolean);
+  if (!zeilen.length) { alert('Bitte mindestens eine Empfängerin oder einen Empfänger eintragen.'); return; }
+  const liste = document.getElementById('bMailListe');
+  liste.innerHTML = zeilen.map(z => {
+    const m = z.match(/^(.*?)<([^>]+)>$/);
+    const name = m ? m[1].trim() : '';
+    const mail = (m ? m[2] : z).trim();
+    const anrede = name ? 'Guten Tag ' + name : 'Guten Tag';
+    const body = anrede + '\n\n' + (letzteIntro ? letzteIntro + '\n\n' : '')
+      + 'Hier der Link zur kurzen Umfrage «' + letzterTitel + '» (dauert nur wenige Minuten):\n' + letzterLink
+      + '\n\nHerzlichen Dank für Ihre Rückmeldung!\nDölf Rütimann';
+    const href = 'mailto:' + encodeURIComponent(mail) + '?subject=' + encodeURIComponent('Kurze Umfrage: ' + letzterTitel) + '&body=' + encodeURIComponent(body);
+    return '<div style="margin:6px 0"><a href="' + href + '"><button type="button">Entwurf öffnen</button></a> <span class="hinweis">' + esc(name ? name + ' – ' + mail : mail) + '</span></div>';
+  }).join('');
+};
+
+/* ---------- Ausfüllen ---------- */
+let def = null;
+const antworten = {};
+function baueFormular() {
+  document.getElementById('kopfTitel').textContent = def.t;
+  document.getElementById('fIntro').textContent = def.i || '';
+  const box = document.getElementById('fFragen');
+  box.innerHTML = def.q.map((q, i) => {
+    if (q.typ === 'skala') {
+      return '<div class="frage"><b>' + esc(q.f) + '</b><div class="skala" data-i="' + i + '">' + [1,2,3,4,5,6].map(n => '<button type="button" data-w="' + n + '">' + n + '</button>').join('') + '</div><span class="hinweis">1 = schlecht &middot; 6 = sehr gut</span></div>';
+    }
+    if (q.typ === 'wahl') {
+      return '<div class="frage"><b>' + esc(q.f) + '</b><div class="wahl" data-i="' + i + '">' + (q.o || []).map(o => '<button type="button" data-w="' + esc(o) + '">' + esc(o) + '</button>').join('') + '</div></div>';
+    }
+    return '<div class="frage"><b>' + esc(q.f) + '</b><textarea rows="2" data-i="' + i + '"></textarea></div>';
+  }).join('');
+  box.querySelectorAll('.skala button, .wahl button').forEach(b => {
+    b.onclick = () => {
+      const grp = b.parentElement;
+      grp.querySelectorAll('button').forEach(x => x.classList.remove('sel'));
+      b.classList.add('sel');
+      antworten[grp.dataset.i] = b.dataset.w;
+    };
+  });
+  zeige('sForm');
+}
+document.getElementById('fSenden').onclick = async () => {
+  /* Einwilligung ist Pflicht (Datenschutz-Konzept, freigegeben 28.07.2026) */
+  if (!document.getElementById('fEinw').checked) { document.getElementById('fFehler').textContent = 'Bitte zuerst das Einverständnis-Häkchen setzen – ohne Einwilligung wird nichts gespeichert.'; return; }
+  document.getElementById('fFragen').querySelectorAll('textarea').forEach(t => { if (t.value.trim()) antworten[t.dataset.i] = t.value.trim(); });
+  const voll = def.q.map((q, i) => ({ frage: q.f, antwort: antworten[i] || '' }));
+  if (!voll.some(a => a.antwort)) { document.getElementById('fFehler').textContent = 'Bitte mindestens eine Frage beantworten.'; return; }
+  const btn = document.getElementById('fSenden');
+  btn.disabled = true; btn.textContent = 'wird gesendet …';
+  try {
+    const r = await fetch(SUPABASE_URL + '/rest/v1/umfrage_antworten', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'apikey': SUPABASE_ANON_KEY, 'authorization': 'Bearer ' + SUPABASE_ANON_KEY, 'prefer': 'return=minimal' },
+      body: JSON.stringify({ umfrage_id: def.id, titel: def.t, antworten: voll, name: document.getElementById('fName').value.trim() || null })
+    });
+    if (!r.ok) throw new Error('HTTP ' + r.status + ' – die Antwort-Tabelle fehlt vermutlich noch (docs/supabase-umfragen.sql).');
+    zeige('sDanke');
+  } catch (e) {
+    btn.disabled = false; btn.textContent = 'Antworten absenden';
+    document.getElementById('fFehler').textContent = '❌ Senden fehlgeschlagen: ' + e.message;
+  }
+};
+
+/* ---------- Dynamische KI-Umfrage (T-021): Fragen kommen vom Vermittler-Dienst,
+   der Anthropic-Schlüssel liegt NUR dort (Supabase Edge Function) – nie im Browser.
+   Obergrenze an Fragen wirkt doppelt: hier UND im Dienst. ---------- */
+const kiVerlauf = []; // [{frage, antwort}]
+let kiFrage = '', kiFertig = false;
+function kiMax() { return Math.min(parseInt(def.max, 10) || 6, 10); }
+function kiZeigen(txt, wer) {
+  const d = document.createElement('div');
+  d.className = 'kmsg ' + wer; d.textContent = txt;
+  document.getElementById('kLog').appendChild(d);
+  d.scrollIntoView({ block: 'nearest' });
+}
+async function kiNaechste() {
+  const r = await fetch(def.ki, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ def: { t: def.t, i: def.i, q: (def.q || []).map(x => x.f), max: kiMax() }, verlauf: kiVerlauf })
+  });
+  if (!r.ok) throw new Error('Dienst antwortet nicht (HTTP ' + r.status + ')');
+  const j = await r.json();
+  return { frage: String(j.frage || '').trim(), fertig: j.fertig === true };
+}
+async function kiSendeAntworten() {
+  const r = await fetch(SUPABASE_URL + '/rest/v1/umfrage_antworten', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', 'apikey': SUPABASE_ANON_KEY, 'authorization': 'Bearer ' + SUPABASE_ANON_KEY, 'prefer': 'return=minimal' },
+    body: JSON.stringify({ umfrage_id: def.id, titel: def.t, antworten: kiVerlauf.slice(), name: document.getElementById('kName').value.trim() || null })
+  });
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  zeige('sDanke');
+}
+async function kiWeiter() {
+  const btn = document.getElementById('kSenden');
+  btn.disabled = true; btn.textContent = '…';
+  document.getElementById('kFehler').textContent = '';
+  try {
+    if (kiVerlauf.length >= kiMax() || kiFertig) { await kiSendeAntworten(); return; }
+    const n = await kiNaechste();
+    kiFertig = n.fertig;
+    if (!n.frage || n.fertig && !n.frage) { await kiSendeAntworten(); return; }
+    kiFrage = n.frage; kiZeigen(n.frage, 'ki');
+    if (kiFertig) { await kiSendeAntworten(); return; }
+  } catch (e) {
+    document.getElementById('kFehler').textContent = '❌ ' + e.message + (kiVerlauf.length ? ' – Ihre bisherigen Antworten versuchen wir zu sichern.' : '');
+    if (kiVerlauf.length) { try { await kiSendeAntworten(); } catch (e2) {} }
+  }
+  btn.disabled = false; btn.textContent = 'Senden';
+}
+function baueKi() {
+  document.getElementById('kopfTitel').textContent = def.t;
+  document.getElementById('kIntro').textContent = def.i || '';
+  document.getElementById('kSenden').onclick = async () => {
+    if (!document.getElementById('kEinw').checked) return;
+    const v = document.getElementById('kEingabe').value.trim();
+    if (!v || !kiFrage) return;
+    document.getElementById('kEingabe').value = '';
+    kiZeigen(v, 'ich');
+    kiVerlauf.push({ frage: kiFrage, antwort: v });
+    kiFrage = '';
+    await kiWeiter();
+  };
+  document.getElementById('kEingabe').addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); document.getElementById('kSenden').click(); } });
+  zeige('sKi');
+  /* Einwilligung ist Pflicht (Datenschutz-Konzept, freigegeben 28.07.2026):
+     die erste Frage kommt erst nach dem Häkchen */
+  document.getElementById('kEingabe').disabled = true;
+  document.getElementById('kSenden').disabled = true;
+  document.getElementById('kEinw').addEventListener('change', function () {
+    if (!this.checked || kiFrage || kiVerlauf.length) return;
+    this.disabled = true;
+    document.getElementById('kEingabe').disabled = false;
+    document.getElementById('kSenden').disabled = false;
+    kiWeiter();
+  });
+}
+
+/* ---------- Start ---------- */
+(function () {
+  const qs = new URLSearchParams(location.search);
+  const u = qs.get('u');
+  if (!u) { zeige('sBau'); return; }
+  try { def = JSON.parse(b64uDec(u)); } catch (e) { zeige('sBau'); return; }
+  try {
+    if (def.ki) baueKi(); else baueFormular();
+    const p = qs.get('p'); // persönlicher Link (T-020): Name vorbefüllen für die Rücklauf-Zuordnung
+    if (p) {
+      const name = b64uDec(p);
+      const fn = document.getElementById('fName'), kn = document.getElementById('kName');
+      if (fn) fn.value = name;
+      if (kn) kn.value = name;
+    }
+  } catch (e) { zeige('sBau'); }
+})();
+</script>
+</body>
+</html>

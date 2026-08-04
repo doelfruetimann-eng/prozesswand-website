@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Prozesswand – dein Projekt auf einen Blick</title>
+<meta name="description" content="Die Prozesswand: Projekte planen wie an der Moderationswand – mit KI-Hilfe, Entscheid-Toren und fertigen Dokumenten. Gedacht wird im Chat, die Wand steuert.">
+<style>
+:root { --bordeaux:#651B32; --rose:#F3EBEE; --gelb:#FFF6D5; --text:#2b2228; --muted:#7d6b73; }
+* { box-sizing:border-box; }
+body { margin:0; font-family:Calibri,'Segoe UI',-apple-system,Arial,sans-serif; color:var(--text); background:#fff; font-size:17px; line-height:1.55; }
+header { background:var(--bordeaux); color:#fff; padding:52px 20px 46px; text-align:center; }
+header h1 { margin:0 0 10px; font-size:clamp(30px,5vw,44px); letter-spacing:.3px; }
+header p { margin:0 auto 26px; max-width:640px; font-size:clamp(17px,2.4vw,21px); opacity:.94; }
+.btnrow { display:flex; gap:12px; justify-content:center; flex-wrap:wrap; }
+a.btn { display:inline-block; text-decoration:none; font-weight:700; border-radius:10px; padding:14px 26px; font-size:18px; }
+a.btn.hell { background:var(--gelb); color:var(--bordeaux); }
+a.btn.rand { border:2px solid #fff; color:#fff; }
+main { max-width:1080px; margin:0 auto; padding:14px 20px 60px; }
+section { margin-top:46px; }
+h2 { color:var(--bordeaux); font-size:clamp(22px,3.4vw,30px); margin:0 0 6px; }
+.sub { color:var(--muted); margin:0 0 20px; }
+.grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:18px; }
+.vcard { background:var(--rose); border-radius:14px; padding:14px; }
+.vcard video { width:100%; border-radius:9px; display:block; background:#000; }
+.vcard b { display:block; margin:10px 2px 2px; font-size:16.5px; color:var(--bordeaux); }
+.vcard span { display:block; margin:0 2px; font-size:14px; color:var(--muted); }
+.feat { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:14px; }
+.feat div { background:var(--gelb); border-radius:12px; padding:14px 16px; font-size:15.5px; }
+.feat b { color:var(--bordeaux); display:block; margin-bottom:3px; font-size:16.5px; }
+.cta { background:var(--rose); border-radius:16px; text-align:center; padding:34px 20px; }
+footer { background:var(--bordeaux); color:#fff; text-align:center; padding:22px 20px; font-size:14.5px; }
+footer a { color:var(--gelb); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🧱 Prozesswand</h1>
+  <p>Dein Projekt auf einen Blick – geplant wie an der Moderationswand,
+     unterstützt von KI. <b>Gedacht wird im Chat, die Wand steuert.</b></p>
+  <div class="btnrow">
+    <a class="btn hell" href="prozesswand.html">▶ Wand öffnen</a>
+    <a class="btn rand" href="#kurs">🎬 Grundkurs ansehen (9 Min.)</a>
+  </div>
+</header>
+
+<main>
+  <section>
+    <h2>Was die Prozesswand kann</h2>
+    <p class="sub">Jede Funktion in einem Satz – so einfach, dass es ein Kind bedienen könnte.</p>
+    <div class="feat">
+      <div><b>🎯 Mit einem Ziel starten</b>Du schreibst dein Ziel in deinen Worten – die Wand macht es mit dir SMART.</div>
+      <div><b>🤖 KI baut den Plan</b>Sechs KI-Helfer entwerfen Phasen, Aufgaben und Risiken – du übernimmst per Vorschau.</div>
+      <div><b>◆ Du entscheidest an den Toren</b>Mails, Käufe und Löschungen passieren nie ohne dein Ja.</div>
+      <div><b>📄 Fertige Dokumente</b>Word-Berichte, Excel-Termine und -Kosten – direkt aus den Karten, ohne KI.</div>
+      <div><b>🔁 KI arbeitet ab</b>Aufgaben wandern nach GitHub, die KI erledigt sie, die Wand hakt automatisch ab.</div>
+      <div><b>👥 Befragungen</b>Umfragen mit persönlichen Links und KI-Nachfragen – Versand bleibt dein Klick.</div>
+    </div>
+  </section>
+
+  <section id="kurs">
+    <h2>Der Grundkurs in 7 kurzen Videos</h2>
+    <p class="sub">Zusammen rund 9 Minuten – mit Sprecherstimme und Untertiteln.</p>
+    <div class="grid">
+      <div class="vcard"><video src="videos/teil1.mp4" controls preload="metadata"></video><b>Teil 1 · Die Grundlagen</b><span>Wand, Karten, Auftrag, Tore, Dashboard, Wörterbuch (1:24)</span></div>
+      <div class="vcard"><video src="videos/teil2.mp4" controls preload="metadata"></video><b>Teil 2 · Neues Projekt mit KI</b><span>Start, Fragekatalog, KI-Struktur, Vorschau (1:12)</span></div>
+      <div class="vcard"><video src="videos/teil3.mp4" controls preload="metadata"></video><b>Teil 3 · Das Dashboard</b><span>Kacheln, «Wartet auf dich», Kanban, Lupe (1:04)</span></div>
+      <div class="vcard"><video src="videos/teil4.mp4" controls preload="metadata"></video><b>Teil 4 · Dokumente &amp; Exporte</b><span>Word, Excel, SSOT, Termin-Einladung (0:51)</span></div>
+      <div class="vcard"><video src="videos/teil5.mp4" controls preload="metadata"></video><b>Teil 5 · Aufgaben an die KI</b><span>Task-Typen, GitHub-Kreislauf, Freigabe-Regel (1:03)</span></div>
+      <div class="vcard"><video src="videos/teil6.mp4" controls preload="metadata"></video><b>Teil 6 · Befragungen</b><span>Personen, Umfrage-Links, KI-Umfrage, Auswertung (1:46)</span></div>
+      <div class="vcard"><video src="videos/teil7.mp4" controls preload="metadata"></video><b>Teil 7 · Projekte aus dem Chat</b><span>/prozesswand, Wand aus einem Repo, Import (1:10)</span></div>
+    </div>
+  </section>
+
+  <section class="cta">
+    <h2>Jetzt selbst ausprobieren</h2>
+    <p class="sub">Die Prozesswand läuft im Browser – nichts zu installieren.</p>
+    <a class="btn hell" style="background:var(--bordeaux);color:#fff" href="prozesswand.html">▶ Prozesswand öffnen</a>
+  </section>
+</main>
+
+<footer>
+  Prozesswand · ein Werkzeug von Dölf Rütimann ·
+  Kontakt: <a href="mailto:doelf.ruetimann@gmail.com">doelf.ruetimann@gmail.com</a>
+</footer>
+
+</body>
+</html>
