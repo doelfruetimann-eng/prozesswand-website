@@ -296,6 +296,7 @@ table.ph-tab { width:100%; border-collapse:collapse; }
   <button id="smartBtn">SMART-Check</button>
   <button id="swarmBtn">&#129302; KI-Struktur</button>
   <button id="prioBtn" title="Handlungs-Karten in eine Rangfolge bringen (P1, P2, &hellip;) &ndash; ohne KI, nur du entscheidest">&#128202; Priorisieren</button>
+  <button id="agBtn" title="Agenten der Wand: wer welche Auftr&auml;ge bekommt, mit welchem Modell &ndash; jede Ebene ist ein Agent" style="display:none">&#129302; Agenten</button>
 </div>
 
 <div id="previewBar">
@@ -340,7 +341,7 @@ table.ph-tab { width:100%; border-collapse:collapse; }
 <script>
 "use strict";
 
-const APP_VERSION = 'V61';
+const APP_VERSION = 'V62';
 /* V49: einheitlicher Wegweiser nach jedem «An Claude kopieren» */
 function claudeHinweis() {
   sysMsg('📋 Kopiert! Jetzt: 1. Claude öffnen (claude.ai bzw. deine Prozesswand-Sitzung) → 2. ins Schreibfeld klicken → 3. Cmd+V (einfügen) → 4. Senden. Mehr braucht es nicht.', true);
@@ -351,7 +352,7 @@ const SUPABASE_URL = 'https://bvbjxofdcugpfsccwlzv.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_eK2xQpV8jfkeMKcC40QDhQ_4Oj2ip--';
 
 /* ---------- OSTO/SYMA-Ebenen ---------- */
-const LANES = [
+const OSTO_LANES = [
   { key:'reflexion', title:'Reflexionsebene',       desc:'Wechselwirkungen · Störungen · Risiken' },
   { key:'input',     title:'Inputebene',            desc:'Experten & Beeinflusser – welche / wer?' },
   { key:'mgmt1',     title:'Managementebene 1',     desc:'Bereichsleitung · strategische Führung' },
@@ -361,7 +362,6 @@ const LANES = [
   { key:'doku',      title:'Dokumentationsebene',   desc:'Wer? Wann? Was? Wie?' },
   { key:'anspruch',  title:'Anspruchsgruppen',      desc:'Stakeholder · Betroffene' }
 ];
-const LANE_KEYS = LANES.map(l => l.key);
 /* Einfach-Modus (V54): jede Ebene in Alltagssprache – erscheint als Tooltip */
 const LANE_EINFACH = {
   reflexion: 'Einfach gesagt: Was schiefgehen kann',
@@ -375,6 +375,73 @@ const LANE_EINFACH = {
 };
 const PALETTE = ['#fdf3bf','#ffd9e0','#cdeccd','#d2e4f5','#e7e3ef'];
 const LANE_COLOR = { reflexion:'#ffd9e0', input:'#fdf3bf', mgmt1:'#d2e4f5', mgmt2:'#d2e4f5', sache:'#fdf3bf', handlung:'#cdeccd', doku:'#e7e3ef', anspruch:'#ffd9e0' };
+
+/* V62: Ebenen sind Daten der Wand. Ohne state.lanes gelten die OSTO-Ebenen –
+   dadurch verhaelt sich jede bestehende Wand unveraendert. */
+function lanes() {
+  const s = previewState || state;
+  return (s && Array.isArray(s.lanes) && s.lanes.length) ? s.lanes : OSTO_LANES;
+}
+function laneKeys() { return lanes().map(l => l.key); }
+function laneColor(key) { const l = lanes().find(x => x.key === key); return (l && l.color) || LANE_COLOR[key] || PALETTE[0]; }
+function laneEinfach(key) { const l = lanes().find(x => x.key === key); return (l && l.einfach) || LANE_EINFACH[key] || ''; }
+/* Ebene, auf deren Hoehe die Tore haengen (OSTO: Sachebene, sonst die oberste) */
+function gateLaneIdx() { const i = laneKeys().indexOf('sache'); return i >= 0 ? i : 0; }
+/* Ebene fuer Karten ohne gueltige Ebenen-Angabe */
+function defaultLaneKey() { const k = laneKeys(); return k.includes('handlung') ? 'handlung' : k[0]; }
+/* Ebenen, auf denen die eigentliche Arbeit liegt: OSTO = Handlungsebene,
+   Agenten-Wand = jede Agenten-Ebene. */
+function arbeitsLanes() { return istAgentenWand() ? laneKeys() : ['handlung']; }
+function istArbeitsLane(k) { return arbeitsLanes().indexOf(k) >= 0; }
+function arbeitsKartenPhase(i) { return arbeitsLanes().reduce((a, k) => a.concat(cardsInPhaseLane(i, k)), []); }
+
+/* ====== V62: AGENTEN-WAND ======
+   Gleiche Zeichen-Maschine, andere Ebenen: jede Ebene ist ein Agent.
+   Oben das Ziel, links nach rechts durch die Tore, Karten = Auftraege. */
+const AGENT_MODELLE = [
+  { id: 'claude-opus-5',             name: 'Opus 5 – am stärksten' },
+  { id: 'claude-opus-4-8',           name: 'Opus 4.8 – stark, günstiger' },
+  { id: 'claude-sonnet-5',           name: 'Sonnet 5 – schnell und solide' },
+  { id: 'claude-haiku-4-5-20251001', name: 'Haiku 4.5 – am günstigsten' }
+];
+const AGENT_FARBEN = ['#d2e4f5', '#cdeccd', '#e7e3ef', '#fdf3bf', '#ffd9e0', '#e2e3e5'];
+function modellKurz(m) { const x = AGENT_MODELLE.find(a => a.id === m); return x ? x.name.split(' – ')[0] : (m || ''); }
+
+/* Standard-Besetzung. Der Mensch ist bewusst eine eigene Ebene:
+   Handgriffe und KI-Arbeit stehen auf derselben Wand. */
+const AGENTEN_STANDARD = [
+  { name: 'Architekt', kurz: 'zerlegt das Ziel in Phasen und Tore', modell: 'claude-opus-5',
+    rolle: 'Du bist der Architekt. Du zerlegst ein Ziel in wenige, klar abgegrenzte Phasen mit je einem prüfbaren Entscheid-Tor am Ende. Du beschreibst Systemgrenzen (was gehört dazu, was nicht). Du erfindest nichts: Fehlendes markierst du als [offen].' },
+  { name: 'Entwickler', kurz: 'schreibt die Bau-Aufträge', modell: 'claude-opus-5',
+    rolle: 'Du bist der Entwickler. Du formulierst Bau-Aufträge, die Claude Code in einem Repo abarbeiten kann: Was genau, womit, welche Ergebnis-Datei entsteht, woran gemessen wird. Keine Platzhalter, keine erfundenen Bibliotheken. Fehlendes als [offen].' },
+  { name: 'Prüfer', kurz: 'Akzeptanzkriterien und Nachweis', modell: 'claude-opus-5',
+    rolle: 'Du bist der Prüfer. Zu jedem Schritt nennst du ein prüfbares Akzeptanzkriterium und den nötigen Nachweis (Datei, Messwert, Screenshot). Du setzt nie selbst erledigt. Du meldest, was fehlt.' },
+  { name: 'Datenschutz & Recht', kurz: 'offene Fragen – keine Freigaben', modell: 'claude-opus-5',
+    rolle: 'Du prüfst das Vorhaben auf Rechtsgrundlage, Datenkategorien, Aufbewahrung, Protokollierung, Auskunftsrechte und Anbieter-Standort. Du meldest ausschliesslich OFFENE FRAGEN, nie Freigaben. Jede Ausgabe endet mit: «Das ersetzt keine Datenschutz-Folgenabschätzung – die Freigabe erteilt die Datenschutzbeauftragte.»' },
+  { name: 'Du (Mensch)', kurz: 'Klicks, Konten, Freigaben, Bezahlung', mensch: true, modell: '', rolle: '' }
+];
+
+function neueAgenten() {
+  return AGENTEN_STANDARD.map((a, i) => ({
+    id: uid('ag'), name: a.name, kurz: a.kurz, modell: a.modell || '',
+    rolle: a.rolle || '', farbe: AGENT_FARBEN[i % AGENT_FARBEN.length],
+    mensch: a.mensch === true, aktiv: true
+  }));
+}
+/* Aus den aktiven Agenten werden die Ebenen der Wand */
+function agentenZuLanes(agenten) {
+  return (agenten || []).filter(a => a.aktiv !== false).map(a => ({
+    key: a.id,
+    title: a.name,
+    desc: (a.kurz || '') + (a.mensch ? '' : (a.modell ? ' · ' + modellKurz(a.modell) : '')),
+    color: a.farbe,
+    einfach: 'Einfach gesagt: ' + (a.kurz || a.name)
+  }));
+}
+function istAgentenWand(s) { s = s || activeState(); return !!(s && s.wandTyp === 'agenten'); }
+function findAgent(key, s) { s = s || activeState(); return (s && s.agenten || []).find(a => a.id === key) || null; }
+/* Ebenen der Wand nach einer Aenderung an den Agenten neu setzen */
+function agentenLanesSetzen(s) { s = s || state; s.lanes = agentenZuLanes(s.agenten); }
 
 const LABEL_W = 150, HEADER_H = 60, LANE_H = 104, PHASE_W = 300, PI_W = 172;
 const STORE = 'osto-prozesswand-v3';
@@ -393,7 +460,7 @@ function defaultState() {
     'Auftrags- & Situationsanalyse', 'Zielanalyse', 'Lösungskonzept / Synthese',
     'Bewertung & Entscheid', 'Umsetzung', 'Kontrolle & Feedback'
   ].map(n => ({ id: uid('ph'), name: n, w: PHASE_W, ziel:'', input:'', output:'', wer:'', was:'', wann:'', wie:'' }));
-  const laneY = k => LANE_KEYS.indexOf(k) * LANE_H + 14;
+  const laneY = k => laneKeys().indexOf(k) * LANE_H + 14;
   const phaseX = i => i * PHASE_W + (PHASE_W - PI_W) / 2;
   const a = { id: uid('p'), x: phaseX(1), y: laneY('sache'), text: 'Beispiel: Post-it anfassen und frei in der Zeit verschieben.', color: PALETTE[3] };
   const b = { id: uid('p'), x: phaseX(2), y: laneY('handlung'), text: 'Beispiel: über «Verbinden» entsteht der Netzplan.', color: PALETTE[2] };
@@ -428,7 +495,11 @@ function normalizeState(d) {
     statusUrl: typeof d.statusUrl === 'string' ? d.statusUrl : '',
     ghRepo: typeof d.ghRepo === 'string' ? d.ghRepo : '',
     viewMode: ['lean', 'mittel', 'voll'].includes(d.viewMode) ? d.viewMode : 'voll',
-    befragungen: Array.isArray(d.befragungen) ? d.befragungen : []
+    befragungen: Array.isArray(d.befragungen) ? d.befragungen : [],
+    /* V62 Agenten-Wand: ohne diese Felder verhaelt sich die Wand wie bisher */
+    wandTyp: d.wandTyp === 'agenten' ? 'agenten' : 'osto',
+    lanes: Array.isArray(d.lanes) ? d.lanes : [],
+    agenten: Array.isArray(d.agenten) ? d.agenten : []
   };
   s.phases.forEach(p => { if (typeof p.w !== 'number' || p.w < 80) p.w = PHASE_W; });
   return s;
@@ -447,7 +518,7 @@ function activateBoard(id) {
   let b = activeBoard();
   if (!b) { b = { id: uid('b'), name: 'Meine Wand', state: defaultState() }; collection.boards.push(b); collection.activeId = b.id; }
   collection.activeId = b.id; state = b.state;
-  renderBoardSelect(); refreshFromState();
+  renderBoardSelect(); refreshFromState(); agentenKnopfZeigen();
 }
 function newBoardFrom(name, st, activate) {
   const b = { id: uid('b'), name: name || 'Neue Wand', state: st || defaultState() };
@@ -501,7 +572,7 @@ function updateUndoBtn() {
 /* ---------- Geometrie ---------- */
 function canvasW(s) { s = s || activeState(); return Math.max(600, s.phases.reduce((t, p) => t + p.w, 0)); }
 function phaseLeft(i, s) { s = s || activeState(); let x = 0; for (let k = 0; k < i && k < s.phases.length; k++) x += s.phases[k].w; return x; }
-function canvasH() { return LANES.length * LANE_H; }
+function canvasH() { return lanes().length * LANE_H + (istAgentenWand() ? 30 : 0); }
 function laneTitle(l) { return activeState().laneTitles[l.key] || l.title; }
 function getPostit(id) { return activeState().postits.find(p => p.id === id); }
 
@@ -519,7 +590,7 @@ function render() {
     if ((c.status || 'offen') === 'erledigt') return false;
     if (mode === 'mittel') return true;
     const lane = laneKeyOfY(c.y);
-    return lane === 'sache' || lane === 'handlung';
+    return istArbeitsLane(lane) || lane === 'sache';
   };
   const visIds = new Set(s.postits.filter(sichtbar).map(c => c.id));
   const depsOk = c => s.connections.filter(k => k.to === c.id).every(k => {
@@ -529,9 +600,9 @@ function render() {
   document.querySelectorAll('#viewSeg button').forEach(b => b.classList.toggle('act', mode === b.dataset.v));
   let h = '';
 
-  LANES.forEach((l, i) => {
+  lanes().forEach((l, i) => {
     h += '<div class="lane-row' + (i % 2 ? ' alt' : '') + '" data-laneidx="' + i + '" style="left:' + LABEL_W + 'px;top:' + (HEADER_H + i*LANE_H) + 'px;width:' + W + 'px;height:' + LANE_H + 'px"></div>';
-    h += '<div class="lane-label" data-lane="' + l.key + '" title="' + esc(LANE_EINFACH[l.key] || '') + '" style="top:' + (HEADER_H + i*LANE_H) + 'px;height:' + LANE_H + 'px"><b>' + esc(laneTitle(l)) + '</b><span>' + esc(l.desc) + '</span></div>';
+    h += '<div class="lane-label" data-lane="' + l.key + '" title="' + esc(laneEinfach(l.key)) + '" style="top:' + (HEADER_H + i*LANE_H) + 'px;height:' + LANE_H + 'px"><b>' + esc(laneTitle(l)) + '</b><span>' + esc(l.desc) + '</span></div>';
   });
 
   s.phases.forEach((p, i) => {
@@ -540,7 +611,11 @@ function render() {
     if (i > 0) h += '<div class="phase-sep" style="left:' + left + 'px;top:' + HEADER_H + 'px;height:' + H + 'px"></div>';
   });
 
-  const flagTop = HEADER_H + LANE_KEYS.indexOf('sache') * LANE_H + 3;
+  /* OSTO: Tore haengen auf der Sachebene. Agenten-Wand: eigene Tor-Leiste
+     unter den Agenten – sonst decken die Faehnchen die obersten Karten zu. */
+  const flagTop = istAgentenWand()
+    ? HEADER_H + lanes().length * LANE_H + 4
+    : HEADER_H + gateLaneIdx() * LANE_H + 3;
   s.milestones.forEach(m => {
     const x = LABEL_W + clamp(m.x, 0, W);
     const short = (m.label || '').split(/\s[–-]\sKriterien/)[0];
@@ -557,11 +632,11 @@ function render() {
     const typTag = taskTyp(p) === 'freigabe' ? '<span class="todoTag" title="Freigabe n&ouml;tig" style="color:#a05c12">&#9995;</span>'
       : taskTyp(p) === 'input' ? '<span class="todoTag" title="braucht menschlichen Input" style="color:#6b4fa0">&#128100;</span>' : '';
     const persTag = Array.isArray(p.personen) && p.personen.length ? '<span class="todoTag" title="hinterlegte Personen (nur in der Wand gespeichert)">&#128101; ' + p.personen.length + '</span>' : '';
-    const owTag = (p.owner || '').trim() && laneKeyOfY(p.y) === 'handlung'
+    const owTag = (p.owner || '').trim() && istArbeitsLane(laneKeyOfY(p.y))
       ? '<span class="todoTag" title="Verantwortlich: ' + esc(ownerLabel(p.owner)) + '">' + ownerKurz(p.owner) + '</span>' : '';
-    const rgTag = (typeof p.rang === 'number' && p.rang > 0 && laneKeyOfY(p.y) === 'handlung')
+    const rgTag = (typeof p.rang === 'number' && p.rang > 0 && istArbeitsLane(laneKeyOfY(p.y)))
       ? '<span class="todoTag" title="Priorit&auml;t (vergeben &uuml;ber &#128202; Priorisieren)" style="' + (p.rang === 1 ? 'background:#651B32;color:#fff;border-radius:6px;padding:0 5px;' : 'color:#651B32;font-weight:700;') + '">P' + p.rang + '</span>' : '';
-    const prio = mode === 'lean' && laneKeyOfY(p.y) === 'handlung' && depsOk(p);
+    const prio = mode === 'lean' && istArbeitsLane(laneKeyOfY(p.y)) && depsOk(p);
     h += '<div class="postit st-' + st + (prio ? ' prio' : '') + (connectSrc === p.id ? ' sel' : '') + '" data-pid="' + p.id + '" style="left:' + (LABEL_W + p.x) + 'px;top:' + (HEADER_H + p.y) + 'px;background:' + (p.color || PALETTE[0]) + '"><span class="dot ' + st + '"></span>' + esc(p.text) + (prio ? '<span class="prioTag">&#10148; als N&auml;chstes</span>' : '') + tds + typTag + persTag + owTag + rgTag + '</div>';
   });
 
@@ -611,7 +686,7 @@ canvas.addEventListener('pointerdown', e => {
   if (rs) {
     const i = +rs.dataset.ri;
     drag = { type:'resize', i, x0:e.clientX, w0: state.phases[i].w,
-      mine: LANE_KEYS.map(k => cardsInPhaseLane(i, k).map(c => c.id)) };
+      mine: laneKeys().map(k => cardsInPhaseLane(i, k).map(c => c.id)) };
     e.preventDefault(); return;
   }
   const ms = e.target.closest('.ms-flag');
@@ -693,15 +768,15 @@ function arrangePhaseCards(i, byLane) {
     });
   });
 }
-function arrangePhase(i) { arrangePhaseCards(i, LANE_KEYS.map(k => cardsInPhaseLane(i, k))); }
+function arrangePhase(i) { arrangePhaseCards(i, laneKeys().map(k => cardsInPhaseLane(i, k))); }
 const FIT_MIN = 220;
 function openWidthOf(i) {
-  const maxN = Math.max(1, ...LANE_KEYS.map(k => cardsInPhaseLane(i, k).length));
+  const maxN = Math.max(1, ...laneKeys().map(k => cardsInPhaseLane(i, k).length));
   return Math.max(PHASE_W, 24 + maxN * (PI_W + 10));
 }
 function fitPhase(i) {
   const p = state.phases[i];
-  const byLane = LANE_KEYS.map(k => cardsInPhaseLane(i, k));
+  const byLane = laneKeys().map(k => cardsInPhaseLane(i, k));
   const mineIds = new Set([].concat(...byLane.map(a => a.map(c => c.id))));
   /* Maxi-Ansicht: ALLE Karten einer Ebene nebeneinander in EINER Reihe */
   const openW = Math.max(PHASE_W, 24 + Math.max(1, ...byLane.map(a => a.length)) * (PI_W + 10));
@@ -751,7 +826,7 @@ canvas.addEventListener('dblclick', e => {
     const x = clamp(e.clientX - r.left - LABEL_W - PI_W/2, 0, canvasW() - PI_W);
     const y = clamp(e.clientY - r.top - HEADER_H - 20, 0, canvasH() - 40);
     const laneIdx = +row.dataset.laneidx;
-    const np = { id: uid('p'), x, y, text: 'Neues Post-it – Doppelklick zum Bearbeiten', color: LANE_COLOR[LANE_KEYS[laneIdx]] || PALETTE[0] };
+    const np = { id: uid('p'), x, y, text: 'Neues Post-it – Doppelklick zum Bearbeiten', color: LANE_COLOR[laneKeys()[laneIdx]] || PALETTE[0] };
     state.postits.push(np); save(); render(); openPostitModal(np.id);
   }
 });
@@ -788,7 +863,7 @@ function openPostitModal(id) {
     + (state.solo ? '' : '<input class="td-wer" data-tj="' + j + '" value="' + esc(t.wer || '') + '" placeholder="wer?" title="Zust&auml;ndige Person / Rolle" style="flex:none;width:96px;font:inherit;font-size:11px;padding:3px 6px;border:1px solid var(--line);border-radius:5px">')
     + '<button class="td-del" data-tj="' + j + '">&#10005;</button></div>').join('')
     || '<div style="font-size:12px;color:var(--muted)">&ndash; noch keine Aufgaben &ndash;</div>');
-  openModal('<h3>Post-it &middot; Phase ' + (pi + 1) + ' &middot; ' + esc(laneTitle(LANES[LANE_KEYS.indexOf(laneKeyOfY(card.y))] || LANES[0])) + '</h3>'
+  openModal('<h3>Post-it &middot; Phase ' + (pi + 1) + ' &middot; ' + esc(laneTitle(lanes()[laneKeys().indexOf(laneKeyOfY(card.y))] || lanes()[0])) + '</h3>'
     + '<label>Text</label><textarea id="mText" rows="3">' + esc(card.text) + '</textarea>'
     + '<label style="margin-top:10px">Auftrag &ndash; genau ausformuliert <span style="font-weight:400;text-transform:none">(steht so im Task-Export; die Karte selbst bleibt kurz)</span></label>'
     + '<textarea id="mAuftrag" rows="3" placeholder="2&ndash;4 S&auml;tze nach festem Format: Was genau ist zu tun? Womit (Ausgangslage)? Welches Ergebnis entsteht (Datei/Zustand)? Woran wird gemessen, dass es gut ist?">' + esc(card.auftrag || '') + '</textarea>'
@@ -800,7 +875,7 @@ function openPostitModal(id) {
     + '<option value="freigabe"' + (card.typ === 'freigabe' ? ' selected' : '') + '>freigabe &ndash; wirkt erst nach deiner Freigabe</option>'
     + '<option value="input"' + (card.typ === 'input' ? ' selected' : '') + '>input &ndash; braucht menschlichen Input</option></select></div>'
     + '<div style="flex:1"><label>Verantwortlich (wer f&uuml;hrt aus)</label>' + ownerSelect('mOwner', card.owner)
-    + (!(card.owner || '').trim() && laneKeyOfY(card.y) === 'handlung' ? '<div style="font-size:10.5px;color:var(--muted);margin-top:3px">Vorschlag: ' + ownerKurz(ownerVorschlag(card)) + '</div>' : '') + '</div></div>'
+    + (!(card.owner || '').trim() && istArbeitsLane(laneKeyOfY(card.y)) ? '<div style="font-size:10.5px;color:var(--muted);margin-top:3px">Vorschlag: ' + ownerKurz(ownerVorschlag(card)) + '</div>' : '') + '</div></div>'
     + '<div style="font-size:10.5px;color:var(--muted);margin-top:3px">Feste Regel (nicht abschaltbar): Entscheid-Tore, L&ouml;schungen und externe Aktionen (Mails, Publikationen, K&auml;ufe) brauchen immer eine Freigabe &ndash; der Task-Export erzwingt das.</div>'
     + (istAnspruch ? '<label style="margin-top:12px">Personen dieser Anspruchsgruppe <span style="font-weight:400;text-transform:none">(f&uuml;r Befragungen im Dashboard)</span></label>'
       + '<div id="mPers">' + persHtml() + '</div>'
@@ -1031,7 +1106,7 @@ function openMilestoneModal(id) {
 /* V53: Beispielprojekt – belebte Übungs-Wand als Vorschau (previewBar entscheidet, nichts wird überschrieben) */
 function ladeBeispiel() {
   closeModal();
-  const W = 300, laneY = k => LANE_KEYS.indexOf(k) * LANE_H + 10;
+  const W = 300, laneY = k => laneKeys().indexOf(k) * LANE_H + 10;
   const px = (p, n) => p * W + 10 + n * 28;
   const F = { reflexion: '#f6d4d4', input: '#dfe8f5', mgmt1: '#e6e0f0', mgmt2: '#e6e0f0', sache: '#d9ead3', handlung: '#fdf3bf', doku: '#e2e3e5', anspruch: '#fce5cd' };
   const K = [ // [phase, ebene, text, status, typ, todos]
@@ -1201,7 +1276,7 @@ document.getElementById('glossarBtn').onclick = () => { if (!previewState) openG
    Karten (Feld rang, gespeichert wie alle Kartenwerte) und legt einen
    Schnappschuss als Karte auf die Dokumentationsebene. */
 function prioKarten() {
-  const hc = state.postits.filter(p => laneKeyOfY(p.y) === 'handlung');
+  const hc = state.postits.filter(p => istArbeitsLane(laneKeyOfY(p.y)));
   hc.sort((a, b) => {
     const ra = typeof a.rang === 'number' ? a.rang : 9999;
     const rb = typeof b.rang === 'number' ? b.rang : 9999;
@@ -1311,8 +1386,34 @@ function startAutoAnzeigen() {
   if (localStorage.getItem('pw-start') !== 'aus') openStart();
 }
 
+/* V62: Einstieg ?agenten – bestehende Agenten-Wand oeffnen oder eine anlegen */
+function agentenWandOeffnen() {
+  const b = collection.boards.find(x => x.state && x.state.wandTyp === 'agenten');
+  if (b) { activateBoard(b.id); }
+  else {
+    const st = defaultState();
+    st.wandTyp = 'agenten';
+    st.agenten = neueAgenten();
+    st.lanes = agentenZuLanes(st.agenten);
+    st.postits = []; st.connections = []; st.milestones = [];
+    st.phases = ['Idee & Nutzen', 'Bauen', 'Prüfen', 'Einführen'].map(n => ({
+      id: uid('ph'), name: n, w: PHASE_W, ziel: '', input: '', output: '', wer: '', was: '', wann: '', wie: ''
+    }));
+    newBoardFrom('Agenten-Wand', st, true);
+  }
+  agentenKnopfZeigen();
+  sysMsg('🤖 Agenten-Wand: Jede Ebene ist ein Agent. Oben das Ziel eintragen, dann «KI-Struktur» – die Agenten verteilen die Aufträge. '
+    + 'Wer mitarbeitet, änderst du unter «Agenten». Gebaut wird nichts automatisch: Die Aufträge gehen über «Dokumente» an Claude Code.', true);
+}
+/* Der Agenten-Knopf erscheint nur auf einer Agenten-Wand */
+function agentenKnopfZeigen() {
+  const b = document.getElementById('agBtn');
+  if (b) b.style.display = istAgentenWand() ? '' : 'none';
+}
+
 function openLaneModal(key) {
-  const l = LANES.find(x => x.key === key); if (!l) return;
+  if (istAgentenWand()) { openAgentenModal(); return; }
+  const l = lanes().find(x => x.key === key); if (!l) return;
   openModal('<h3>Ebene umbenennen</h3><label>Titel</label><input type="text" id="mLane" value="' + esc(laneTitle(l)) + '"><div class="btnrow"><button class="go" id="mSave">Speichern</button><button id="mCancel">Abbrechen</button></div>');
   document.getElementById('mSave').onclick = () => {
     const v = document.getElementById('mLane').value.trim();
@@ -1321,6 +1422,108 @@ function openLaneModal(key) {
   };
   document.getElementById('mCancel').onclick = closeModal;
 }
+
+/* ---------- V62: Agenten-Fenster ---------- */
+function agModellSelect(a) {
+  return '<select class="ag-modell">'
+    + AGENT_MODELLE.map(m => '<option value="' + m.id + '"' + (m.id === a.modell ? ' selected' : '') + '>' + esc(m.name) + '</option>').join('')
+    + '</select>';
+}
+function agZeile(a) {
+  const kn = 'font:inherit;font-size:12px;cursor:pointer;border:1px solid var(--line);background:#f6f7f9;border-radius:6px;padding:4px 8px';
+  let h = '<div class="ag-row" data-agid="' + a.id + '" style="border:1px solid var(--line);border-left:7px solid ' + esc(a.farbe || '#ccc') + ';border-radius:8px;padding:10px 12px;margin-bottom:10px">';
+  h += '<div style="display:flex;gap:6px;align-items:center">'
+     + '<input type="text" class="ag-name" value="' + esc(a.name) + '" style="flex:1;font-weight:700">'
+     + '<button class="ag-up" style="' + kn + '" title="nach oben">&#9650;</button>'
+     + '<button class="ag-dn" style="' + kn + '" title="nach unten">&#9660;</button>'
+     + '<button class="ag-del" style="' + kn + ';color:var(--warn)" title="Agent entfernen">&#10005;</button>'
+     + '</div>';
+  h += '<label>Was dieser Agent tut (steht an der Ebene)</label>'
+     + '<input type="text" class="ag-kurz" value="' + esc(a.kurz || '') + '">';
+  if (a.mensch) {
+    h += '<p style="font-size:12px;color:var(--muted);margin:8px 0 0">Das bist du. Diese Ebene bekommt kein Modell &ndash; hier stehen die Handgriffe, die du selbst machst: Konten er&ouml;ffnen, klicken, freigeben, bezahlen.</p>';
+  } else {
+    h += '<label>Modell</label>' + agModellSelect(a)
+       + '<label>Auftrag an den Agenten <button class="ag-reset" style="' + kn + ';text-transform:none;margin-left:6px">zur&uuml;cksetzen</button></label>'
+       + '<textarea class="ag-rolle" rows="3">' + esc(a.rolle || '') + '</textarea>';
+  }
+  h += '<label style="display:flex;align-items:center;gap:6px;text-transform:none;font-size:12px;margin-top:8px">'
+     + '<input type="checkbox" class="ag-aktiv" style="width:auto"' + (a.aktiv !== false ? ' checked' : '') + '> auf der Wand zeigen</label>';
+  return h + '</div>';
+}
+function openAgentenModal() {
+  if (!istAgentenWand()) { sysMsg('Die Agenten-Ebenen gibt es nur auf einer Agenten-Wand (Adresse mit ?agenten).', true); return; }
+  const liste = (state.agenten || []).slice();
+  let h = '<h3>&#129302; Agenten dieser Wand</h3>'
+    + '<p style="font-size:12px;color:var(--muted);margin:0 0 12px">Jeder Agent ist eine Ebene der Wand &ndash; von oben nach unten in dieser Reihenfolge. '
+    + 'Entfernst du einen Agenten, wandern seine Karten auf die oberste Ebene.</p>'
+    + '<div id="agListe">' + liste.map(agZeile).join('') + '</div>'
+    + '<button id="agAdd" style="font:inherit;font-size:13px;cursor:pointer;border:1px dashed var(--line);background:#fff;border-radius:7px;padding:8px 12px;width:100%">+ Agent hinzuf&uuml;gen</button>'
+    + '<div class="btnrow"><button class="go" id="agSave">Speichern</button><button id="agCancel">Abbrechen</button></div>';
+  openModal(h, true);
+
+  const box = document.getElementById('agListe');
+  box.addEventListener('click', e => {
+    const row = e.target.closest('.ag-row'); if (!row) return;
+    if (e.target.closest('.ag-up')) { const pr = row.previousElementSibling; if (pr) box.insertBefore(row, pr); return; }
+    if (e.target.closest('.ag-dn')) { const nx = row.nextElementSibling; if (nx) box.insertBefore(nx, row); return; }
+    if (e.target.closest('.ag-del')) {
+      if (box.children.length <= 1) { alert('Mindestens ein Agent muss bleiben.'); return; }
+      row.remove(); return;
+    }
+    if (e.target.closest('.ag-reset')) {
+      e.preventDefault();
+      const nm = row.querySelector('.ag-name').value.trim();
+      const std = AGENTEN_STANDARD.find(x => x.name === nm);
+      const ta = row.querySelector('.ag-rolle');
+      if (std && ta) ta.value = std.rolle || ''; else alert('Für diesen Namen gibt es keinen Standardtext.');
+      return;
+    }
+  });
+  document.getElementById('agAdd').onclick = () => {
+    const n = box.children.length;
+    box.insertAdjacentHTML('beforeend', agZeile({
+      id: uid('ag'), name: 'Neuer Agent', kurz: '', modell: 'claude-opus-5',
+      rolle: '', farbe: AGENT_FARBEN[n % AGENT_FARBEN.length], mensch: false, aktiv: true
+    }));
+  };
+  document.getElementById('agCancel').onclick = closeModal;
+  document.getElementById('agSave').onclick = () => {
+    const neu = Array.from(box.children).map((row, i) => {
+      const alt = findAgent(row.dataset.agid) || {};
+      const mo = row.querySelector('.ag-modell'), ro = row.querySelector('.ag-rolle');
+      return {
+        id: row.dataset.agid,
+        name: row.querySelector('.ag-name').value.trim() || 'Agent ' + (i + 1),
+        kurz: row.querySelector('.ag-kurz').value.trim(),
+        modell: mo ? mo.value : '',
+        rolle: ro ? ro.value.trim() : '',
+        farbe: alt.farbe || AGENT_FARBEN[i % AGENT_FARBEN.length],
+        mensch: alt.mensch === true,
+        aktiv: row.querySelector('.ag-aktiv').checked
+      };
+    });
+    if (!neu.some(a => a.aktiv)) { alert('Mindestens ein Agent muss sichtbar bleiben.'); return; }
+    agentenUebernehmen(neu);
+    save(); render(); closeModal();
+  };
+}
+/* Agenten ersetzen und die Karten auf die neuen Ebenen umhaengen */
+function agentenUebernehmen(neu) {
+  const altKeys = (state.lanes && state.lanes.length) ? state.lanes.map(l => l.key) : null;
+  state.agenten = neu;
+  agentenLanesSetzen(state);
+  const neuKeys = state.lanes.map(l => l.key);
+  if (!altKeys) return;
+  state.postits.forEach(c => {
+    const ai = clamp(Math.floor(c.y / LANE_H), 0, altKeys.length - 1);
+    const rest = clamp(c.y - ai * LANE_H, 0, LANE_H - 56);
+    let ni = neuKeys.indexOf(altKeys[ai]);
+    if (ni < 0) ni = 0;
+    c.y = ni * LANE_H + rest;
+  });
+}
+document.getElementById('agBtn').onclick = openAgentenModal;
 
 /* ---------- Kopfleisten-Knöpfe ---------- */
 document.getElementById('addPhase').onclick = () => {
@@ -1529,8 +1732,8 @@ function wallContext() {
   const s = state;
   let t = 'Gesamtziel: ' + (s.goal || '(noch leer)') + '\nPhasen: ' + s.phases.map((p, i) => (i+1) + '. ' + p.name).join(' | ');
   t += '\nMeilensteine: ' + (s.milestones.map(m => m.label).join(', ') || 'keine');
-  LANES.forEach(l => {
-    const items = s.postits.filter(p => Math.floor(p.y / LANE_H) === LANE_KEYS.indexOf(l.key));
+  lanes().forEach(l => {
+    const items = s.postits.filter(p => Math.floor(p.y / LANE_H) === laneKeys().indexOf(l.key));
     if (items.length) t += '\n' + laneTitle(l) + ': ' + items.map(p => '«' + p.text.slice(0, 80) + '»').join('; ');
   });
   return t;
@@ -1633,6 +1836,7 @@ async function agentJSON(role, system, user, maxTok) {
 
 document.getElementById('swarmBtn').onclick = () => {
   if (previewState) return;
+  if (istAgentenWand()) { openAgentenSchwarmModal(); return; }
   openModal('<h3>&#129302; Projekt strukturieren (KI)</h3>'
     + '<p style="font-size:12px;color:var(--muted);margin:0">Sechs Agenten (Architekt &rarr; Planer &rarr; Kritiker &rarr; Verbinder &rarr; Lean &rarr; Optimierer) bauen einen Entwurf nach deiner Methodik. Du siehst zuerst eine Vorschau.</p>'
     + '<label>Gesamtziel</label><textarea id="swZiel" rows="3">' + esc(state.goal || '') + '</textarea>'
@@ -1715,13 +1919,13 @@ function optBar(karten) {
     const ziel = previewState || state;
     let n = 0;
     karten.forEach(k => {
-      const lane = LANE_KEYS.includes(k.ebene) ? k.ebene : 'handlung';
+      const lane = laneKeys().includes(k.ebene) ? k.ebene : defaultLaneKey();
       const pi = clamp((parseInt(k.phase, 10) || 1) - 1, 0, ziel.phases.length - 1);
-      const li = LANE_KEYS.indexOf(lane), left = phaseLeft(pi, ziel), w = ziel.phases[pi].w;
+      const li = laneKeys().indexOf(lane), left = phaseLeft(pi, ziel), w = ziel.phases[pi].w;
       const vorhanden = ziel.postits.filter(p => phaseIndexOfX(p.x) === pi && Math.floor(p.y / LANE_H) === li).length;
       ziel.postits.push({ id: uid('p'), x: clamp(left + 10 + (vorhanden * 28) % Math.max(40, w - PI_W - 20), 0, canvasW(ziel) - PI_W),
         y: li * LANE_H + 6 + (vorhanden * 22) % (LANE_H - 62),
-        text: '💡 ' + k.text, color: LANE_COLOR[lane] || PALETTE[0], status: 'offen', checked: true });
+        text: '💡 ' + k.text, color: laneColor(lane), status: 'offen', checked: true });
       n++;
     });
     if (!previewState) save();
@@ -1734,6 +1938,157 @@ function optBar(karten) {
   bar.appendChild(b); bar.appendChild(n2);
   kiLog.appendChild(bar); kiLog.scrollTop = kiLog.scrollHeight;
 }
+/* ================================================================
+   V62: AGENTEN-SCHWARM – die Agenten DIESER Wand verteilen die Arbeit.
+   Schritt 1: Struktur (Phasen + Tore). Schritt 2: je Agent sein Beitrag.
+   Alles landet in der VORSCHAU – uebernommen wird nur per Knopf.
+   ================================================================ */
+async function agentJSONModell(modell, system, user, maxTok) {
+  const sys = system + '\n\nAntworte AUSSCHLIESSLICH mit gültigem JSON, ohne Erklärtext.';
+  const call = u => callClaude(sys, u, modell || CHAT_MODEL, maxTok, SWARM_TEMP);
+  try { return extractJSON(await call(user)); }
+  catch (e) {
+    if (e instanceof SyntaxError || /JSON/.test(e.message)) return extractJSON(await call(user + '\n\nWICHTIG: Nur gültiges JSON ausgeben.'));
+    throw e;
+  }
+}
+
+const MENSCH_ROLLE = 'Du listest ausschliesslich die Handgriffe auf, die ein MENSCH selbst machen muss und die keine KI erledigen kann: '
+  + 'Konten eröffnen, in fremden Diensten klicken, Zugänge einrichten, Zahlungen auslösen, Verträge unterschreiben, Freigaben erteilen, Personen ansprechen. '
+  + 'Keine Programmier- oder Schreibarbeit – die machen die anderen Agenten. Nichts erfinden; Unbekanntes als [offen].';
+
+function agentBeitragFormat() {
+  return '\n\nFormat:\n{"beitraege":[{"phase":1,"text":"Auftrag in max. 12 Worten","auftrag":"2–4 Sätze: Was genau ist zu tun? Womit (Ausgangslage)? Welches Ergebnis entsteht (Datei oder prüfbarer Zustand)? Woran wird gemessen, dass es gut ist? Unbekanntes als [offen].","freigabe":false}]}\n'
+    + '"phase" ist die Phasennummer (1 = erste Phase). "freigabe" auf true setzen, wenn der Schritt eine Freigabe, eine Löschung, eine Zahlung, einen Versand oder eine Veröffentlichung auslöst.\n'
+    + 'Höchstens 3 Beiträge pro Phase. Lieber wenige klare Aufträge als viele vage. Nichts erfinden – Fehlendes als [offen] markieren.';
+}
+
+function buildAgentenPreview(cfg, phasen, beitraege) {
+  const totalW = Math.max(phasen.length, 5) * PHASE_W;
+  const sumAnteil = phasen.reduce((t, p) => t + (typeof p.anteil === 'number' && p.anteil > 0 ? p.anteil : 100 / phasen.length), 0);
+  const st = {
+    goal: cfg.ziel, phases: [], postits: [], connections: [], milestones: [],
+    laneTitles: Object.assign({}, state.laneTitles),
+    wandTyp: 'agenten',
+    agenten: JSON.parse(JSON.stringify(state.agenten || [])),
+    lanes: []
+  };
+  st.lanes = agentenZuLanes(st.agenten);
+  const keys = st.lanes.map(l => l.key);
+  phasen.forEach((p, i) => {
+    const anteil = (typeof p.anteil === 'number' && p.anteil > 0 ? p.anteil : 100 / phasen.length) / sumAnteil;
+    st.phases.push({ id: uid('ph'), name: p.name, w: clamp(Math.round(totalW * anteil), 220, 640),
+      ziel: p.ziel || '', input: '', output: '', wer: '', was: '', wann: '', wie: '' });
+  });
+  const zaehler = {};
+  const cards = [];
+  let kn = 0;
+  function put(phaseIdx, laneKey, text, it) {
+    const li = keys.indexOf(laneKey); if (li < 0) return null;
+    const left = phaseLeft(phaseIdx, st), w = st.phases[phaseIdx].w;
+    const ck = phaseIdx + '|' + laneKey;
+    const k = zaehler[ck] = (zaehler[ck] || 0) + 1;
+    const x = clamp(left + 10 + ((k - 1) * 28) % Math.max(40, w - PI_W - 20), 0, canvasW(st) - PI_W);
+    const y = li * LANE_H + 6 + ((k - 1) * 22) % (LANE_H - 62);
+    const id = uid('p');
+    const c = { id, x, y, text, color: (st.lanes[li] || {}).color || PALETTE[0], checked: true };
+    if (it && it.auftrag && String(it.auftrag).trim()) c.auftrag = String(it.auftrag).trim();
+    if (it && it.freigabe === true) c.typ = 'freigabe';
+    st.postits.push(c);
+    kn++; cards.push({ key: 'K' + kn, id, lane: laneKey, phase: phaseIdx, text });
+    return id;
+  }
+  beitraege.forEach(b => {
+    (b.items || []).forEach(it => {
+      const txt = (it && it.text || '').trim(); if (!txt) return;
+      const pi = clamp((typeof it.phase === 'number' ? it.phase : 1) - 1, 0, st.phases.length - 1);
+      put(pi, b.agentId, (it.freigabe === true ? '🔑 ' : '') + txt, it);
+    });
+  });
+  phasen.forEach((p, i) => {
+    const gateName = (p.gate && p.gate.name) || ('Entscheid Phase ' + (i + 1));
+    const krit = p.gate && Array.isArray(p.gate.kriterien) && p.gate.kriterien.length ? ' – Kriterien: ' + p.gate.kriterien.join('; ') : '';
+    st.milestones.push({ id: uid('m'), x: clamp(phaseLeft(i, st) + st.phases[i].w - 4, 20, canvasW(st) - 4), label: gateName + krit });
+  });
+  return { state: st, cards };
+}
+
+async function runAgentenSchwarm(cfg) {
+  const aktive = (state.agenten || []).filter(a => a.aktiv !== false);
+  if (!aktive.length) { sysMsg('❌ Diese Wand hat keine aktiven Agenten.'); return; }
+  const strukt = aktive.find(a => !a.mensch) || aktive[0];
+  try {
+    sysMsg('🏛️ ' + strukt.name + ' legt Phasen und Entscheid-Tore fest …');
+    const arch = await agentJSONModell(strukt.modell,
+      (strukt.rolle || 'Du zerlegst ein Ziel in Phasen mit prüfbaren Entscheid-Toren.')
+      + '\n\nDu arbeitest an einer Agenten-Wand: oben das Ziel, links nach rechts die Phasen, am Ende jeder Phase ein Entscheid-Tor.\n'
+      + 'Erzeuge 3–6 Phasen. Format:\n'
+      + '{"phasen":[{"name":"kurzer Phasenname","ziel":"was am Ende dieser Phase vorliegt","anteil":25,"gate":{"name":"Entscheid: …","kriterien":["prüfbares Kriterium","Kriterium 2"]}}]}\n'
+      + '"anteil" = geschätzter Anteil an der Gesamtdauer in Prozent (Summe ≈ 100). Tor-Kriterien müssen prüfbar sein (Zahl, Zustand oder Vorliegen eines Dokuments) – keine Absichtserklärungen. Nichts erfinden; Fehlendes als [offen].',
+      'Ziel: ' + cfg.ziel + '\nZeitrahmen: ' + (cfg.zeit || 'offen') + '\nKontext: ' + (cfg.kontext || 'keiner angegeben')
+      + '\n\nDie Wand hat diese Agenten (Ebenen):\n' + aktive.map(a => '– ' + a.name + ': ' + (a.kurz || '')).join('\n'), 2000);
+    if (!arch || !Array.isArray(arch.phasen) || arch.phasen.length < 2) throw new Error(strukt.name + ' lieferte keine brauchbare Phasenstruktur.');
+    const phasen = arch.phasen.slice(0, 6);
+    sysMsg('✅ ' + phasen.length + ' Phasen: ' + phasen.map(p => p.name).join(' → '));
+
+    const phasenText = phasen.map((p, i) => (i + 1) + '. ' + p.name + ' – Ziel: ' + (p.ziel || '[offen]')
+      + ' | Tor: ' + ((p.gate && p.gate.name) || '-')).join('\n');
+
+    const beitraege = [];
+    for (const a of aktive) {
+      sysMsg('🤖 ' + a.name + ' verteilt seine Aufträge …');
+      try {
+        const sys = (a.mensch ? MENSCH_ROLLE : (a.rolle || ('Du bist der Agent «' + a.name + '». ' + (a.kurz || ''))))
+          + '\n\nDu bist EINE Ebene einer Agenten-Wand. Du lieferst NUR deinen eigenen Beitrag – nicht den der anderen.'
+          + '\nDie anderen Ebenen sind: ' + aktive.filter(x => x.id !== a.id).map(x => x.name).join(', ') + '.'
+          + agentBeitragFormat();
+        const out = await agentJSONModell(a.mensch ? CHAT_MODEL : a.modell, sys,
+          'Ziel: ' + cfg.ziel + '\nZeitrahmen: ' + (cfg.zeit || 'offen') + '\nKontext: ' + (cfg.kontext || '-')
+          + '\n\nPhasen:\n' + phasenText, 2200);
+        const items = (out && Array.isArray(out.beitraege)) ? out.beitraege : [];
+        beitraege.push({ agentId: a.id, name: a.name, items });
+        sysMsg('✅ ' + a.name + ': ' + items.length + ' Auftrag/Aufträge.');
+      } catch (e) {
+        sysMsg('⚠️ ' + a.name + ' übersprungen: ' + e.message);
+        beitraege.push({ agentId: a.id, name: a.name, items: [] });
+      }
+    }
+
+    const pv = buildAgentenPreview(cfg, phasen, beitraege);
+    previewState = pv.state; previewMeta = cfg;
+    document.getElementById('previewBar').style.display = 'flex';
+    render();
+    sysMsg('✅ Entwurf fertig: ' + pv.state.postits.length + ' Aufträge auf ' + pv.state.lanes.length + ' Agenten-Ebenen, '
+      + pv.state.milestones.length + ' Tore. Oben wählen: Als neue Wand, Ersetzen, Ergänzen oder Verwerfen. '
+      + 'Gebaut wird nichts automatisch – die Aufträge gehen über «Dokumente» an Claude Code.');
+  } catch (e) {
+    sysMsg('❌ Agenten-Schwarm abgebrochen: ' + e.message);
+  }
+}
+
+function openAgentenSchwarmModal() {
+  const aktive = (state.agenten || []).filter(a => a.aktiv !== false);
+  openModal('<h3>&#129302; Auftr&auml;ge an die Agenten verteilen</h3>'
+    + '<p style="font-size:12px;color:var(--muted);margin:0">Diese ' + aktive.length + ' Agenten arbeiten mit: '
+    + esc(aktive.map(a => a.name).join(' · ')) + '. Zuerst werden Phasen und Tore festgelegt, dann legt jeder Agent seine Auftr&auml;ge auf seine Ebene. Du siehst zuerst eine Vorschau.</p>'
+    + '<label>Ziel</label><textarea id="asZiel" rows="3">' + esc(state.goal || '') + '</textarea>'
+    + '<label>Zeitrahmen</label><input type="text" id="asZeit" placeholder="z.B. bis Ende Oktober 2026">'
+    + '<label>Kontext</label><textarea id="asKontext" rows="3" placeholder="z.B. Umfrage-Modul mit Bezahlung, Supabase vorhanden, Stripe neu"></textarea>'
+    + '<div class="btnrow"><button class="go" id="asStart">Verteilen starten</button><button id="mCancel">Abbrechen</button></div>');
+  document.getElementById('mCancel').onclick = closeModal;
+  document.getElementById('asStart').onclick = () => {
+    const cfg = {
+      ziel: document.getElementById('asZiel').value.trim(),
+      zeit: document.getElementById('asZeit').value.trim(),
+      kontext: document.getElementById('asKontext').value.trim()
+    };
+    if (!cfg.ziel) { document.getElementById('asZiel').focus(); return; }
+    closeModal();
+    if (!kiBereit()) { openKeyModal(() => runAgentenSchwarm(cfg)); return; }
+    runAgentenSchwarm(cfg);
+  };
+}
+
 async function runSwarm(cfg) {
   const TIEFE_N = { grob: 3, mittel: 4, fein: 6 };
   const verbatim = (cfg.verbatim || cfg.tiefe === 'fein') ? VERBATIM_REGEL : '';
@@ -1920,14 +2275,14 @@ function buildPreview(cfg, phasen, plaene, kritik, arch) {
   const cards = [], chain = [];
   let kn = 0;
   function put(phaseIdx, laneKey, text, toChain) {
-    const li = LANE_KEYS.indexOf(laneKey);
+    const li = laneKeys().indexOf(laneKey);
     const left = phaseLeft(phaseIdx, st), w = st.phases[phaseIdx].w;
     const ck = phaseIdx + '|' + laneKey;
     const k = laneCount[ck] = (laneCount[ck] || 0) + 1;
     const x = clamp(left + 10 + ((k-1) * 28) % Math.max(40, w - PI_W - 20), 0, canvasW(st) - PI_W);
     const y = li * LANE_H + 6 + ((k-1) * 22) % (LANE_H - 62);
     const id = uid('p');
-    st.postits.push({ id, x, y, text, color: LANE_COLOR[laneKey] || PALETTE[0], checked: true });
+    st.postits.push({ id, x, y, text, color: laneColor(laneKey), checked: true });
     kn++; cards.push({ key: 'K' + kn, id, lane: laneKey, phase: phaseIdx, text });
     if (toChain) chain.push(id);
     return id;
@@ -2086,7 +2441,7 @@ function stempelErledigt(c) {
   if ((c.status || 'offen') === 'erledigt') { if (!c.erledigtAm) c.erledigtAm = new Date().toISOString().slice(0, 10); }
   else delete c.erledigtAm;
 }
-function tasksOfPhase(i) { return cardsInPhaseLane(i, 'handlung'); }
+function tasksOfPhase(i) { return arbeitsKartenPhase(i); }
 function cleanTxt(t) { return (t||'').replace(/^[⚠️↻👥📄🎯🧭💡]+\s*/u, ''); }
 
 /* CI-Palette exakt aus den Original-Vorlagen: Bordeaux 651B32, Rosé F3EBEE/FAF6F7,
@@ -2223,7 +2578,7 @@ function genAuftrag(entwurf) {
    dann entsteht die 📄-Karte auf der Wand und daraus das Word-File.
    ================================================================ */
 function fortschrittZahlen() {
-  const t = state.postits.filter(c => laneKeyOfY(c.y) === 'handlung');
+  const t = state.postits.filter(c => istArbeitsLane(laneKeyOfY(c.y)));
   const e = t.filter(c => c.status === 'erledigt');
   return { erledigt: e.length, total: t.length, pct: t.length ? Math.round(e.length / t.length * 100) : 0 };
 }
@@ -2304,7 +2659,7 @@ function genWissArbeit() {
     + (g ? ' Im vorliegenden Projekt: ' + esc(g.label) + (g.due ? ' am ' + esc(g.due) : '') + '.' : '') + '</p>'
     + '<p><b>3.3 Die acht Ebenen der Wand.</b></p>'
     + '<table><tr><th style="width:120pt">Ebene</th><th>Leitfrage</th><th style="width:130pt">Einfach gesagt</th></tr>'
-    + LANES.map(l => '<tr><td><b>' + esc(l.title) + '</b></td><td>' + esc(l.desc) + '</td><td>' + esc((LANE_EINFACH[l.key] || '').replace('Einfach gesagt: ', '')) + '</td></tr>').join('')
+    + lanes().map(l => '<tr><td><b>' + esc(l.title) + '</b></td><td>' + esc(l.desc) + '</td><td>' + esc(laneEinfach(l.key).replace('Einfach gesagt: ', '')) + '</td></tr>').join('')
     + '</table>'
     + '<p><b>3.4 Arbeitsweise mit KI.</b> Sechs KI-Agenten (Architekt, Planer, Kritiker, Verbinder, Lean, Optimierer) entwerfen die Wand; übernommen wird ausschliesslich per Vorschau durch den Menschen. Es gelten drei Regeln: (1) Evidenz – nichts erfinden, Fehlendes wird als [offen] markiert; (2) Freigabe – Mails, Käufe und Löschungen geschehen nie ohne menschliches Ja; (3) Nachvollziehbarkeit – Exporte geben nur wieder, was auf der Wand steht.</p>';
   b += '<h2>4. Vorgehen im Projekt</h2>'
@@ -2718,7 +3073,7 @@ function genKosten() {
 /* Architektur-Landkarte: ganze Wand als SVG/PNG – deterministisch, ohne KI */
 function genLandkarte() {
   const TOP = 34, FOOT = 44;
-  const W = LABEL_W + canvasW(state), H = TOP + HEADER_H + LANES.length * LANE_H + FOOT;
+  const W = LABEL_W + canvasW(state), H = TOP + HEADER_H + lanes().length * LANE_H + FOOT;
   const tspan = (t, n) => esc((t || '').slice(0, n));
   let s = '<svg xmlns="http://www.w3.org/2000/svg" width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + ' ' + H + '" font-family="Helvetica,Arial,sans-serif">';
   s += '<defs><marker id="la" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5.5" markerHeight="5.5" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#1f5fae"/></marker></defs>';
@@ -2726,7 +3081,7 @@ function genLandkarte() {
   s += '<text x="12" y="22" font-size="16" font-weight="bold" fill="#651B32">' + tspan(boardName(), 60) + ' &#183; Architektur-Landkarte</text>';
   s += '<text x="' + (W - 12) + '" y="22" font-size="10" fill="#666666" text-anchor="end">Prozesswand &#183; ' + heute() + '</text>';
   /* Ebenen */
-  LANES.forEach((l, i) => {
+  lanes().forEach((l, i) => {
     const y = TOP + HEADER_H + i * LANE_H;
     s += '<rect x="0" y="' + y + '" width="' + W + '" height="' + LANE_H + '" fill="' + (i % 2 ? '#fafbfd' : '#ffffff') + '" stroke="#e2e5ea" stroke-width="1"/>';
     s += '<rect x="0" y="' + y + '" width="' + LABEL_W + '" height="' + LANE_H + '" fill="#f4f6f9" stroke="#d5dae1"/>';
@@ -2738,7 +3093,7 @@ function genLandkarte() {
     s += '<rect x="' + x + '" y="' + TOP + '" width="' + p.w + '" height="' + HEADER_H + '" fill="#F3EBEE" stroke="#d8c3ca"/>';
     s += '<text x="' + (x + 8) + '" y="' + (TOP + 24) + '" font-size="12" font-weight="bold" fill="#651B32">' + tspan(p.name, Math.floor(p.w / 7)) + '</text>';
     s += '<text x="' + (x + 8) + '" y="' + (TOP + 42) + '" font-size="9" fill="#8a6070">Phase ' + (i + 1) + (p.wann ? ' &#183; ' + tspan(p.wann, 24) : '') + '</text>';
-    if (i > 0) s += '<line x1="' + x + '" y1="' + TOP + '" x2="' + x + '" y2="' + (TOP + HEADER_H + LANES.length * LANE_H) + '" stroke="#c9ccd4" stroke-dasharray="4,4"/>';
+    if (i > 0) s += '<line x1="' + x + '" y1="' + TOP + '" x2="' + x + '" y2="' + (TOP + HEADER_H + lanes().length * LANE_H) + '" stroke="#c9ccd4" stroke-dasharray="4,4"/>';
   });
   /* Verbindungen */
   state.connections.forEach(cn => {
@@ -2753,9 +3108,9 @@ function genLandkarte() {
   state.milestones.forEach(m => {
     const x = LABEL_W + clamp(m.x, 0, canvasW(state));
     const yTop = TOP + HEADER_H;
-    s += '<line x1="' + x + '" y1="' + yTop + '" x2="' + x + '" y2="' + (yTop + LANES.length * LANE_H) + '" stroke="#651B32" stroke-width="1.6" stroke-dasharray="6,4"/>';
+    s += '<line x1="' + x + '" y1="' + yTop + '" x2="' + x + '" y2="' + (yTop + lanes().length * LANE_H) + '" stroke="#651B32" stroke-width="1.6" stroke-dasharray="6,4"/>';
     const label = tspan(m.label.split(/\s[–-]\sKriterien/)[0], 34);
-    const li = LANE_KEYS.indexOf('sache');
+    const li = gateLaneIdx();
     s += '<rect x="' + (x - 4) + '" y="' + (yTop + li * LANE_H - 16) + '" width="' + (label.length * 5.6 + 18) + '" height="16" rx="4" fill="#651B32"/>';
     s += '<text x="' + (x + 4) + '" y="' + (yTop + li * LANE_H - 4) + '" font-size="9" font-weight="bold" fill="#ffffff">&#9670; ' + label + '</text>';
   });
@@ -2770,7 +3125,7 @@ function genLandkarte() {
     s += '<circle cx="' + (x + PI_W - 9) + '" cy="' + (y + 9) + '" r="4" fill="' + (st === 'erledigt' ? '#2f8a4c' : st === 'arbeit' ? '#3f6fb0' : '#cfd5dd') + '"/>';
   });
   /* Fusszeile: Ziel + Legende */
-  const gy = TOP + HEADER_H + LANES.length * LANE_H + 16;
+  const gy = TOP + HEADER_H + lanes().length * LANE_H + 16;
   s += '<text x="12" y="' + gy + '" font-size="9.5" font-weight="bold" fill="#333333">Gesamtziel:</text>';
   s += '<text x="72" y="' + gy + '" font-size="9.5" fill="#333333">' + tspan(state.goal, 200) + '</text>';
   s += '<text x="12" y="' + (gy + 16) + '" font-size="8.5" fill="#666666">&#9670; Entscheid-Tor &#183; Punkt: grau=offen, blau=in Arbeit, gr&#252;n=erledigt &#183; Pfeile: Ablauf/R&#252;ckkopplung &#183; erzeugt aus der OSTO/SYMA Prozesswand'
@@ -2833,7 +3188,7 @@ function genClaudeAuftrag(sel) {
     const g = gateOfPhase(i);
     if (g) L.push('- Entscheid-Tor am Phasenende: ' + g.label);
     L.push('');
-    const schritte = cardsInPhaseLane(i, 'handlung');
+    const schritte = arbeitsKartenPhase(i);
     if (schritte.length) {
       L.push('### Schritte');
       schritte.forEach((c, j) => {
@@ -2935,7 +3290,7 @@ function ownerVorschlag(c) {
 function openOwnerModal() {
   if (previewState) return;
   const liste = [];
-  state.phases.forEach((p, i) => cardsInPhaseLane(i, 'handlung')
+  state.phases.forEach((p, i) => arbeitsKartenPhase(i)
     .sort((a, b) => (a.x - b.x) || (a.y - b.y))
     .forEach(c => liste.push({ c, i })));
   if (!liste.length) { sysMsg('Keine Schritte auf der Handlungsebene – nichts zuzuteilen.', true); return; }
@@ -2977,16 +3332,22 @@ function openOwnerModal() {
 function buildTasks(sel) {
   const tnr = {}, byT = {}, list = [];
   let n = 0;
-  state.phases.forEach((p, i) => cardsInPhaseLane(i, 'handlung').forEach(c => {
+  /* V62: Auf einer Agenten-Wand liefert JEDE Agenten-Ebene Aufgaben,
+     auf der OSTO-Wand wie bisher nur die Handlungsebene. */
+  const agWand = istAgentenWand();
+  const taskLanes = agWand ? laneKeys() : ['handlung'];
+  state.phases.forEach((p, i) => taskLanes.forEach(lk => cardsInPhaseLane(i, lk).forEach(c => {
     n++; const t = 'T-' + String(n).padStart(3, '0');
-    tnr[c.id] = t; byT[t] = c; list.push({ c, i, t });
-  }));
+    tnr[c.id] = t; byT[t] = c; list.push({ c, i, t, lk });
+  })));
   const proj = slug(boardName());
   return list.filter(x => sel === null || x.i === sel).map(x => {
     const { c, i, t } = x;
+    const ag = agWand ? findAgent(x.lk) : null;
     const deps = state.connections.filter(k => k.to === c.id && tnr[k.from]).map(k => tnr[k.from]);
     const typ = taskTyp(c);
-    const owner = (c.owner || '').trim() || (typ === 'input' ? 'doelf' : 'claude_code');
+    const owner = (c.owner || '').trim()
+      || (ag ? (ag.mensch ? 'doelf' : 'claude_code') : (typ === 'input' ? 'doelf' : 'claude_code'));
     const st = c.status || 'offen';
     const blocked = st !== 'erledigt' && deps.some(d => (byT[d].status || 'offen') !== 'erledigt');
     const status = st === 'erledigt' ? 'erledigt' : blocked ? 'blockiert' : st === 'arbeit' ? 'in_arbeit' : 'offen';
@@ -2995,17 +3356,19 @@ function buildTasks(sel) {
       'id: ' + t,
       'projekt: ' + proj,
       'phase: ' + (i + 1),
-      'ebene: handlung',
+      'ebene: ' + (agWand ? x.lk : 'handlung'),
       'titel: ' + cleanTxt(c.text).replace(/\s*\n\s*/g, ' ').trim(),
       'status: ' + status,
       'typ: ' + typ,
       'owner: ' + owner];
+    if (ag) { L.push('agent: ' + ag.name); if (ag.modell) L.push('modell: ' + ag.modell); }
     if (deps.length) L.push('abhaengig_von: [' + deps.join(', ') + ']');
     if (ssot()) L.push('ssot: ' + ssot());
     L.push('---', '', '## Auftrag');
     L.push(cleanTxt(c.text).trim() + ' — Projekt «' + boardName() + '», Phase ' + (i + 1) + (state.phases[i].name ? ' (' + state.phases[i].name + ')' : '') + '.');
     if (c.auftrag) L.push(cleanTxt(c.auftrag).replace(/\s*\n\s*/g, ' ').trim());
     if (c.guide) L.push(cutAtSentence(stripMd(c.guide).replace(/\n+/g, ' '), 400));
+    if (ag && ag.mensch) L.push('Diese Aufgabe macht ein Mensch selbst (Konto, Klick, Zahlung, Unterschrift, Freigabe) – nicht automatisch ausführen.');
     if (typ === 'freigabe') L.push('Wirkung erst nach Freigabe durch den Projektinhaber: vollständig vorbereiten, nicht ausführen.');
     if (g) L.push('Entscheid-Tor am Phasenende: ' + g.label.split(/\s[–-]\sKriterien/)[0] + ' (Go/No-Go, Freigabe nötig).');
     L.push('Privacy-Regel: Ins Repo und in die status.json gehören nur Code, Dokumente, Task-Titel und Status – nie Screenshots, OCR- oder Inhaltsauszüge.');
@@ -3175,7 +3538,7 @@ function buildStatusJson() {
   state.milestones.forEach(m => { ms[cleanTxt(m.label).split(/\s[–-]\s/)[0].slice(0, 60)] = 'offen'; });
   const gate = nextGate();
   const warten = state.postits
-    .filter(c => laneKeyOfY(c.y) === 'handlung' && taskTyp(c) !== 'auto' && (c.status || 'offen') !== 'erledigt')
+    .filter(c => istArbeitsLane(laneKeyOfY(c.y)) && taskTyp(c) !== 'auto' && (c.status || 'offen') !== 'erledigt')
     .slice(0, 3).map(c => cleanTxt(c.text).replace(/\s*\n\s*/g, ' ').slice(0, 80));
   return JSON.stringify({
     projekt: slug(boardName()),
@@ -3512,7 +3875,7 @@ document.getElementById('checkBtn').onclick = async () => {
   if (!cards.length) { sysMsg('Alles bereits geprüft – keine neuen oder geänderten Post-its.', true); return; }
   addMsg('user', '[Karten-Check] ' + cards.length + ' Post-it(s) prüfen');
   const wait = sysMsg('🔍 prüft Ebene, Formulierung, Dubletten …', true);
-  const liste = cards.map((c, j) => 'K' + (j+1) + ' [Phase ' + (phaseIndexOfX(c.x)+1) + ' · ' + laneTitle(LANES[LANE_KEYS.indexOf(laneKeyOfY(c.y))]) + ']: ' + cleanTxt(c.text)).join('\n');
+  const liste = cards.map((c, j) => 'K' + (j+1) + ' [Phase ' + (phaseIndexOfX(c.x)+1) + ' · ' + laneTitle(lanes()[laneKeys().indexOf(laneKeyOfY(c.y))]) + ']: ' + cleanTxt(c.text)).join('\n');
   try {
     const out = await callClaude(
       'Du prüfst Post-its einer OSTO/SYMA-Prozesswand nach der Methodik: 1) richtige Ebene? (Reflexion=Risiken, Input=Experten, Mgmt=Führung/Entscheid, Sache=Zwischenziele, Handlung=Tätigkeiten, Doku=Ergebnisse, Anspruchsgruppen=Betroffene) 2) klar und konkret formuliert? 3) Dublette zu Bestehendem? 4) fehlt eine offensichtliche Verbindung/Rückkopplung? '
@@ -3548,7 +3911,7 @@ const FK_SYS = 'Du bist der Fragekatalog der OSTO/SYMA-Prozesswand: autonome Pai
   + 'Antworte NUR als JSON: {"modus":"pain"|"ist","scqa":{"kern":"…","situation":"…","komplikation":"…","kernfrage":"…"},"landkarte":[{"ebene":"reflexion","phase":1,"pain":"…","impact":"hoch","konfidenz":"mittel","beleg":"…"}],"fragen":[{"frage":"…","warum":"…"}],"annahmen":["…"]} '
   + '"phase" ist die Nummer der am besten passenden Phase. Deutsch, Schweizer Schreibweise (ss statt ß).';
 
-function fkLaneName(key) { const l = LANES.find(x => x.key === key); return l ? laneTitle(l) : key; }
+function fkLaneName(key) { const l = lanes().find(x => x.key === key); return l ? laneTitle(l) : key; }
 
 function fkRender(res) {
   fkRound = res;
@@ -3579,7 +3942,7 @@ function fkActionBar(res, karte) {
     b.onclick = () => {
       let n = 0;
       karte.forEach(e => {
-        if (LANE_KEYS.indexOf(e.ebene) < 0 || !e.pain) return;
+        if (laneKeys().indexOf(e.ebene) < 0 || !e.pain) return;
         const pi = clamp((parseInt(e.phase, 10) || 1) - 1, 0, state.phases.length - 1);
         addCard(pi, e.ebene, (res.modus === 'ist' ? '' : '⚠️ ') + e.pain, 'offen');
         n++;
@@ -3653,7 +4016,7 @@ document.getElementById('fkBtn').onclick = () => {
   if (previewState) return;
   const opts = ['<option value="all">Gesamtprozess (alle Phasen und Ebenen)</option>']
     .concat(state.phases.map((p, i) => '<option value="p' + i + '">Nur Phase ' + (i + 1) + ': ' + esc(p.name) + '</option>'))
-    .concat(LANES.map(l => '<option value="l' + l.key + '">Nur Ebene: ' + esc(fkLaneName(l.key)) + '</option>')).join('');
+    .concat(lanes().map(l => '<option value="l' + l.key + '">Nur Ebene: ' + esc(fkLaneName(l.key)) + '</option>')).join('');
   const istHint = state.postits.length < 5;
   openModal('<h3>&#128506; Fragekatalog</h3>'
     + '<p style="font-size:12.5px;color:var(--muted)">Findet Schwachstellen (Pain Points) selbst&auml;ndig entlang der 8 Ebenen und stellt dir h&ouml;chstens 3 Fragen &ndash; nur wo eine Antwort wirklich etwas &auml;ndert.'
@@ -3739,7 +4102,7 @@ function renderGuide() {
   const c = getPostit(guide.list[guide.idx]);
   if (!c) { guide.list.splice(guide.idx, 1); if (!guide.list.length) { guide = null; closeModal(); return; } if (guide.idx >= guide.list.length) guide.idx = guide.list.length - 1; return renderGuide(); }
   const pi = phaseIndexOfX(c.x), p = state.phases[pi] || { name: '?' };
-  const lane = LANES[LANE_KEYS.indexOf(laneKeyOfY(c.y))] || LANES[0];
+  const lane = lanes()[laneKeys().indexOf(laneKeyOfY(c.y))] || lanes()[0];
   const st = c.status || 'offen';
   const last = guide.idx >= guide.list.length - 1;
   const gBtn = 'font:inherit;font-size:12px;font-weight:600;cursor:pointer;border:1px solid var(--line);border-radius:6px;background:#f6f7f9;padding:5px 11px;';
@@ -3876,7 +4239,9 @@ function syncErledigtVonStatus() {
     const nt = norm(t.titel);
     if (!nt) return;
     state.postits.forEach(c => {
-      if ((c.status || 'offen') === 'erledigt' || laneKeyOfY(c.y) !== 'handlung') return;
+      /* V62: auf einer Agenten-Wand zaehlt jede Agenten-Ebene, sonst nur die Handlungsebene */
+      if ((c.status || 'offen') === 'erledigt') return;
+      if (!istAgentenWand() && laneKeyOfY(c.y) !== 'handlung') return;
       if (norm(cleanTxt(c.text)) === nt) { c.status = 'erledigt'; stempelErledigt(c); n++; }
     });
   });
@@ -4320,7 +4685,7 @@ document.getElementById('dashBody').addEventListener('click', e => {
    ================================================================ */
 const STATUS_NEXT = { offen:'arbeit', arbeit:'erledigt', erledigt:'offen' };
 const STATUS_LABEL = { offen:'offen', arbeit:'in Arbeit', erledigt:'erledigt' };
-const LUPE_SECTIONS = [
+const LUPE_SECTIONS_OSTO = [
   { lane:'handlung', title:'Aufgaben / Handlungen', add:'Aufgabe' },
   { lane:'doku',     title:'Ergebnisse / Dokumentation', add:'Ergebnis' },
   { lane:'sache',    title:'Zwischenziele', add:'Zwischenziel' },
@@ -4330,17 +4695,21 @@ const LUPE_SECTIONS = [
   { lane:'input',    title:'Experten / Input', add:'Experte' },
   { lane:'anspruch', title:'Anspruchsgruppen', add:'Gruppe' }
 ];
+function lupeSections() {
+  if (!istAgentenWand()) return LUPE_SECTIONS_OSTO;
+  return lanes().map(l => ({ lane: l.key, title: l.title, add: 'Auftrag' }));
+}
 let lupeIdx = -1;
 
 function phaseIndexOfX(x) { let acc = 0; for (let i = 0; i < state.phases.length; i++) { if (x < acc + state.phases[i].w) return i; acc += state.phases[i].w; } return state.phases.length - 1; }
-function laneKeyOfY(y) { return LANE_KEYS[clamp(Math.floor(y / LANE_H), 0, LANES.length - 1)]; }
+function laneKeyOfY(y) { return laneKeys()[clamp(Math.floor(y / LANE_H), 0, lanes().length - 1)]; }
 function cardsInPhaseLane(i, laneKey) { return state.postits.filter(p => phaseIndexOfX(p.x) === i && laneKeyOfY(p.y) === laneKey); }
 function addCard(i, laneKey, text, status) {
-  const li = LANE_KEYS.indexOf(laneKey), left = phaseLeft(i), w = state.phases[i].w;
+  const li = laneKeys().indexOf(laneKey), left = phaseLeft(i), w = state.phases[i].w;
   const n = cardsInPhaseLane(i, laneKey).length;
   const x = clamp(left + 12 + (n * 26) % Math.max(30, w - PI_W - 24), 0, canvasW(state) - PI_W);
   const y = li * LANE_H + 8 + (n * 20) % (LANE_H - 60);
-  const card = { id: uid('p'), x, y, text: text || 'Neuer Eintrag', color: LANE_COLOR[laneKey] || PALETTE[0], status: status || 'offen' };
+  const card = { id: uid('p'), x, y, text: text || 'Neuer Eintrag', color: laneColor(laneKey), status: status || 'offen' };
   state.postits.push(card); return card;
 }
 
@@ -4371,7 +4740,7 @@ function renderLupe() {
   h += '<div class="ei-grid">' + eif('ziel','Ziel der Phase', true) + eif('input','Input') + eif('output','Output / Ergebnis') + eif('wer','Wer?') + eif('was','Was?') + eif('wann','Wann?') + eif('wie','Wie?') + '</div>';
   if (gate.length) h += '<div style="font-size:12px;color:var(--warn);margin-top:6px">&#9670; Entscheid-Tor: ' + esc(gate.map(g=>g.label).join(' | ')) + '</div>';
 
-  LUPE_SECTIONS.forEach(sec => {
+  lupeSections().forEach(sec => {
     const cards = cardsInPhaseLane(i, sec.lane);
     h += '<div class="lupe-sec"><h3>' + esc(sec.title) + ' <span class="cnt">' + cards.length + '</span><span class="add" data-addlane="' + sec.lane + '">+ ' + sec.add + '</span></h3>';
     cards.forEach(c => {
@@ -4498,7 +4867,7 @@ async function phaseTool(kind) {
   document.querySelectorAll('.lupe-tool').forEach(b => b.disabled = true);
   if (!kiBereit()) { document.querySelectorAll('.lupe-tool').forEach(b => b.disabled = false); openKeyModal(() => phaseTool(kind)); return; }
   const ctx = 'Projektziel: ' + (state.goal||'-') + '\nPhase ' + (lupeIdx+1) + ': ' + p.name
-    + '\nBereits vorhanden – Schritte: ' + cardsInPhaseLane(lupeIdx,'handlung').map(c=>c.text).join('; ')
+    + '\nBereits vorhanden – Schritte: ' + arbeitsKartenPhase(lupeIdx).map(c=>c.text).join('; ')
     + ' | Risiken: ' + cardsInPhaseLane(lupeIdx,'reflexion').map(c=>c.text).join('; ')
     + ' | Anspruchsgruppen: ' + cardsInPhaseLane(lupeIdx,'anspruch').map(c=>c.text).join('; ');
   try {
@@ -4576,6 +4945,7 @@ async function startApp(user) {
   document.getElementById('logoutBtn').style.display = '';
   authGate.style.display = 'none';
   await loadFromCloud();
+  if (new URLSearchParams(location.search).has('agenten')) { agentenWandOeffnen(); return; }
   startAutoAnzeigen();
 }
 async function initAuth() {
