@@ -341,7 +341,7 @@ table.ph-tab { width:100%; border-collapse:collapse; }
 <script>
 "use strict";
 
-const APP_VERSION = 'V62';
+const APP_VERSION = 'V63';
 /* V49: einheitlicher Wegweiser nach jedem «An Claude kopieren» */
 function claudeHinweis() {
   sysMsg('📋 Kopiert! Jetzt: 1. Claude öffnen (claude.ai bzw. deine Prozesswand-Sitzung) → 2. ins Schreibfeld klicken → 3. Cmd+V (einfügen) → 4. Senden. Mehr braucht es nicht.', true);
@@ -421,6 +421,20 @@ const AGENTEN_STANDARD = [
   { name: 'Du (Mensch)', kurz: 'Klicks, Konten, Freigaben, Bezahlung', mensch: true, modell: '', rolle: '' }
 ];
 
+/* V63: Katalog zum Dazuschalten. Bewusst NICHT von Anfang an aktiv –
+   jeder zusätzliche Agent ist ein zusätzlicher Aufruf und kostet. */
+const AGENTEN_KATALOG = [
+  { name: 'Zukunftsforscher', kurz: 'was in 3–5 Jahren anders ist', modell: 'claude-opus-5',
+    rolle: 'Du bist Zukunftsforscher. Du prüfst das Vorhaben gegen absehbare Entwicklungen: Was ist in drei bis fünf Jahren anders – Technik, Recht, Erwartungen der Nutzer, Kosten? Du nennst konkrete Vorkehrungen, die man HEUTE trifft, damit die Lösung morgen nicht wertlos ist. Keine Modewörter, keine Prognosen ins Blaue: Nur was sich begründen lässt. Unsicheres kennzeichnest du als [Annahme].' },
+  { name: 'Kritiker', kurz: 'sucht die Lücken und Denkfehler', modell: 'claude-opus-5',
+    rolle: 'Du bist der Kritiker. Du suchst schonungslos, aber sachlich: Was fehlt, was ist zu optimistisch geschätzt, welche Abhängigkeit ist ungeklärt, wo widerspricht sich der Plan? Du machst ein Pre-Mortem: Angenommen, das Vorhaben scheitert – woran lag es? Jeder Punkt konkret und an eine Phase gebunden. Keine Höflichkeitsfloskeln. Unbelegtes markierst du als [offen].' },
+  { name: 'Querdenker', kurz: 'stellt den ganzen Weg in Frage', modell: 'claude-opus-5',
+    rolle: 'Du bist der kreative Querdenker. Du fragst, ob der eingeschlagene Weg überhaupt der richtige ist. Welche naheliegende Lösung wird nur aus Gewohnheit gewählt? Was, wenn man das Problem ganz anders angeht – oder gar nicht lösen muss? Du schlägst mindestens einen unbequemen Gegenentwurf vor und sagst in einem Satz, was er besser könnte. Du streichst nichts selbst; du schlägst vor.' },
+  { name: 'Innovator', kurz: 'was die Lösung besonders macht', modell: 'claude-opus-5',
+    rolle: 'Du bist der Innovator. Du suchst den Punkt, an dem die Lösung mehr kann als das Übliche: Welcher kleine Zusatz bringt einen spürbaren Vorteil, welche Verbindung zweier vorhandener Bausteine ergibt etwas Neues? Jeder Vorschlag muss mit vorhandenen Mitteln umsetzbar sein – keine Wunschtechnik, keine erfundenen Dienste. Nutzen in einem Satz benennen.' },
+  { name: 'Prozessmanager', kurz: 'Reihenfolge, Leerlauf, Abkürzungen', modell: 'claude-opus-5',
+    rolle: 'Du bist Prozessmanager. Du prüfst vier Dinge: Was läuft nacheinander, obwohl es parallel gehen könnte? Wo bringt ein kleiner Test früh die Antwort, für die sonst viel Arbeit nötig wäre? Wo entstehen Wartezeiten, Doppelarbeit oder Übergaben, die man zusammenlegen kann? Welcher Schritt bringt gemessen am Aufwand am wenigsten? Jeder Punkt an eine Phase gebunden und in einem Satz begründet.' }
+];
 function neueAgenten() {
   return AGENTEN_STANDARD.map((a, i) => ({
     id: uid('ag'), name: a.name, kurz: a.kurz, modell: a.modell || '',
@@ -1458,7 +1472,15 @@ function openAgentenModal() {
     + '<p style="font-size:12px;color:var(--muted);margin:0 0 12px">Jeder Agent ist eine Ebene der Wand &ndash; von oben nach unten in dieser Reihenfolge. '
     + 'Entfernst du einen Agenten, wandern seine Karten auf die oberste Ebene.</p>'
     + '<div id="agListe">' + liste.map(agZeile).join('') + '</div>'
-    + '<button id="agAdd" style="font:inherit;font-size:13px;cursor:pointer;border:1px dashed var(--line);background:#fff;border-radius:7px;padding:8px 12px;width:100%">+ Agent hinzuf&uuml;gen</button>'
+    + '<div style="display:flex;gap:8px;align-items:center;margin-top:4px">'
+    + '<select id="agWahl" style="flex:1">'
+    + '<option value="">&ndash; eigener Agent (leer) &ndash;</option>'
+    + AGENTEN_KATALOG.map((k, i) => '<option value="' + i + '">' + esc(k.name) + ' &ndash; ' + esc(k.kurz) + '</option>').join('')
+    + '</select>'
+    + '<button id="agAdd" style="font:inherit;font-size:13px;cursor:pointer;border:1px dashed var(--line);background:#fff;border-radius:7px;padding:8px 12px;white-space:nowrap">+ hinzuf&uuml;gen</button>'
+    + '</div>'
+    + '<p style="font-size:11.5px;color:var(--muted);margin:8px 0 0">Jeder zus&auml;tzliche Agent ist ein zus&auml;tzlicher KI-Aufruf und kostet. '
+    + 'Die Agenten arbeiten in dieser Reihenfolge und sehen die Arbeit der Agenten &uuml;ber ihnen.</p>'
     + '<div class="btnrow"><button class="go" id="agSave">Speichern</button><button id="agCancel">Abbrechen</button></div>';
   openModal(h, true);
 
@@ -1474,7 +1496,7 @@ function openAgentenModal() {
     if (e.target.closest('.ag-reset')) {
       e.preventDefault();
       const nm = row.querySelector('.ag-name').value.trim();
-      const std = AGENTEN_STANDARD.find(x => x.name === nm);
+      const std = AGENTEN_STANDARD.concat(AGENTEN_KATALOG).find(x => x.name === nm);
       const ta = row.querySelector('.ag-rolle');
       if (std && ta) ta.value = std.rolle || ''; else alert('Für diesen Namen gibt es keinen Standardtext.');
       return;
@@ -1482,10 +1504,17 @@ function openAgentenModal() {
   });
   document.getElementById('agAdd').onclick = () => {
     const n = box.children.length;
+    const wahl = document.getElementById('agWahl').value;
+    const k = wahl === '' ? null : AGENTEN_KATALOG[+wahl];
     box.insertAdjacentHTML('beforeend', agZeile({
-      id: uid('ag'), name: 'Neuer Agent', kurz: '', modell: 'claude-opus-5',
-      rolle: '', farbe: AGENT_FARBEN[n % AGENT_FARBEN.length], mensch: false, aktiv: true
+      id: uid('ag'),
+      name: k ? k.name : 'Neuer Agent',
+      kurz: k ? k.kurz : '',
+      modell: k ? k.modell : 'claude-opus-5',
+      rolle: k ? k.rolle : '',
+      farbe: AGENT_FARBEN[n % AGENT_FARBEN.length], mensch: false, aktiv: true
     }));
+    box.lastElementChild.scrollIntoView({ block: 'nearest' });
   };
   document.getElementById('agCancel').onclick = closeModal;
   document.getElementById('agSave').onclick = () => {
@@ -1817,11 +1846,51 @@ async function agentCall(role, system, user, maxTok) {
     throw e;
   }
 }
+/* V62: Rettet eine abgeschnittene Antwort. Schneidet hinter dem letzten
+   VOLLSTÄNDIGEN Element eines Arrays ab und schliesst die offenen Klammern –
+   so geht die bereits geschriebene Arbeit nicht verloren. */
+function jsonReparieren(t) {
+  const zu = [];
+  let inStr = false, esc = false, letzteGut = -1;
+  for (let i = 0; i < t.length; i++) {
+    const c = t[i];
+    if (inStr) {
+      if (esc) esc = false; else if (c === '\\') esc = true; else if (c === '"') inStr = false;
+      continue;
+    }
+    if (c === '"') { inStr = true; continue; }
+    if (c === '{' || c === '[') zu.push(c === '{' ? '}' : ']');
+    else if (c === '}' || c === ']') {
+      zu.pop();
+      if (zu.length && zu[zu.length - 1] === ']') letzteGut = i; // Ende eines Array-Elements
+    }
+  }
+  if (letzteGut < 0) return null;
+  let s = t.slice(0, letzteGut + 1);
+  const offen = [];
+  inStr = false; esc = false;
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (inStr) {
+      if (esc) esc = false; else if (c === '\\') esc = true; else if (c === '"') inStr = false;
+      continue;
+    }
+    if (c === '"') { inStr = true; continue; }
+    if (c === '{' || c === '[') offen.push(c === '{' ? '}' : ']');
+    else if (c === '}' || c === ']') offen.pop();
+  }
+  while (offen.length) s += offen.pop();
+  try { return JSON.parse(s); } catch (e) { return null; }
+}
 function extractJSON(t) {
   t = t.replace(/```json/gi, '```').replace(/```/g, '');
-  const a = t.indexOf('{'), b = t.lastIndexOf('}');
-  if (a < 0 || b <= a) throw new Error('Keine JSON-Antwort erhalten.');
-  return JSON.parse(t.slice(a, b + 1));
+  const a = t.indexOf('{');
+  if (a < 0) throw new Error('Keine JSON-Antwort erhalten.');
+  const b = t.lastIndexOf('}');
+  if (b > a) { try { return JSON.parse(t.slice(a, b + 1)); } catch (e) { /* evtl. abgeschnitten */ } }
+  const rest = jsonReparieren(t.slice(a));
+  if (rest) return rest;
+  throw new Error('Die Antwort war unvollständig – kein gültiges JSON (abgeschnitten).');
 }
 async function agentJSON(role, system, user, maxTok) {
   const sys = system + '\n\nAntworte AUSSCHLIESSLICH mit gültigem JSON, ohne Erklärtext.';
@@ -1943,12 +2012,19 @@ function optBar(karten) {
    Schritt 1: Struktur (Phasen + Tore). Schritt 2: je Agent sein Beitrag.
    Alles landet in der VORSCHAU – uebernommen wird nur per Knopf.
    ================================================================ */
-async function agentJSONModell(modell, system, user, maxTok) {
+async function agentJSONModell(modell, system, user, maxTok, kurzHinweis) {
   const sys = system + '\n\nAntworte AUSSCHLIESSLICH mit gültigem JSON, ohne Erklärtext.';
-  const call = u => callClaude(sys, u, modell || CHAT_MODEL, maxTok, SWARM_TEMP);
+  const call = (u, mt) => callClaude(sys, u, modell || CHAT_MODEL, mt || maxTok, SWARM_TEMP);
   try { return extractJSON(await call(user)); }
   catch (e) {
-    if (e instanceof SyntaxError || /JSON/.test(e.message)) return extractJSON(await call(user + '\n\nWICHTIG: Nur gültiges JSON ausgeben.'));
+    if (e instanceof SyntaxError || /JSON/.test(e.message)) {
+      /* Zweiter Versuch: kürzer antworten lassen UND mehr Platz geben –
+         sonst bricht dieselbe Antwort an derselben Stelle wieder ab. */
+      return extractJSON(await call(
+        user + '\n\nWICHTIG: Nur gültiges JSON ausgeben, vollständig bis zur letzten Klammer.'
+        + (kurzHinweis ? ' ' + kurzHinweis : ''),
+        Math.round((maxTok || 2000) * 1.5)));
+    }
     throw e;
   }
 }
@@ -1957,10 +2033,16 @@ const MENSCH_ROLLE = 'Du listest ausschliesslich die Handgriffe auf, die ein MEN
   + 'Konten eröffnen, in fremden Diensten klicken, Zugänge einrichten, Zahlungen auslösen, Verträge unterschreiben, Freigaben erteilen, Personen ansprechen. '
   + 'Keine Programmier- oder Schreibarbeit – die machen die anderen Agenten. Nichts erfinden; Unbekanntes als [offen].';
 
-function agentBeitragFormat() {
-  return '\n\nFormat:\n{"beitraege":[{"phase":1,"text":"Auftrag in max. 12 Worten","auftrag":"2–4 Sätze: Was genau ist zu tun? Womit (Ausgangslage)? Welches Ergebnis entsteht (Datei oder prüfbarer Zustand)? Woran wird gemessen, dass es gut ist? Unbekanntes als [offen].","freigabe":false}]}\n'
+function agentBeitragFormat(nPhasen) {
+  /* Der Deckel haengt an der Phasenzahl: sonst wird die Antwort zu lang
+     und bricht mitten im JSON ab (Fehler «unvollstaendig»). */
+  const proPhase = nPhasen >= 5 ? 2 : 3;
+  const gesamt = Math.min(12, proPhase * Math.max(1, nPhasen));
+  return '\n\nFormat:\n{"beitraege":[{"phase":1,"text":"Auftrag in max. 12 Worten","auftrag":"2–3 Sätze: Was genau ist zu tun? Welches Ergebnis entsteht (Datei oder prüfbarer Zustand)? Woran wird gemessen, dass es gut ist? Unbekanntes als [offen].","freigabe":false}]}\n'
     + '"phase" ist die Phasennummer (1 = erste Phase). "freigabe" auf true setzen, wenn der Schritt eine Freigabe, eine Löschung, eine Zahlung, einen Versand oder eine Veröffentlichung auslöst.\n'
-    + 'Höchstens 3 Beiträge pro Phase. Lieber wenige klare Aufträge als viele vage. Nichts erfinden – Fehlendes als [offen] markieren.';
+    + 'Höchstens ' + proPhase + ' Beiträge pro Phase und höchstens ' + gesamt + ' insgesamt. '
+    + 'Halte "auftrag" knapp (höchstens 3 Sätze) – die Antwort muss vollständig in eine Nachricht passen. '
+    + 'Lieber wenige klare Aufträge als viele vage. Nichts erfinden – Fehlendes als [offen] markieren.';
 }
 
 function buildAgentenPreview(cfg, phasen, beitraege) {
@@ -2034,20 +2116,37 @@ async function runAgentenSchwarm(cfg) {
     const phasenText = phasen.map((p, i) => (i + 1) + '. ' + p.name + ' – Ziel: ' + (p.ziel || '[offen]')
       + ' | Tor: ' + ((p.gate && p.gate.name) || '-')).join('\n');
 
+    /* Die Agenten arbeiten als KETTE, nicht nebeneinander: Jeder sieht, was
+       die Agenten vor ihm auf die Wand gelegt haben. So prüft der Prüfer
+       wirklich die Arbeit des Entwicklers statt ins Blaue. Reihenfolge im
+       Agenten-Fenster = Reihenfolge der Bearbeitung. */
     const beitraege = [];
+    const bisher = [];
+    const maxTok = Math.min(4000, 1400 + phasen.length * 600);
+    const phNr = it => clamp((typeof it.phase === 'number' ? it.phase : 1), 1, phasen.length);
     for (const a of aktive) {
       sysMsg('🤖 ' + a.name + ' verteilt seine Aufträge …');
       try {
         const sys = (a.mensch ? MENSCH_ROLLE : (a.rolle || ('Du bist der Agent «' + a.name + '». ' + (a.kurz || ''))))
           + '\n\nDu bist EINE Ebene einer Agenten-Wand. Du lieferst NUR deinen eigenen Beitrag – nicht den der anderen.'
           + '\nDie anderen Ebenen sind: ' + aktive.filter(x => x.id !== a.id).map(x => x.name).join(', ') + '.'
-          + agentBeitragFormat();
+          + (bisher.length ? '\nDu arbeitest NACH den Agenten, deren Aufträge unten stehen. Beziehe dich darauf, ergänze sie und wiederhole nichts.' : '')
+          + agentBeitragFormat(phasen.length);
         const out = await agentJSONModell(a.mensch ? CHAT_MODEL : a.modell, sys,
           'Ziel: ' + cfg.ziel + '\nZeitrahmen: ' + (cfg.zeit || 'offen') + '\nKontext: ' + (cfg.kontext || '-')
-          + '\n\nPhasen:\n' + phasenText, 2200);
-        const items = (out && Array.isArray(out.beitraege)) ? out.beitraege : [];
+          + '\n\nPhasen:\n' + phasenText
+          + (bisher.length ? '\n\nSchon auf der Wand (Arbeit der Agenten vor dir):\n' + bisher.join('\n') : ''),
+          maxTok, 'Höchstens 2 Beiträge pro Phase, "auftrag" höchstens 2 Sätze.');
+        const items = (out && Array.isArray(out.beitraege)) ? out.beitraege.filter(x => x && x.text) : [];
         beitraege.push({ agentId: a.id, name: a.name, items });
-        sysMsg('✅ ' + a.name + ': ' + items.length + ' Auftrag/Aufträge.');
+        if (items.length) {
+          bisher.push(a.name + ':\n' + items.map(it => '  P' + phNr(it) + ' · ' + String(it.text).slice(0, 90)).join('\n'));
+          /* Zeigen, WAS der Agent geschrieben hat – nicht nur wie viel */
+          sysMsg('✅ ' + a.name + ': ' + items.length + (items.length === 1 ? ' Auftrag' : ' Aufträge') + '\n'
+            + items.slice(0, 12).map(it => '   P' + phNr(it) + ' · ' + String(it.text).slice(0, 70) + (it.freigabe === true ? '  🔑' : '')).join('\n'));
+        } else {
+          sysMsg('✅ ' + a.name + ': kein eigener Beitrag zu diesem Ziel.');
+        }
       } catch (e) {
         sysMsg('⚠️ ' + a.name + ' übersprungen: ' + e.message);
         beitraege.push({ agentId: a.id, name: a.name, items: [] });
