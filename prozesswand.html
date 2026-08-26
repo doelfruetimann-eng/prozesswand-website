@@ -341,7 +341,7 @@ table.ph-tab { width:100%; border-collapse:collapse; }
 <script>
 "use strict";
 
-const APP_VERSION = 'V65';
+const APP_VERSION = 'V66';
 /* V49: einheitlicher Wegweiser nach jedem «An Claude kopieren» */
 function claudeHinweis() {
   sysMsg('📋 Kopiert! Jetzt: 1. Claude öffnen (claude.ai bzw. deine Prozesswand-Sitzung) → 2. ins Schreibfeld klicken → 3. Cmd+V (einfügen) → 4. Senden. Mehr braucht es nicht.', true);
@@ -412,6 +412,8 @@ function modellKurz(m) { const x = AGENT_MODELLE.find(a => a.id === m); return x
 const AGENTEN_STANDARD = [
   { name: 'Architekt', kurz: 'zerlegt das Ziel in Phasen und Tore', modell: 'claude-opus-5',
     rolle: 'Du bist der Architekt. Du zerlegst ein Ziel in wenige, klar abgegrenzte Phasen mit je einem prüfbaren Entscheid-Tor am Ende. Du beschreibst Systemgrenzen (was gehört dazu, was nicht). Du erfindest nichts: Fehlendes markierst du als [offen].' },
+  { name: 'Rechercheur', kurz: 'prüft Annahmen an der Quelle', modell: 'claude-opus-5',
+    rolle: 'Du bist der Rechercheur. Du baust nichts und erfindest nichts. Für jede Annahme, auf der ein Schritt beruht, prüfst du an der Primärquelle nach und trägst den Beleg ein: eine URL, einen Dateinamen oder einen gemessenen Wert. Findest du keinen Beleg, schreibst du wörtlich [unbelegt] und schlägst vor, den Schritt zu streichen oder in eine offene Frage umzuwandeln. Besonders misstrauisch bist du bei Formulierungen wie «falls nötig», «gegebenenfalls» oder «beantragen» – dahinter steckt meist eine ungeprüfte Vermutung, keine echte Hürde.' },
   { name: 'Entwickler', kurz: 'schreibt die Bau-Aufträge', modell: 'claude-opus-5',
     rolle: 'Du bist der Entwickler. Du formulierst Bau-Aufträge, die Claude Code in einem Repo abarbeiten kann: Was genau, womit, welche Ergebnis-Datei entsteht, woran gemessen wird. Keine Platzhalter, keine erfundenen Bibliotheken. Fehlendes als [offen].' },
   { name: 'Prüfer', kurz: 'Akzeptanzkriterien und Nachweis', modell: 'claude-opus-5',
@@ -656,8 +658,13 @@ function render() {
       ? '<span class="todoTag" title="Verantwortlich: ' + esc(ownerLabel(p.owner)) + '">' + ownerKurz(p.owner) + '</span>' : '';
     const rgTag = (typeof p.rang === 'number' && p.rang > 0 && istArbeitsLane(laneKeyOfY(p.y)))
       ? '<span class="todoTag" title="Priorit&auml;t (vergeben &uuml;ber &#128202; Priorisieren)" style="' + (p.rang === 1 ? 'background:#651B32;color:#fff;border-radius:6px;padding:0 5px;' : 'color:#651B32;font-weight:700;') + '">P' + p.rang + '</span>' : '';
+    /* V66: unbelegte Arbeitskarten sichtbar machen – eine Behauptung ohne Quelle
+       soll auffallen, bevor jemand danach plant. */
+    const beTag = (istArbeitsLane(laneKeyOfY(p.y)) && istUnbelegt(p))
+      ? '<span class="todoTag" title="Unbelegt: Es ist nicht festgehalten, woher die Annahme hinter dieser Karte stammt. Doppelklick &rarr; Feld &laquo;Beleg&raquo; ausf&uuml;llen." style="color:#b3391f;font-weight:700">&#9679; unbelegt</span>'
+      : '';
     const prio = mode === 'lean' && istArbeitsLane(laneKeyOfY(p.y)) && depsOk(p);
-    h += '<div class="postit st-' + st + (prio ? ' prio' : '') + (connectSrc === p.id ? ' sel' : '') + '" data-pid="' + p.id + '" style="left:' + (LABEL_W + p.x) + 'px;top:' + (HEADER_H + p.y) + 'px;background:' + (p.color || PALETTE[0]) + '"><span class="dot ' + st + '"></span>' + esc(p.text) + (prio ? '<span class="prioTag">&#10148; als N&auml;chstes</span>' : '') + tds + typTag + persTag + owTag + rgTag + '</div>';
+    h += '<div class="postit st-' + st + (prio ? ' prio' : '') + (connectSrc === p.id ? ' sel' : '') + '" data-pid="' + p.id + '" style="left:' + (LABEL_W + p.x) + 'px;top:' + (HEADER_H + p.y) + 'px;background:' + (p.color || PALETTE[0]) + '"><span class="dot ' + st + '"></span>' + esc(p.text) + (prio ? '<span class="prioTag">&#10148; als N&auml;chstes</span>' : '') + tds + typTag + persTag + owTag + rgTag + beTag + '</div>';
   });
 
   h += '<svg id="conns" width="' + (LABEL_W + W) + '" height="' + (HEADER_H + H) + '"><defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#1f5fae"/></marker></defs>';
@@ -888,6 +895,9 @@ function openPostitModal(id) {
     + '<label style="margin-top:10px">Auftrag &ndash; genau ausformuliert <span style="font-weight:400;text-transform:none">(steht so im Task-Export; die Karte selbst bleibt kurz)</span></label>'
     + '<textarea id="mAuftrag" rows="3" placeholder="2&ndash;4 S&auml;tze nach festem Format: Was genau ist zu tun? Womit (Ausgangslage)? Welches Ergebnis entsteht (Datei/Zustand)? Woran wird gemessen, dass es gut ist?">' + esc(card.auftrag || '') + '</textarea>'
     + '<div class="btnrow" style="margin-top:4px"><button id="mAuftragAI" style="font:inherit;font-size:12px;cursor:pointer;border:1px solid var(--accent);color:var(--accent);border-radius:6px;background:#eef4fb;padding:4px 10px">&#129302; ausformulieren</button><span style="font-size:10.5px;color:var(--muted);align-self:center">Vorschlag erscheint im Feld &ndash; gespeichert wird erst mit &laquo;Speichern&raquo;</span></div>'
+    + '<label>Beleg <span style="font-weight:400;text-transform:none">&ndash; woher weisst du, dass das n&ouml;tig ist?</span></label>'
+    + '<input type="text" id="mBeleg" placeholder="URL, Dateiname oder gemessener Wert &ndash; sonst [unbelegt]" value="' + esc(card.beleg || '') + '">'
+    + '<div style="font-size:10.5px;color:var(--muted);margin-top:3px">Ohne Beleg kann diese Karte kein Entscheid-Tor ausl&ouml;sen &ndash; eine Vermutung darf den Ablauf nicht anhalten.</div>'
     + '<label>Farbe</label><div class="swatches">' + sw + '</div>'
     + '<div style="display:flex;gap:8px;margin-top:10px">'
     + '<div style="flex:1"><label>Task-Typ</label><select id="mTyp" style="width:100%;font:inherit;font-size:12.5px;padding:6px 8px;border:1px solid var(--line);border-radius:6px">'
@@ -1047,9 +1057,15 @@ function openPostitModal(id) {
     card.text = neuText;
     const auEl = document.getElementById('mAuftrag');
     if (auEl) { const v = auEl.value.trim(); if (v) card.auftrag = v; else delete card.auftrag; }
+    const beEl = document.getElementById('mBeleg');
+    if (beEl) { const v = beEl.value.trim(); if (v) card.beleg = v; else delete card.beleg; }
     const sel = modalBox.querySelector('.swatch.sel'); if (sel) card.color = sel.dataset.c;
     const tySel = document.getElementById('mTyp'); if (tySel) card.typ = tySel.value;
     const owEl = document.getElementById('mOwner'); if (owEl) card.owner = owEl.value.trim();
+    /* V66: ohne Beleg kein Tor – gilt auch, wenn von Hand gesetzt */
+    const warTor = card.typ === 'freigabe';
+    belegRegelAnwenden(card);
+    if (warTor && card.typ !== 'freigabe') sysMsg('❓ «' + cleanTxt(card.text).slice(0, 40) + '» ist unbelegt – daraus wurde eine offene Frage statt eines Entscheid-Tors. Trag einen Beleg ein, dann kann sie wieder ein Tor sein.', true);
     save(); render(); closeModal();
   };
   document.getElementById('mCancel').onclick = closeModal;
@@ -2082,13 +2098,34 @@ const MENSCH_ROLLE = 'Du listest ausschliesslich die Handgriffe auf, die ein MEN
   + 'Konten eröffnen, in fremden Diensten klicken, Zugänge einrichten, Zahlungen auslösen, Verträge unterschreiben, Freigaben erteilen, Personen ansprechen. '
   + 'Keine Programmier- oder Schreibarbeit – die machen die anderen Agenten. Nichts erfinden; Unbekanntes als [offen].';
 
+/* V66: Belege. Eine Karte darf eine Behauptung tragen – aber sichtbar muss
+   sein, woher sie sie hat. Ohne Beleg kein Tor: Das verhindert Tore für
+   Arbeit, die es gar nicht gibt. */
+const UNBELEGT = '[unbelegt]';
+function istUnbelegt(c) {
+  const b = String((c && c.beleg) || '').trim();
+  return !b || b.toLowerCase() === UNBELEGT;
+}
+/* Harte Regel: eine unbelegte Karte kann kein Freigabe-Tor auslösen. */
+function belegRegelAnwenden(c) {
+  if (c && c.typ === 'freigabe' && istUnbelegt(c)) {
+    c.typ = 'input';
+    c.text = String(c.text || '').replace(/^🔑\s*/, '❓ ');
+    c.belegHinweis = 'War als Freigabe geplant, ist aber unbelegt – jetzt eine offene Frage.';
+  }
+  return c;
+}
 function agentBeitragFormat(nPhasen) {
   /* Der Deckel haengt an der Phasenzahl: sonst wird die Antwort zu lang
      und bricht mitten im JSON ab (Fehler «unvollstaendig»). */
   const proPhase = nPhasen >= 5 ? 2 : 3;
   const gesamt = Math.min(12, proPhase * Math.max(1, nPhasen));
-  return '\n\nFormat:\n{"beitraege":[{"phase":1,"text":"Auftrag in max. 12 Worten","auftrag":"2–3 Sätze: Was genau ist zu tun? Welches Ergebnis entsteht (Datei oder prüfbarer Zustand)? Woran wird gemessen, dass es gut ist? Unbekanntes als [offen].","freigabe":false}]}\n'
+  return '\n\nFormat:\n{"beitraege":[{"phase":1,"text":"Auftrag in max. 12 Worten","auftrag":"2–3 Sätze: Was genau ist zu tun? Welches Ergebnis entsteht (Datei oder prüfbarer Zustand)? Woran wird gemessen, dass es gut ist? Unbekanntes als [offen].","beleg":"URL, Dateiname oder gemessener Wert – oder wörtlich [unbelegt]","freigabe":false}]}\n'
     + '"phase" ist die Phasennummer (1 = erste Phase). "freigabe" auf true setzen, wenn der Schritt eine Freigabe, eine Löschung, eine Zahlung, einen Versand oder eine Veröffentlichung auslöst.\n'
+    + '"beleg" ist PFLICHT: Woher weisst du, dass dieser Schritt nötig ist? Nenne die Quelle (URL, Dateiname, gemessener Wert). '
+    + 'Weisst du es nicht, schreibe wörtlich [unbelegt] – niemals raten und niemals eine Quelle erfinden. '
+    + 'Ein Schritt mit [unbelegt] darf NICHT "freigabe": true tragen: Eine Vermutung darf den Ablauf nicht anhalten. '
+    + 'Achtung bei «falls nötig», «gegebenenfalls», «beantragen» – das sind fast immer ungeprüfte Vermutungen; dann [unbelegt] und "freigabe": false.\n'
     + 'Höchstens ' + proPhase + ' Beiträge pro Phase und höchstens ' + gesamt + ' insgesamt. '
     + 'Halte "auftrag" knapp (höchstens 3 Sätze) – die Antwort muss vollständig in eine Nachricht passen. '
     + 'Lieber wenige klare Aufträge als viele vage. Nichts erfinden – Fehlendes als [offen] markieren.';
@@ -2124,9 +2161,11 @@ function buildAgentenPreview(cfg, phasen, beitraege) {
     const id = uid('p');
     const c = { id, x, y, text, color: (st.lanes[li] || {}).color || PALETTE[0], checked: true };
     if (it && it.auftrag && String(it.auftrag).trim()) c.auftrag = String(it.auftrag).trim();
+    if (it && it.beleg && String(it.beleg).trim()) c.beleg = String(it.beleg).trim();
     if (it && it.freigabe === true) c.typ = 'freigabe';
+    belegRegelAnwenden(c);   // ohne Beleg kein Tor
     st.postits.push(c);
-    kn++; cards.push({ key: 'K' + kn, id, lane: laneKey, phase: phaseIdx, text });
+    kn++; cards.push({ key: 'K' + kn, id, lane: laneKey, phase: phaseIdx, text, li });
     return id;
   }
   beitraege.forEach(b => {
@@ -2139,7 +2178,26 @@ function buildAgentenPreview(cfg, phasen, beitraege) {
   phasen.forEach((p, i) => {
     const gateName = (p.gate && p.gate.name) || ('Entscheid Phase ' + (i + 1));
     const krit = p.gate && Array.isArray(p.gate.kriterien) && p.gate.kriterien.length ? ' – Kriterien: ' + p.gate.kriterien.join('; ') : '';
-    st.milestones.push({ id: uid('m'), x: clamp(phaseLeft(i, st) + st.phases[i].w - 4, 20, canvasW(st) - 4), label: gateName + krit });
+    const m = { id: uid('m'), x: clamp(phaseLeft(i, st) + st.phases[i].w - 4, 20, canvasW(st) - 4), label: gateName + krit };
+    /* V66: Zieldatum des Tors, wenn der Struktur-Agent eines geliefert hat */
+    if (p.gate && /^\d{4}-\d{2}-\d{2}$/.test(String(p.gate.due || ''))) m.due = p.gate.due;
+    st.milestones.push(m);
+  });
+
+  /* V66: Verbindungen. Innerhalb einer Phase entsteht die Kette entlang der
+     Agenten-Reihenfolge automatisch (oben arbeitet zuerst) – ohne sie kennt
+     die Wand 38 Positionen, aber keine Reihenfolge. Zusätzlich hängt die
+     erste Karte einer Phase an der letzten der Vorphase. */
+  let letzteDerVorphase = null;
+  st.phases.forEach((ph, pi) => {
+    const inPhase = cards.filter(c => c.phase === pi).sort((a, b) => a.li - b.li);
+    if (!inPhase.length) return;
+    if (letzteDerVorphase) st.connections.push({ id: uid('c'), from: letzteDerVorphase, to: inPhase[0].id });
+    for (let k = 1; k < inPhase.length; k++) {
+      if (inPhase[k].li === inPhase[k - 1].li) continue;  // gleiche Bahn: keine Kette erzwingen
+      st.connections.push({ id: uid('c'), from: inPhase[k - 1].id, to: inPhase[k].id });
+    }
+    letzteDerVorphase = inPhase[inPhase.length - 1].id;
   });
   return { state: st, cards };
 }
@@ -2154,8 +2212,10 @@ async function runAgentenSchwarm(cfg) {
       (strukt.rolle || 'Du zerlegst ein Ziel in Phasen mit prüfbaren Entscheid-Toren.')
       + '\n\nDu arbeitest an einer Agenten-Wand: oben das Ziel, links nach rechts die Phasen, am Ende jeder Phase ein Entscheid-Tor.\n'
       + 'Erzeuge 3–6 Phasen. Format:\n'
-      + '{"phasen":[{"name":"kurzer Phasenname","ziel":"was am Ende dieser Phase vorliegt","anteil":25,"gate":{"name":"Entscheid: …","kriterien":["prüfbares Kriterium","Kriterium 2"]}}]}\n'
-      + '"anteil" = geschätzter Anteil an der Gesamtdauer in Prozent (Summe ≈ 100). Tor-Kriterien müssen prüfbar sein (Zahl, Zustand oder Vorliegen eines Dokuments) – keine Absichtserklärungen. Nichts erfinden; Fehlendes als [offen].',
+      + '{"phasen":[{"name":"kurzer Phasenname","ziel":"was am Ende dieser Phase vorliegt","anteil":25,"gate":{"name":"Entscheid: …","kriterien":["prüfbares Kriterium","Kriterium 2"],"due":"2026-10-31"}}]}\n'
+      + '"anteil" = geschätzter Anteil an der Gesamtdauer in Prozent (Summe ≈ 100). Tor-Kriterien müssen prüfbar sein (Zahl, Zustand oder Vorliegen eines Dokuments) – keine Absichtserklärungen.\n'
+      + '"due" = Zieldatum des Tors im Format JJJJ-MM-TT. Stehen im Ziel oder im Zeitrahmen Termine, verteile sie auf die passenden Tore. Steht dort kein Datum, lass "due" ganz weg – niemals ein Datum erfinden.\n'
+      + 'Nichts erfinden; Fehlendes als [offen].',
       'Ziel: ' + cfg.ziel + '\nZeitrahmen: ' + (cfg.zeit || 'offen') + '\nKontext: ' + (cfg.kontext || 'keiner angegeben')
       + '\n\nDie Wand hat diese Agenten (Ebenen):\n' + aktive.map(a => '– ' + a.name + ': ' + (a.kurz || '')).join('\n'), 2000);
     if (!arch || !Array.isArray(arch.phasen) || arch.phasen.length < 2) throw new Error(strukt.name + ' lieferte keine brauchbare Phasenstruktur.');
@@ -2246,7 +2306,8 @@ function aboSchemaText() {
      + '  "phases": [{ "name": "…", "w": 300, "ziel": "was am Ende dieser Phase vorliegt" }],\n'
      + '  "postits": [{ "id": "k1", "x": 20, "y": 110, "text": "kurzer Titel, höchstens 80 Zeichen",\n'
      + '    "color": "#fdf3bf", "status": "offen", "typ": "auto", "checked": true,\n'
-     + '    "auftrag": "2–4 Sätze: Was genau ist zu tun? Womit? Welche Ergebnis-Datei entsteht? Woran wird gemessen?" }],\n'
+     + '    "auftrag": "2–4 Sätze: Was genau ist zu tun? Womit? Welche Ergebnis-Datei entsteht? Woran wird gemessen?",\n'
+     + '    "beleg": "URL, Dateiname oder gemessener Wert – oder wörtlich [unbelegt]" }],\n'
      + '  "connections": [{ "id": "c1", "from": "k1", "to": "k2" }],\n'
      + '  "milestones": [{ "id": "m1", "x": 296, "label": "Entscheid: … – Kriterien: K1; K2" }]\n}\n```\n\n'
      + '## Regeln (bitte genau einhalten)\n\n'
@@ -2254,7 +2315,11 @@ function aboSchemaText() {
      + '- Karten-x = Phasenanfang + 10 bis (w−180); mehrere Karten in derselben Phase und Ebene je ~26 px versetzen.\n'
      + '- Karten-y = Ebenen-Index × 104 + 6 bis 40.\n'
      + '- Tore ans Phasenende: x = Phasenende − 4. Label-Form «Torname – Kriterien: K1; K2». Kriterien müssen prüfbar sein (Zahl, Zustand oder vorliegendes Dokument).\n'
-     + '- "typ": "freigabe" bei allem, was eine Freigabe, Zahlung, Löschung, Versand oder Veröffentlichung auslöst.\n'
+     + '- "beleg" ist PFLICHT auf jeder Karte: Woher weisst du, dass dieser Schritt nötig ist? Quelle nennen (URL, Dateiname, gemessener Wert) oder wörtlich [unbelegt] schreiben. Niemals eine Quelle erfinden.\n'
+     + '- **Eine Karte mit [unbelegt] darf NICHT "typ": "freigabe" tragen.** Eine Vermutung darf den Ablauf nicht anhalten. Formulierungen wie «falls nötig», «gegebenenfalls» oder «beantragen» sind fast immer ungeprüfte Vermutungen – dann [unbelegt] und kein Tor.\n'
+     + '- "typ": "freigabe" bei allem, was eine Freigabe, Zahlung, Löschung, Versand oder Veröffentlichung auslöst – aber nur mit Beleg.\n'
+     + '- "connections" wirklich füllen: Ohne Kanten kennt die Wand Positionen, aber keine Reihenfolge. Innerhalb einer Phase entlang der Bahnen von oben nach unten, und von der letzten Karte einer Phase zur ersten der nächsten.\n'
+     + '- "milestones" dürfen ein "due" im Format JJJJ-MM-TT tragen. Stehen im Ziel Termine, verteile sie auf die Tore; sonst "due" weglassen – nie ein Datum erfinden.\n'
      + '- Höchstens 3 Karten pro Phase und Ebene. Der Titel bleibt kurz – das Detail gehört in "auftrag".\n'
      + '- "checked": true bei jeder Karte setzen.\n'
      + '- "goal" WEGLASSEN – die Zielleiste gehört dem Nutzer und wird beim Import nicht angerührt.\n'
@@ -2921,8 +2986,16 @@ async function kiBericht(artKey) {
   let text = '';
   try {
     text = (await callClaude(
-      'Du schreibst für die OSTO/SYMA-Prozesswand einen kurzen Berichts-Entwurf in einfachem Deutsch (Schweizer Schreibweise, ss statt ß). Regeln: NUR die gelieferten Fakten verwenden, nichts erfinden, Unbekanntes als [offen] markieren. Keine Markdown-Zeichen, keine Aufzählungszeichen – nur Fliesstext. ' + art.anweisung,
-      wallFaktenText(), CHAT_MODEL, 700)).trim();
+      'Du schreibst für die OSTO/SYMA-Prozesswand einen kurzen Berichts-Entwurf in einfachem Deutsch (Schweizer Schreibweise, ss statt ß). Regeln: NUR die gelieferten Fakten verwenden, nichts erfinden, Unbekanntes als [offen] markieren. Keine Markdown-Zeichen, keine Aufzählungszeichen – nur Fliesstext. '
+      + 'Ziellänge: höchstens 2000 Zeichen. Schreibe so, dass der Text mit einem vollständigen Satz endet – lieber kürzer als abgebrochen. ' + art.anweisung,
+      wallFaktenText(), CHAT_MODEL, 1400)).trim();
+    /* V66: Sicherheitsnetz. Reichte der Platz trotzdem nicht, endet der Text
+       mitten im Wort. Dann auf die letzte Satzgrenze kürzen und das sichtbar
+       vermerken – nie einen halben Satz weiterreichen. */
+    if (text && !/[.!?»)\]]$/.test(text)) {
+      const ganz = cutAtSentence(text, Math.max(200, text.length - 1));
+      text = (ganz && ganz.length > 200 ? ganz : text) + '\n\n[Der Entwurf wurde hier gekürzt – bitte den Schluss selbst ergänzen.]';
+    }
   } catch (e) { sysMsg('⚠️ KI-Entwurf fehlgeschlagen: ' + e.message, true); return; }
   openModal('<h3>' + art.titel + ' – KI-Entwurf prüfen</h3>'
     + '<p style="font-size:12px;color:var(--muted)">Vorschlag-Prinzip: Erst «Übernehmen &amp; exportieren» schreibt den Text als 📄-Karte auf die Wand und erzeugt das Word-Dokument. Du kannst den Text hier direkt ändern.</p>'
@@ -3590,6 +3663,7 @@ function buildTasks(sel) {
       'typ: ' + typ,
       'owner: ' + owner];
     if (ag) { L.push('agent: ' + ag.name); if (ag.modell) L.push('modell: ' + ag.modell); }
+    L.push('beleg: ' + (String(c.beleg || '').trim() || '[unbelegt]'));
     if (deps.length) L.push('abhaengig_von: [' + deps.join(', ') + ']');
     if (ssot()) L.push('ssot: ' + ssot());
     L.push('---', '', '## Auftrag');
