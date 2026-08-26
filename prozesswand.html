@@ -341,7 +341,7 @@ table.ph-tab { width:100%; border-collapse:collapse; }
 <script>
 "use strict";
 
-const APP_VERSION = 'V63';
+const APP_VERSION = 'V64';
 /* V49: einheitlicher Wegweiser nach jedem «An Claude kopieren» */
 function claudeHinweis() {
   sysMsg('📋 Kopiert! Jetzt: 1. Claude öffnen (claude.ai bzw. deine Prozesswand-Sitzung) → 2. ins Schreibfeld klicken → 3. Cmd+V (einfügen) → 4. Senden. Mehr braucht es nicht.', true);
@@ -484,7 +484,10 @@ function defaultState() {
     connections: [{ id: uid('c'), from: a.id, to: b.id }],
     milestones: [{ id: uid('m'), x: 3 * PHASE_W, label: 'Konzept-Entscheid' }],
     laneTitles: {},
-    befragungen: []
+    befragungen: [],
+    /* V62/V64: gleiche Felder wie normalizeState, damit eine frische Wand
+       und eine geladene Wand identisch aussehen */
+    wandTyp: 'osto', lanes: [], agenten: []
   };
 }
 function uid(p) { return (p||'i') + Date.now().toString(36) + Math.random().toString(36).slice(2,5); }
@@ -560,7 +563,10 @@ function loadCollection(d) {
 }
 function renderBoardSelect() {
   const sel = document.getElementById('boardSelect'); if (!sel) return;
-  sel.innerHTML = collection.boards.map(b => '<option value="' + b.id + '"' + (b.id === collection.activeId ? ' selected' : '') + '>' + esc(b.name) + '</option>').join('');
+  /* V64: Agenten-Wände tragen 🤖 im Namen – damit auf einen Blick klar ist,
+     welche Wand welcher Art ist. */
+  sel.innerHTML = collection.boards.map(b => '<option value="' + b.id + '"' + (b.id === collection.activeId ? ' selected' : '') + '>'
+    + (b.state && b.state.wandTyp === 'agenten' ? '🤖 ' : '') + esc(b.name) + '</option>').join('');
 }
 
 let undoStack = [], undoSkip = false, lastSaved = null, lastSavedBoard = null;
@@ -1360,23 +1366,64 @@ function openStart() {
   document.getElementById('stWeg').onclick = () => openWegweiser(null);
   document.getElementById('stAus').onchange = e => localStorage.setItem('pw-start', e.target.checked ? 'aus' : 'an');
 }
+/* V64: Beim Start wählen – normale Prozesswand oder KI-Projekt (Agenten).
+   Die normale Wand ist und bleibt die Voreinstellung. */
+function wandTypWahl() {
+  /* text-transform/letter-spacing zurücksetzen: .modal label schreibt sonst
+     den ganzen Erklärtext in GROSSBUCHSTABEN. */
+  const k = 'display:flex;gap:9px;align-items:flex-start;border:2px solid var(--line);border-radius:9px;'
+    + 'padding:10px 12px;margin-bottom:7px;cursor:pointer;text-transform:none;letter-spacing:0;'
+    + 'font-size:13.5px;font-weight:400;color:inherit';
+  return '<label style="margin-top:12px">Was f&uuml;r ein Projekt ist das?</label>'
+    + '<label class="wt-opt" style="' + k + '"><input type="radio" name="wtyp" value="osto" checked style="width:auto;margin-top:3px">'
+    + '<span><b>&#129521; Normale Prozesswand</b><br><span style="font-size:12px;color:var(--muted)">Die acht Denk-Ebenen: Reflexion, Input, Management 1 und 2, Sache, Handlungen, Dokumentation, Anspruchsgruppen. F&uuml;r Bauprojekte, Anl&auml;sse, Ver&auml;nderungen &ndash; alles, was Menschen zusammen tun.</span></span></label>'
+    + '<label class="wt-opt" style="' + k + '"><input type="radio" name="wtyp" value="agenten" style="width:auto;margin-top:3px">'
+    + '<span><b>&#129302; KI-Projekt (Agenten-Wand)</b><br><span style="font-size:12px;color:var(--muted)">Jede Ebene ist ein Agent: Architekt, Entwickler, Pr&uuml;fer, Datenschutz &ndash; und du selbst. F&uuml;r Dinge, die Claude Code baut. Die Wand verteilt die Auftr&auml;ge und f&uuml;hrt durch die Tore.</span></span></label>';
+}
+function gewaehlterWandTyp() {
+  const r = modalBox.querySelector('input[name="wtyp"]:checked');
+  return r && r.value === 'agenten' ? 'agenten' : 'osto';
+}
+/* Legt eine neue Wand des gewählten Typs an und aktiviert sie */
+function neueWandNachTyp(name, typ) {
+  syncActive();
+  const st = defaultState();
+  if (typ === 'agenten') {
+    st.wandTyp = 'agenten';
+    st.agenten = neueAgenten();
+    st.lanes = agentenZuLanes(st.agenten);
+    st.postits = []; st.connections = []; st.milestones = [];
+    st.phases = ['Idee & Nutzen', 'Bauen', 'Prüfen', 'Einführen'].map(n => ({
+      id: uid('ph'), name: n, w: PHASE_W, ziel: '', input: '', output: '', wer: '', was: '', wann: '', wie: ''
+    }));
+  }
+  newBoardFrom(name, st, true);
+  agentenKnopfZeigen();
+  return st;
+}
 function startMitZiel() {
   openModal('<h3>&#127919; Mit einem Ziel starten</h3>'
     + '<p style="font-size:13px;margin:2px 0 8px">Schreib in deinen Worten, was du erreichen willst &ndash; ein bis zwei S&auml;tze gen&uuml;gen. Die Wand pr&uuml;ft das Ziel danach mit dir nach dem SMART-Muster (spezifisch &middot; messbar &middot; attraktiv &middot; realistisch &middot; terminiert) und stellt dir nur die Fragen, die noch offen sind.</p>'
     + '<label>Was willst du erreichen?</label>'
     + '<textarea id="szZiel" rows="3" placeholder="z. B. Bis im Sommer will ich mit den Nachbarn einen Gemeinschaftsgarten auf der Brache er&ouml;ffnen."></textarea>'
+    + wandTypWahl()
     + '<div class="btnrow"><button class="go" id="szLos">Los geht&apos;s</button><button id="szBack">&larr; Zur&uuml;ck</button></div>');
   document.getElementById('szBack').onclick = openStart;
   document.getElementById('szLos').onclick = () => {
     const z = document.getElementById('szZiel').value.trim();
     if (!z) { document.getElementById('szZiel').style.borderColor = '#a02020'; return; }
+    const typ = gewaehlterWandTyp();
     closeModal();
-    syncActive();
-    newBoardFrom(z.slice(0, 34) + (z.length > 34 ? '…' : ''), null, true);
+    neueWandNachTyp(z.slice(0, 34) + (z.length > 34 ? '…' : ''), typ);
     state.goal = z;
     goalInput.value = z; autoResizeGoal(); save(); render();
-    document.getElementById('smartBtn').click();
-    sysMsg('🎯 Dein Ziel steht in der Zielleiste. Beantworte die SMART-Fragen im KI-Fenster – und wenn das Ziel sitzt: oben rechts «🤖 KI-Struktur» klicken, dann baut die Wand daraus das Projekt (mit Vorschau).', true);
+    if (typ === 'agenten') {
+      sysMsg('🤖 Agenten-Wand angelegt. Jede Ebene ist ein Agent. Klick oben rechts «🤖 KI-Struktur» – dann legen die Agenten ihre Aufträge auf ihre Ebenen (du siehst zuerst eine Vorschau). '
+        + 'Wer mitarbeitet, änderst du unter «Agenten». Gebaut wird nichts automatisch: Die Aufträge gehen über «Dokumente» an Claude Code.', true);
+    } else {
+      document.getElementById('smartBtn').click();
+      sysMsg('🎯 Dein Ziel steht in der Zielleiste. Beantworte die SMART-Fragen im KI-Fenster – und wenn das Ziel sitzt: oben rechts «🤖 KI-Struktur» klicken, dann baut die Wand daraus das Projekt (mit Vorschau).', true);
+    }
   };
 }
 function startNeuesProjekt() {
@@ -1384,15 +1431,20 @@ function startNeuesProjekt() {
     + '<p style="font-size:13px;margin:2px 0 8px">Gib deinem Projekt einen Namen. Danach stellt dir die Wand eine Frage nach der anderen &ndash; aus deinen Antworten entsteht das Projekt. Deine bisherigen W&auml;nde bleiben unver&auml;ndert.</p>'
     + '<label>Wie soll das Projekt heissen?</label>'
     + '<input type="text" id="stName" placeholder="z. B. Gartenhaus bauen" style="width:100%;font:inherit;font-size:14px;padding:9px 10px;border:1px solid var(--line);border-radius:8px">'
+    + wandTypWahl()
     + '<div class="btnrow"><button class="go" id="stLos">Los geht&apos;s</button><button id="stBack">&larr; Zur&uuml;ck</button></div>');
   document.getElementById('stBack').onclick = openStart;
   document.getElementById('stLos').onclick = () => {
     const nm = document.getElementById('stName').value.trim();
     if (!nm) { document.getElementById('stName').style.borderColor = '#a02020'; return; }
+    const typ = gewaehlterWandTyp();
     closeModal();
-    syncActive();
-    newBoardFrom(nm, null, true);
-    document.getElementById('fkBtn').click();
+    neueWandNachTyp(nm, typ);
+    if (typ === 'agenten') {
+      sysMsg('🤖 Agenten-Wand «' + nm + '» angelegt. Schreib zuerst dein Ziel in die Zielleiste unten, dann «🤖 KI-Struktur» – die Agenten verteilen die Aufträge auf ihre Ebenen.', true);
+    } else {
+      document.getElementById('fkBtn').click();
+    }
   };
 }
 document.getElementById('startBtn').onclick = () => openStart();
@@ -1404,17 +1456,7 @@ function startAutoAnzeigen() {
 function agentenWandOeffnen() {
   const b = collection.boards.find(x => x.state && x.state.wandTyp === 'agenten');
   if (b) { activateBoard(b.id); }
-  else {
-    const st = defaultState();
-    st.wandTyp = 'agenten';
-    st.agenten = neueAgenten();
-    st.lanes = agentenZuLanes(st.agenten);
-    st.postits = []; st.connections = []; st.milestones = [];
-    st.phases = ['Idee & Nutzen', 'Bauen', 'Prüfen', 'Einführen'].map(n => ({
-      id: uid('ph'), name: n, w: PHASE_W, ziel: '', input: '', output: '', wer: '', was: '', wann: '', wie: ''
-    }));
-    newBoardFrom('Agenten-Wand', st, true);
-  }
+  else { neueWandNachTyp('Agenten-Wand', 'agenten'); }
   agentenKnopfZeigen();
   sysMsg('🤖 Agenten-Wand: Jede Ebene ist ein Agent. Oben das Ziel eintragen, dann «KI-Struktur» – die Agenten verteilen die Aufträge. '
     + 'Wer mitarbeitet, änderst du unter «Agenten». Gebaut wird nichts automatisch: Die Aufträge gehen über «Dokumente» an Claude Code.', true);
