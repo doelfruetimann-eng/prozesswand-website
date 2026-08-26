@@ -341,7 +341,7 @@ table.ph-tab { width:100%; border-collapse:collapse; }
 <script>
 "use strict";
 
-const APP_VERSION = 'V64';
+const APP_VERSION = 'V65';
 /* V49: einheitlicher Wegweiser nach jedem «An Claude kopieren» */
 function claudeHinweis() {
   sysMsg('📋 Kopiert! Jetzt: 1. Claude öffnen (claude.ai bzw. deine Prozesswand-Sitzung) → 2. ins Schreibfeld klicken → 3. Cmd+V (einfügen) → 4. Senden. Mehr braucht es nicht.', true);
@@ -1958,7 +1958,14 @@ document.getElementById('swarmBtn').onclick = () => {
     + '<label style="margin-top:10px">Projekt-Unterlagen einlesen (.md / .txt) &ndash; optional</label>'
     + '<input type="file" id="swMd" multiple accept=".md,.markdown,.txt">'
     + '<div style="font-size:11px;color:var(--muted);margin-top:3px">z.B. CLAUDE.md, Konzept-/Handoff-Dokumente, ADRs &ndash; der Schwarm leitet Phasen und Inhalte direkt daraus ab.</div>'
-    + '<div class="btnrow"><button class="go" id="swStart">Schwarm starten</button><button id="mCancel">Abbrechen</button></div>');
+    + '<div class="btnrow"><button class="go" id="swStart">Schwarm starten</button>' + aboKnopf() + '<button id="mCancel">Abbrechen</button></div>');
+  document.getElementById('aboLos').onclick = () => {
+    const z = document.getElementById('swZiel').value.trim();
+    if (!z) { document.getElementById('swZiel').focus(); return; }
+    aboStrukturStarten({ ziel: z,
+      zeit: document.getElementById('swZeit').value.trim(),
+      kontext: document.getElementById('swKontext').value.trim() });
+  };
   document.getElementById('mCancel').onclick = closeModal;
   document.getElementById('swTiefe').onchange = e => { if (e.target.value === 'fein') document.getElementById('swVerbatim').checked = true; };
   document.getElementById('swStart').onclick = async () => {
@@ -2207,6 +2214,80 @@ async function runAgentenSchwarm(cfg) {
   }
 }
 
+/* ================================================================
+   V65: STRUKTUR ÜBER DAS ABO statt über die API.
+   Die Wand baut den vollständigen Auftrag samt Dateiformat; gedacht wird
+   in Claude Code (Abo, keine Token). Das Ergebnis kommt als JSON zurück
+   und läuft über denselben Import-Weg wie alles andere – mit Vorschau.
+   ================================================================ */
+function aboSchemaText() {
+  const ag = istAgentenWand();
+  let t = '\n\n## Dateiformat (Rohformat der Wand)\n\n';
+  t += 'Ein JSON-Objekt. Pflicht sind "phases" und "postits".\n\n';
+  if (ag) {
+    t += '**Diese Wand ist eine AGENTEN-WAND: jede Ebene ist ein Agent.** Übernimm die beiden folgenden Felder '
+       + 'UNVERÄNDERT in die Datei – die Schlüssel in "lanes" verbinden die Karten mit den Ebenen:\n\n'
+       + '"wandTyp": "agenten",\n'
+       + '"agenten": ' + JSON.stringify(state.agenten || []) + ',\n'
+       + '"lanes": ' + JSON.stringify(state.lanes || []) + '\n\n'
+       + 'Ebenen-Index von oben nach unten: '
+       + (state.lanes || []).map((l, i) => i + ' = ' + l.title).join(', ') + '.\n'
+       + 'Jede Karte gehört auf die Ebene des Agenten, der den Auftrag ausführt. '
+       + 'Die Ebene «Du (Mensch)» bekommt NUR Handgriffe, die keine KI erledigen kann '
+       + '(Konten eröffnen, klicken, zahlen, unterschreiben, freigeben) – und diese Karten tragen "typ": "freigabe" '
+       + 'und beginnen mit «🔑 ».\n';
+  } else {
+    t += 'Ebenen-Index: reflexion 0, input 1, mgmt1 2, mgmt2 3, sache 4, handlung 5, doku 6, anspruch 7.\n'
+       + 'Ebenen-Logik: Risiken→reflexion («⚠️ »), Experten→input («💡 »), Führung→mgmt1/mgmt2 («🧭 »), '
+       + 'Zwischenziele→sache («🎯 »), Tätigkeiten→handlung (ohne Symbol), Ergebnisse→doku («📄 »), '
+       + 'Betroffene→anspruch («👥 »).\n';
+  }
+  t += '\n```json\n{\n'
+     + '  "phases": [{ "name": "…", "w": 300, "ziel": "was am Ende dieser Phase vorliegt" }],\n'
+     + '  "postits": [{ "id": "k1", "x": 20, "y": 110, "text": "kurzer Titel, höchstens 80 Zeichen",\n'
+     + '    "color": "#fdf3bf", "status": "offen", "typ": "auto", "checked": true,\n'
+     + '    "auftrag": "2–4 Sätze: Was genau ist zu tun? Womit? Welche Ergebnis-Datei entsteht? Woran wird gemessen?" }],\n'
+     + '  "connections": [{ "id": "c1", "from": "k1", "to": "k2" }],\n'
+     + '  "milestones": [{ "id": "m1", "x": 296, "label": "Entscheid: … – Kriterien: K1; K2" }]\n}\n```\n\n'
+     + '## Regeln (bitte genau einhalten)\n\n'
+     + '- Koordinaten: Phasen liegen lückenlos nebeneinander, Phase i beginnt bei x = Summe der "w" aller Vorphasen. Breite 220–640, Standard 300.\n'
+     + '- Karten-x = Phasenanfang + 10 bis (w−180); mehrere Karten in derselben Phase und Ebene je ~26 px versetzen.\n'
+     + '- Karten-y = Ebenen-Index × 104 + 6 bis 40.\n'
+     + '- Tore ans Phasenende: x = Phasenende − 4. Label-Form «Torname – Kriterien: K1; K2». Kriterien müssen prüfbar sein (Zahl, Zustand oder vorliegendes Dokument).\n'
+     + '- "typ": "freigabe" bei allem, was eine Freigabe, Zahlung, Löschung, Versand oder Veröffentlichung auslöst.\n'
+     + '- Höchstens 3 Karten pro Phase und Ebene. Der Titel bleibt kurz – das Detail gehört in "auftrag".\n'
+     + '- "checked": true bei jeder Karte setzen.\n'
+     + '- "goal" WEGLASSEN – die Zielleiste gehört dem Nutzer und wird beim Import nicht angerührt.\n'
+     + '- **Nichts erfinden.** Was du nicht weisst, schreibst du als [offen] in den Auftrag statt es auszudenken.\n\n'
+     + 'Gib mir die Datei zum Herunterladen.';
+  return t;
+}
+function aboPromptText(cfg) {
+  return 'Auftrag: Struktur für meine Prozesswand bauen\n\n'
+    + 'ZIEL: ' + (cfg.ziel || '[offen]') + '\n'
+    + 'ZEITRAHMEN: ' + (cfg.zeit || 'offen') + '\n'
+    + 'KONTEXT: ' + (cfg.kontext || '-') + '\n\n'
+    + 'Zerlege das Ziel in 3–6 Phasen auf einer Zeitachse, mit je einem prüfbaren Entscheid-Tor am Phasenende, '
+    + 'und verteile die Arbeit als Karten auf die Ebenen. Jede Karte bekommt einen ausformulierten Auftrag.'
+    + aboSchemaText();
+}
+function aboStrukturStarten(cfg) {
+  const txt = aboPromptText(cfg);
+  const schritte = '📋 Kopiert! So geht es weiter – ganz ohne API-Guthaben:\n'
+    + '1. Claude Code öffnen (deine Sitzung) und einfügen: Cmd+V, dann senden\n'
+    + '2. Claude schickt dir eine JSON-Datei – herunterladen (landet in «Downloads»)\n'
+    + '3. Hier zurück: «Dokumente» → «Import (JSON)» → Datei wählen\n'
+    + '4. Du siehst eine Vorschau – dann oben «Als neue Wand» oder «Ersetzen»\n'
+    + 'Deine Zielleiste bleibt dabei unangetastet.';
+  navigator.clipboard.writeText(txt).then(() => { closeModal(); sysMsg(schritte, false); })
+    .catch(() => { closeModal(); sysMsg('Bitte von Hand kopieren:\n\n' + txt, false); });
+}
+function aboKnopf() {
+  return '<button id="aboLos" style="font:inherit;font-size:13px;font-weight:600;cursor:pointer;border-radius:7px;'
+    + 'padding:8px 14px;border:1px solid var(--line);background:#fff6d5" '
+    + 'title="Die Wand schreibt den fertigen Auftrag; gedacht wird in Claude Code über dein Abo. Kostet kein API-Guthaben.">'
+    + '&#128179;&#10060; Über mein Abo (ohne API)</button>';
+}
 function openAgentenSchwarmModal() {
   const aktive = (state.agenten || []).filter(a => a.aktiv !== false);
   openModal('<h3>&#129302; Auftr&auml;ge an die Agenten verteilen</h3>'
@@ -2215,18 +2296,24 @@ function openAgentenSchwarmModal() {
     + '<label>Ziel</label><textarea id="asZiel" rows="3">' + esc(state.goal || '') + '</textarea>'
     + '<label>Zeitrahmen</label><input type="text" id="asZeit" placeholder="z.B. bis Ende Oktober 2026">'
     + '<label>Kontext</label><textarea id="asKontext" rows="3" placeholder="z.B. Umfrage-Modul mit Bezahlung, Supabase vorhanden, Stripe neu"></textarea>'
-    + '<div class="btnrow"><button class="go" id="asStart">Verteilen starten</button><button id="mCancel">Abbrechen</button></div>');
+    + '<div class="btnrow"><button class="go" id="asStart">Verteilen starten</button>' + aboKnopf() + '<button id="mCancel">Abbrechen</button></div>');
+  const asCfg = () => ({
+    ziel: document.getElementById('asZiel').value.trim(),
+    zeit: document.getElementById('asZeit').value.trim(),
+    kontext: document.getElementById('asKontext').value.trim()
+  });
   document.getElementById('mCancel').onclick = closeModal;
   document.getElementById('asStart').onclick = () => {
-    const cfg = {
-      ziel: document.getElementById('asZiel').value.trim(),
-      zeit: document.getElementById('asZeit').value.trim(),
-      kontext: document.getElementById('asKontext').value.trim()
-    };
+    const cfg = asCfg();
     if (!cfg.ziel) { document.getElementById('asZiel').focus(); return; }
     closeModal();
     if (!kiBereit()) { openKeyModal(() => runAgentenSchwarm(cfg)); return; }
     runAgentenSchwarm(cfg);
+  };
+  document.getElementById('aboLos').onclick = () => {
+    const cfg = asCfg();
+    if (!cfg.ziel) { document.getElementById('asZiel').focus(); return; }
+    aboStrukturStarten(cfg);
   };
 }
 
