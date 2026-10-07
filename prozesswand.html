@@ -341,7 +341,7 @@ table.ph-tab { width:100%; border-collapse:collapse; }
 <script>
 "use strict";
 
-const APP_VERSION = 'V66';
+const APP_VERSION = 'V67';
 /* V49: einheitlicher Wegweiser nach jedem «An Claude kopieren» */
 function claudeHinweis() {
   sysMsg('📋 Kopiert! Jetzt: 1. Claude öffnen (claude.ai bzw. deine Prozesswand-Sitzung) → 2. ins Schreibfeld klicken → 3. Cmd+V (einfügen) → 4. Senden. Mehr braucht es nicht.', true);
@@ -489,7 +489,7 @@ function defaultState() {
     befragungen: [],
     /* V62/V64: gleiche Felder wie normalizeState, damit eine frische Wand
        und eine geladene Wand identisch aussehen */
-    wandTyp: 'osto', lanes: [], agenten: []
+    wandTyp: 'osto', lanes: [], agenten: [], orga: ''
   };
 }
 function uid(p) { return (p||'i') + Date.now().toString(36) + Math.random().toString(36).slice(2,5); }
@@ -518,7 +518,9 @@ function normalizeState(d) {
     /* V62 Agenten-Wand: ohne diese Felder verhaelt sich die Wand wie bisher */
     wandTyp: d.wandTyp === 'agenten' ? 'agenten' : 'osto',
     lanes: Array.isArray(d.lanes) ? d.lanes : [],
-    agenten: Array.isArray(d.agenten) ? d.agenten : []
+    agenten: Array.isArray(d.agenten) ? d.agenten : [],
+    /* V67: Organisation und Rollen – ein Ort, den alle Agenten kennen */
+    orga: typeof d.orga === 'string' ? d.orga : ''
   };
   s.phases.forEach(p => { if (typeof p.w !== 'number' || p.w < 80) p.w = PHASE_W; });
   return s;
@@ -1819,6 +1821,7 @@ function wallContext() {
   const s = state;
   let t = 'Gesamtziel: ' + (s.goal || '(noch leer)') + '\nPhasen: ' + s.phases.map((p, i) => (i+1) + '. ' + p.name).join(' | ');
   t += '\nMeilensteine: ' + (s.milestones.map(m => m.label).join(', ') || 'keine');
+  if (orgaText()) t = 'Organisation und Rollen:\n' + orgaText() + '\n\n' + t;
   lanes().forEach(l => {
     const items = s.postits.filter(p => Math.floor(p.y / LANE_H) === laneKeys().indexOf(l.key));
     if (items.length) t += '\n' + laneTitle(l) + ': ' + items.map(p => '«' + p.text.slice(0, 80) + '»').join('; ');
@@ -1970,6 +1973,7 @@ document.getElementById('swarmBtn').onclick = () => {
     + '<label>Zeitrahmen</label><input type="text" id="swZeit" placeholder="z.B. Januar bis Juni 2027, 6 Monate">'
     + '<label>Kontext / Projektart</label><textarea id="swKontext" rows="3" placeholder="z.B. Umbau Mehrfamilienhaus, Budget 1.2 Mio, Bauherrschaft privat, Bewilligung nötig"></textarea>'
     + '<label>Detailtiefe</label><select id="swTiefe"><option value="grob">grob (Überblick)</option><option value="mittel" selected>mittel</option><option value="fein">fein (detailliert)</option></select>'
+    + orgaFeld('swOrga')
     + '<label style="display:flex;align-items:center;gap:6px;margin-top:8px;cursor:pointer;font-weight:400;text-transform:none"><input type="checkbox" id="swVerbatim" style="width:auto"> Vorgaben w&ouml;rtlich &uuml;bernehmen (nichts umformulieren, Fehlendes als [offen] markieren)</label>'
     + '<label style="margin-top:10px">Projekt-Unterlagen einlesen (.md / .txt) &ndash; optional</label>'
     + '<input type="file" id="swMd" multiple accept=".md,.markdown,.txt">'
@@ -1978,6 +1982,7 @@ document.getElementById('swarmBtn').onclick = () => {
   document.getElementById('aboLos').onclick = () => {
     const z = document.getElementById('swZiel').value.trim();
     if (!z) { document.getElementById('swZiel').focus(); return; }
+    orgaSichern('swOrga');
     aboStrukturStarten({ ziel: z,
       zeit: document.getElementById('swZeit').value.trim(),
       kontext: document.getElementById('swKontext').value.trim() });
@@ -1994,16 +1999,8 @@ document.getElementById('swarmBtn').onclick = () => {
       unterlagen: ''
     };
     if (!cfg.ziel) { document.getElementById('swZiel').focus(); return; }
-    const files = Array.from(document.getElementById('swMd').files || []).slice(0, 6);
-    if (files.length) {
-      const texts = await Promise.all(files.map(f => new Promise(res => {
-        const r = new FileReader();
-        r.onload = () => res('--- Datei: ' + f.name + ' ---\n' + String(r.result || ''));
-        r.onerror = () => res('--- Datei: ' + f.name + ' (nicht lesbar) ---');
-        r.readAsText(f);
-      })));
-      cfg.unterlagen = texts.join('\n\n').slice(0, 24000);
-    }
+    orgaSichern('swOrga');
+    cfg.unterlagen = await leseUnterlagen('swMd');
     closeModal();
     if (!kiBereit()) { openKeyModal(() => runSwarm(cfg)); return; }
     runSwarm(cfg);
@@ -2215,9 +2212,10 @@ async function runAgentenSchwarm(cfg) {
       + '{"phasen":[{"name":"kurzer Phasenname","ziel":"was am Ende dieser Phase vorliegt","anteil":25,"gate":{"name":"Entscheid: …","kriterien":["prüfbares Kriterium","Kriterium 2"],"due":"2026-10-31"}}]}\n'
       + '"anteil" = geschätzter Anteil an der Gesamtdauer in Prozent (Summe ≈ 100). Tor-Kriterien müssen prüfbar sein (Zahl, Zustand oder Vorliegen eines Dokuments) – keine Absichtserklärungen.\n'
       + '"due" = Zieldatum des Tors im Format JJJJ-MM-TT. Stehen im Ziel oder im Zeitrahmen Termine, verteile sie auf die passenden Tore. Steht dort kein Datum, lass "due" ganz weg – niemals ein Datum erfinden.\n'
-      + 'Nichts erfinden; Fehlendes als [offen].',
+      + 'Nichts erfinden; Fehlendes als [offen].' + orgaBlock(),
       'Ziel: ' + cfg.ziel + '\nZeitrahmen: ' + (cfg.zeit || 'offen') + '\nKontext: ' + (cfg.kontext || 'keiner angegeben')
-      + '\n\nDie Wand hat diese Agenten (Ebenen):\n' + aktive.map(a => '– ' + a.name + ': ' + (a.kurz || '')).join('\n'), 2000);
+      + '\n\nDie Wand hat diese Agenten (Ebenen):\n' + aktive.map(a => '– ' + a.name + ': ' + (a.kurz || '')).join('\n')
+      + (cfg.unterlagen ? '\n\nProjekt-Unterlagen (massgeblich – Phasen und Tore daraus ableiten, nicht neu erfinden):\n' + cfg.unterlagen.slice(0, 20000) : ''), 2000);
     if (!arch || !Array.isArray(arch.phasen) || arch.phasen.length < 2) throw new Error(strukt.name + ' lieferte keine brauchbare Phasenstruktur.');
     const phasen = arch.phasen.slice(0, 6);
     sysMsg('✅ ' + phasen.length + ' Phasen: ' + phasen.map(p => p.name).join(' → '));
@@ -2240,10 +2238,12 @@ async function runAgentenSchwarm(cfg) {
           + '\n\nDu bist EINE Ebene einer Agenten-Wand. Du lieferst NUR deinen eigenen Beitrag – nicht den der anderen.'
           + '\nDie anderen Ebenen sind: ' + aktive.filter(x => x.id !== a.id).map(x => x.name).join(', ') + '.'
           + (bisher.length ? '\nDu arbeitest NACH den Agenten, deren Aufträge unten stehen. Beziehe dich darauf, ergänze sie und wiederhole nichts.' : '')
+          + orgaBlock()
           + agentBeitragFormat(phasen.length);
         const out = await agentJSONModell(a.mensch ? CHAT_MODEL : a.modell, sys,
           'Ziel: ' + cfg.ziel + '\nZeitrahmen: ' + (cfg.zeit || 'offen') + '\nKontext: ' + (cfg.kontext || '-')
           + '\n\nPhasen:\n' + phasenText
+          + (cfg.unterlagen ? '\n\nProjekt-Unterlagen (Auszug – Inhalte bevorzugt hieraus, nichts erfinden):\n' + cfg.unterlagen.slice(0, 6000) : '')
           + (bisher.length ? '\n\nSchon auf der Wand (Arbeit der Agenten vor dir):\n' + bisher.join('\n') : ''),
           maxTok, 'Höchstens 2 Beiträge pro Phase, "auftrag" höchstens 2 Sätze.');
         const items = (out && Array.isArray(out.beitraege)) ? out.beitraege.filter(x => x && x.text) : [];
@@ -2280,6 +2280,45 @@ async function runAgentenSchwarm(cfg) {
    in Claude Code (Abo, keine Token). Das Ergebnis kommt als JSON zurück
    und läuft über denselben Import-Weg wie alles andere – mit Vorschau.
    ================================================================ */
+/* ================================================================
+   V67: ORGANISATION UND ROLLEN – ein Ort je Wand, den alle Agenten
+   kennen. Bewusst Fliesstext statt Formular (gleicher Grund wie beim
+   auftrag-Feld: ein Mensch liest es als Beschreibung, ein Modell als
+   Vorgabe – ein Formular kann nur eines von beidem).
+   ================================================================ */
+const ORGA_PLATZ = 'z. B.: Auftraggeber ist die Bereichsleitung Finanzen, sie entscheidet an Tor 2. '
+  + 'Die Fachführung liegt beim Ertragsmanagement – ohne deren Tarifwissen taugt die Analyse nichts. '
+  + 'Ich mache Projektleitung und Analyse. IT/BI liefert die Exporte, rund ein halber Tag. '
+  + 'Der Datenschutz braucht nur eine Kurznotiz, weil es interne Daten für einen internen Zweck sind.';
+
+/* Was an die KI geht, wird vorher gesäubert: Mail-Adressen und
+   Telefonnummern gehören nicht in einen Prompt. Rollen schon. */
+function orgaSauber(t) {
+  return String(t || '')
+    .replace(/[\w.+-]+@[\w-]+\.[\w.-]+/g, '[Mail entfernt]')
+    .replace(/(?:\+41|0041|\b0)[\s./-]?\d{2}[\s./-]?\d{3}[\s./-]?\d{2}[\s./-]?\d{2}\b/g, '[Telefon entfernt]')
+    .trim();
+}
+function orgaText() { return orgaSauber((state && state.orga) || ''); }
+/* Block für die Prompts – leer, wenn nichts eingetragen ist */
+function orgaBlock() {
+  const t = orgaText();
+  return t ? '\n\nORGANISATION UND ROLLEN (gilt für das ganze Vorhaben – berücksichtige, wer entscheidet, '
+    + 'wer fachlich führt und wer nur zuliefert; verteile Aufgaben danach):\n' + t : '';
+}
+/* Eingabefeld für die Struktur-Fenster, vorbelegt aus der Wand */
+function orgaFeld(id) {
+  return '<label style="margin-top:10px">Organisation und Rollen <span style="font-weight:400;text-transform:none">(bleibt bei dieser Wand gespeichert)</span></label>'
+    + '<textarea id="' + id + '" rows="4" placeholder="' + esc(ORGA_PLATZ) + '">' + esc((state && state.orga) || '') + '</textarea>'
+    + '<div style="font-size:10.5px;color:var(--muted);margin-top:3px">Wer entscheidet, wer f&uuml;hrt fachlich, wer liefert zu, wie viel Zeit hat wer. '
+    + 'Dieser Text geht an die KI. <b>Mail-Adressen und Telefonnummern werden automatisch entfernt</b>; '
+    + 'ins Repo und in die status.json geht er nie. Keine Patientendaten.</div>';
+}
+function orgaSichern(id) {
+  const el = document.getElementById(id); if (!el) return;
+  const v = el.value.trim();
+  if (v !== (state.orga || '')) { state.orga = v; save(); }
+}
 function aboSchemaText() {
   const ag = istAgentenWand();
   let t = '\n\n## Dateiformat (Rohformat der Wand)\n\n';
@@ -2332,8 +2371,11 @@ function aboPromptText(cfg) {
     + 'ZIEL: ' + (cfg.ziel || '[offen]') + '\n'
     + 'ZEITRAHMEN: ' + (cfg.zeit || 'offen') + '\n'
     + 'KONTEXT: ' + (cfg.kontext || '-') + '\n\n'
+    + (orgaText() ? 'ORGANISATION UND ROLLEN:\n' + orgaText() + '\n\n' : '')
+    + (cfg.unterlagen ? 'PROJEKT-UNTERLAGEN (massgeblich – Inhalte hieraus ableiten, nichts erfinden):\n' + cfg.unterlagen.slice(0, 20000) + '\n\n' : '')
     + 'Zerlege das Ziel in 3–6 Phasen auf einer Zeitachse, mit je einem prüfbaren Entscheid-Tor am Phasenende, '
-    + 'und verteile die Arbeit als Karten auf die Ebenen. Jede Karte bekommt einen ausformulierten Auftrag.'
+    + 'und verteile die Arbeit als Karten auf die Ebenen. Jede Karte bekommt einen ausformulierten Auftrag. '
+    + 'Berücksichtige, wer entscheidet, wer fachlich führt und wer nur zuliefert.'
     + aboSchemaText();
 }
 function aboStrukturStarten(cfg) {
@@ -2353,6 +2395,19 @@ function aboKnopf() {
     + 'title="Die Wand schreibt den fertigen Auftrag; gedacht wird in Claude Code über dein Abo. Kostet kein API-Guthaben.">'
     + '&#128179;&#10060; Über mein Abo (ohne API)</button>';
 }
+/* V67: Unterlagen einlesen – gemeinsam für beide Struktur-Fenster */
+async function leseUnterlagen(inputId) {
+  const el = document.getElementById(inputId); if (!el) return '';
+  const files = Array.from(el.files || []).slice(0, 6);
+  if (!files.length) return '';
+  const texts = await Promise.all(files.map(f => new Promise(res => {
+    const r = new FileReader();
+    r.onload = () => res('--- Datei: ' + f.name + ' ---\n' + String(r.result || ''));
+    r.onerror = () => res('--- Datei: ' + f.name + ' (nicht lesbar) ---');
+    r.readAsText(f);
+  })));
+  return texts.join('\n\n').slice(0, 24000);
+}
 function openAgentenSchwarmModal() {
   const aktive = (state.agenten || []).filter(a => a.aktiv !== false);
   openModal('<h3>&#129302; Auftr&auml;ge an die Agenten verteilen</h3>'
@@ -2361,23 +2416,32 @@ function openAgentenSchwarmModal() {
     + '<label>Ziel</label><textarea id="asZiel" rows="3">' + esc(state.goal || '') + '</textarea>'
     + '<label>Zeitrahmen</label><input type="text" id="asZeit" placeholder="z.B. bis Ende Oktober 2026">'
     + '<label>Kontext</label><textarea id="asKontext" rows="3" placeholder="z.B. Umfrage-Modul mit Bezahlung, Supabase vorhanden, Stripe neu"></textarea>'
+    + orgaFeld('asOrga')
+    + '<label style="margin-top:10px">Projekt-Unterlagen einlesen (.md / .txt) &ndash; optional</label>'
+    + '<input type="file" id="asMd" multiple accept=".md,.markdown,.txt">'
+    + '<div style="font-size:11px;color:var(--muted);margin-top:3px">Architektur, Konzept, Pr&uuml;fkatalog, RACI &ndash; die Agenten leiten Phasen und Auftr&auml;ge direkt daraus ab, statt sie neu zu erfinden.</div>'
     + '<div class="btnrow"><button class="go" id="asStart">Verteilen starten</button>' + aboKnopf() + '<button id="mCancel">Abbrechen</button></div>');
   const asCfg = () => ({
     ziel: document.getElementById('asZiel').value.trim(),
     zeit: document.getElementById('asZeit').value.trim(),
-    kontext: document.getElementById('asKontext').value.trim()
+    kontext: document.getElementById('asKontext').value.trim(),
+    unterlagen: ''
   });
   document.getElementById('mCancel').onclick = closeModal;
-  document.getElementById('asStart').onclick = () => {
+  document.getElementById('asStart').onclick = async () => {
     const cfg = asCfg();
     if (!cfg.ziel) { document.getElementById('asZiel').focus(); return; }
+    orgaSichern('asOrga');
+    cfg.unterlagen = await leseUnterlagen('asMd');
     closeModal();
     if (!kiBereit()) { openKeyModal(() => runAgentenSchwarm(cfg)); return; }
     runAgentenSchwarm(cfg);
   };
-  document.getElementById('aboLos').onclick = () => {
+  document.getElementById('aboLos').onclick = async () => {
     const cfg = asCfg();
     if (!cfg.ziel) { document.getElementById('asZiel').focus(); return; }
+    orgaSichern('asOrga');
+    cfg.unterlagen = await leseUnterlagen('asMd');
     aboStrukturStarten(cfg);
   };
 }
@@ -2393,7 +2457,7 @@ async function runSwarm(cfg) {
       + '\n\nErzeuge 4–8 projektspezifische Phasen. Format:\n'
       + '{"systemgrenze":{"innen":["max. 4 Beteiligte/Bereiche, die gestaltet werden"],"aussen":["max. 4, die einwirken, aber nicht steuerbar sind"]},'
       + '"phasen":[{"name":"...","anteil":15,"gate":{"name":"Entscheid: ...","kriterien":["messbares Kriterium 1","Kriterium 2"]}}]}\n'
-      + '"anteil" = geschätzter Anteil an der Projektdauer in Prozent (Summe ≈ 100). Tor-Kriterien müssen prüfbar sein (Zahl, Zustand oder Vorliegen eines Dokuments) – keine Absichtserklärungen.' + verbatim,
+      + '"anteil" = geschätzter Anteil an der Projektdauer in Prozent (Summe ≈ 100). Tor-Kriterien müssen prüfbar sein (Zahl, Zustand oder Vorliegen eines Dokuments) – keine Absichtserklärungen.' + verbatim + orgaBlock(),
       'Gesamtziel: ' + cfg.ziel + '\nZeitrahmen: ' + (cfg.zeit || 'offen') + '\nKontext: ' + (cfg.kontext || 'keiner angegeben') + '\nDetailtiefe: ' + cfg.tiefe
       + (cfg.unterlagen ? '\n\nProjekt-Unterlagen (massgeblich – Phasen, Beteiligte und Inhalte daraus ableiten):\n' + cfg.unterlagen.slice(0, 20000) : ''), 2500);
     if (!arch || !Array.isArray(arch.phasen) || arch.phasen.length < 3) throw new Error('Architekt lieferte keine brauchbare Phasenstruktur.');
@@ -2417,7 +2481,7 @@ async function runSwarm(cfg) {
             + '"input" und "output" des Eis sind wörtlich das, was hineingeht und herauskommt – der Output ist der Input der nächsten Phase. '
             + 'Max. ' + nMax + ' schritte; je Schritt 2–3 "aufgaben" (bei grober Detailtiefe darf "aufgaben" leer sein). Max. 3 ergebnisse, je max. 2 mgmt1/mgmt2/zwischenziele/experten. Detailtiefe: ' + fein + '.'
             + (state.solo ? '\nEinzelperson-Projekt: keine Rollen/Zuständigen vergeben; "wer" im ei knapp halten (die Person selbst).' : '')
-            + verbatim,
+            + verbatim + orgaBlock(),
             'Projektziel: ' + cfg.ziel + '\nZeitrahmen: ' + (cfg.zeit || 'offen') + '\nKontext: ' + (cfg.kontext || '-')
             + (cfg.unterlagen ? '\nUnterlagen-Auszug (Inhalte bevorzugt hieraus):\n' + cfg.unterlagen.slice(0, 6000) : '')
             + '\nPhase ' + (i+1) + ' von ' + phasen.length + ': ' + phasen[i].name
@@ -2822,6 +2886,8 @@ function genAuftrag(entwurf) {
     + kopfRow('Kritischer Meilenstein', ms)
     + '</table>';
   b += '<h2>' + num() + 'Ausgangslage</h2>' + txtOrPlatz(entwurf || p0.input, 'offen – Ausgangslage über den KI-Entwurf ergänzen');
+  /* V67: Organisation und Rollen, wenn für diese Wand hinterlegt */
+  if (orgaText()) b += '<h2>' + num() + 'Organisation und Rollen</h2>' + txtOrPlatz(orgaText(), '');
   const ziele = [state.goal].concat(state.phases.map(p => p.ziel && (p.name + ': ' + p.ziel))).filter(Boolean);
   if (ziele.length) {
     b += '<h2>' + num() + 'Zielbild / Nutzung</h2><p>Nach Abschluss des Projekts soll Folgendes erreicht sein:</p><ul>'
