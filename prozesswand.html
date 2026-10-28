@@ -341,7 +341,7 @@ table.ph-tab { width:100%; border-collapse:collapse; }
 <script>
 "use strict";
 
-const APP_VERSION = 'V67';
+const APP_VERSION = 'V68';
 /* V49: einheitlicher Wegweiser nach jedem «An Claude kopieren» */
 function claudeHinweis() {
   sysMsg('📋 Kopiert! Jetzt: 1. Claude öffnen (claude.ai bzw. deine Prozesswand-Sitzung) → 2. ins Schreibfeld klicken → 3. Cmd+V (einfügen) → 4. Senden. Mehr braucht es nicht.', true);
@@ -1770,7 +1770,10 @@ async function rawClaude(system, user, model, maxTok, temperature) {
   const body = { model, max_tokens: maxTok || 2000, system, messages: [{ role: 'user', content: user }] };
   // Neuere Modelle (Opus 4.7/4.8, Sonnet 5, Fable/Mythos) akzeptieren temperature nicht mehr (API-Fehler) – dort weglassen.
   // Determinismus wird bei diesen Modellen über den Prompt gesteuert (VERBATIM_REGEL).
-  if (typeof temperature === 'number' && !/opus-4-[789]|sonnet-5|fable|mythos/.test(model)) body.temperature = temperature;
+  /* V68: opus-5 fehlte in der Liste – jeder Opus-5-Aufruf lief zuerst in einen
+     Fehler und erst im zweiten Anlauf durch (Sicherheitsnetz unten). Gleiche
+     Liste wie im Vermittler-Dienst halten! */
+  if (typeof temperature === 'number' && !/opus-4-[789]|opus-5|sonnet-5|fable|mythos/.test(model)) body.temperature = temperature;
   const send = () => fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
