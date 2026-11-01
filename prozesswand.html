@@ -7,14 +7,17 @@
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧱</text></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 :root { --line:#d9dde3; --muted:#6b7280; --accent:#3f6fb0; --bg:#eef0f3; --ok:#2f8a4c; --warn:#b14b46; }
 * { box-sizing:border-box; }
 html,body { margin:0; height:100%; }
 body { font:13px/1.45 -apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; color:#1d2530; background:var(--bg); display:flex; flex-direction:column; }
 
-header { display:flex; align-items:center; gap:8px; padding:8px 14px; background:#fff; border-bottom:1px solid var(--line); flex-wrap:wrap; }
+header { display:flex; align-items:center; gap:8px; padding:8px 14px; background:#fff; border-bottom:1px solid var(--line); flex-wrap:wrap; position:relative; }
+/* V72: «gespeichert» schwebt – die Kopfzeile bricht dadurch nicht mehr um und die Wand springt nicht (Befund Peter) */
+#savedTag { position:fixed; left:14px; bottom:58px; z-index:6; pointer-events:none; background:rgba(255,255,255,.92); border-radius:5px; padding:1px 7px; text-align:left; min-width:0; }
+#savedTag:empty { display:none; }
 header h1 { font-size:16px; margin:0 6px 0 0; }
 header .sub { font-size:11px; color:var(--muted); margin-right:auto; }
 header button { font:inherit; font-size:12px; font-weight:600; cursor:pointer; border:1px solid var(--line); border-radius:6px; background:#f6f7f9; padding:6px 11px; }
@@ -26,7 +29,7 @@ header button.active { background:#e3ecf7; border-color:var(--accent); color:var
 .userTag { font-size:11px; color:var(--muted); }
 
 #main { flex:1; display:flex; min-height:0; }
-#wallScroll { flex:1; overflow:auto; position:relative; }
+#wallScroll { flex:1; overflow:auto; position:relative; overscroll-behavior:contain; }
 #wallCanvas { position:relative; background:#fff; }
 
 .lane-label { position:absolute; left:0; width:150px; padding:8px 10px; border-right:2px solid #c3c9d1; border-bottom:1px solid var(--line); background:#f8f9fb; z-index:15; cursor:default; box-shadow:2px 0 4px rgba(0,0,0,.06); }
@@ -93,12 +96,12 @@ aside { width:332px; background:#fff; border-left:1px solid var(--line); display
 #swarmBtn { background:#2f8a4c; }
 #swarmBtn:hover { background:#27703f; }
 
-#overlay { position:fixed; inset:0; z-index:60; display:none; align-items:center; justify-content:center; background:rgba(20,28,40,.45); }
+#overlay { position:fixed; inset:0; z-index:80; display:none; align-items:center; justify-content:center; background:rgba(20,28,40,.45); }
 .modal { background:#fff; border-radius:10px; box-shadow:0 8px 30px rgba(0,0,0,.25); width:430px; max-width:94vw; max-height:88vh; overflow-y:auto; padding:18px 20px; }
 .modal h3 { margin:0 0 12px; font-size:15px; }
 .modal label { display:block; font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.4px; margin:10px 0 3px; }
 .modal input[type=text], .modal input[type=password], .modal textarea, .modal select { width:100%; font:inherit; font-size:13px; padding:7px 9px; border:1px solid var(--line); border-radius:6px; resize:vertical; }
-.modal .btnrow { display:flex; gap:8px; margin-top:16px; }
+.modal .btnrow { display:flex; flex-wrap:wrap; gap:8px; margin-top:16px; }
 .modal .btnrow button { font:inherit; font-size:13px; font-weight:600; cursor:pointer; border-radius:7px; padding:8px 14px; border:1px solid var(--line); background:#f6f7f9; }
 .modal .btnrow .go { background:var(--accent); border-color:var(--accent); color:#fff; }
 .modal .btnrow .del { color:var(--warn); margin-left:auto; }
@@ -297,7 +300,7 @@ body.iv-on #main { margin-left:460px; }
    Alles andere bleibt hinter «Profi-Ansicht» erhalten. */
 body.einfach #guideBtn, body.einfach #wegBtn, body.einfach #glossarBtn, body.einfach #boardMenu,
 body.einfach #addPhase, body.einfach #addMs, body.einfach #connectBtn, body.einfach #viewSeg, body.einfach #fsBtn,
-body.einfach #checkBtn, body.einfach #docsBtn, body.einfach #kiWipe, body.einfach #keyBtn,
+body.einfach #checkBtn, body.einfach #docsBtn, body.einfach #exportBtn, body.einfach #kiWipe, body.einfach #keyBtn,
 body.einfach #smartBtn, body.einfach #prioBtn, body.einfach .phase-fit { display:none !important; }
 body.einfach header .sub { font-size:0; }
 body.einfach header .sub b { font-size:11px; }
@@ -306,6 +309,39 @@ body.einfach .lane-label b { font-size:12.5px; }
 .fp-tab th { text-align:left; font-size:11px; color:var(--muted); font-weight:600; padding:4px; border-bottom:1px solid var(--line); }
 .fp-tab td { padding:4px; border-bottom:1px solid #f0f1f3; vertical-align:top; }
 .fp-tab input[type=text], .fp-tab select { font:inherit; font-size:12.5px; padding:4px 6px; border:1px solid var(--line); border-radius:5px; width:100%; }
+/* V72: Wegweiser-Leiste – wo du stehst, was als Naechstes dran ist, was du erstellen kannst */
+#wegLeiste { display:none; flex-wrap:wrap; align-items:center; gap:6px 18px; padding:7px 14px; background:#fbf6f7; border-bottom:1px solid #ead9de; font-size:13px; }
+#wegLeiste.an { display:flex; }
+#wegLeiste .wl-teil { display:flex; align-items:center; gap:7px; min-width:0; flex:0 1 auto; }
+#wegLeiste .wl-lab { font-size:10.5px; font-weight:700; color:#651B32; text-transform:uppercase; letter-spacing:.4px; white-space:nowrap; }
+#wegLeiste .wl-txt { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:30vw; }
+#wegLeiste .wl-fehlt { color:#a05c12; font-weight:600; }
+#wegLeiste button { font:inherit; font-size:12.5px; font-weight:600; cursor:pointer; border:1px solid #d9c4ca; border-radius:7px; background:#fff; padding:6px 11px; min-height:32px; white-space:nowrap; }
+#wegLeiste button:hover { background:#f3ebee; }
+#wegLeiste button.wl-haupt { background:#651B32; border-color:#651B32; color:#fff; }
+#wegLeiste button.wl-haupt:hover { background:#4f1527; }
+#wegLeiste .wl-ziel { margin-left:auto; }
+#wegLeiste .wl-kurz { display:none; }
+body.iv-on #wegLeiste { display:none; }
+.ww-liste { display:flex; flex-direction:column; gap:8px; max-height:62vh; overflow-y:auto; margin-top:6px; }
+.ww-opt { display:flex; gap:12px; align-items:flex-start; border:1px solid var(--line); border-radius:10px; padding:10px 12px; background:#fff; }
+.ww-opt .ww-ic { font-size:22px; line-height:1; }
+.ww-opt .ww-body { flex:1; min-width:0; }
+.ww-opt b { font-size:14px; }
+.ww-opt p { margin:2px 0 0; font-size:12.5px; color:var(--muted); }
+.ww-opt .ww-vorher { margin-top:5px; font-size:12.5px; color:#a05c12; }
+.ww-opt .ww-ok { margin-top:5px; font-size:12.5px; color:#2f7d4f; }
+.ww-opt button { font:inherit; font-size:12.5px; font-weight:700; cursor:pointer; border:1px solid #651B32; background:#651B32; color:#fff; border-radius:7px; padding:8px 12px; min-height:36px; white-space:nowrap; }
+@media (max-width:800px) {
+  #wegLeiste { gap:5px 8px; padding:5px 10px; }
+  #wegLeiste .wl-lab { display:none; }
+  #wegLeiste .wl-txt { max-width:calc(100vw - 150px); }
+  #wegLeiste .wl-teil:first-child .wl-txt { max-width:calc(100vw - 20px); font-size:12px; color:var(--muted); }
+  #wegLeiste .wl-ziel { margin-left:0; }
+  #wegLeiste .wl-lang { display:none; }
+  #wegLeiste .wl-kurz { display:inline; }
+  .ww-opt { flex-wrap:wrap; }
+}
 #ivBtn { background:#eb6834; border-color:#eb6834; color:#fff; }
 #ivBtn:hover { background:#d45a29; }
 #ansichtBtn { font-weight:500; }
@@ -314,14 +350,167 @@ body.einfach .lane-label b { font-size:12.5px; }
   body.einfach #main { flex-direction:column; }
   body.einfach aside { width:100%; max-height:42vh; border-left:0; border-top:1px solid var(--line); }
 }
+:root {
+  --ic-home:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z'/%3E%3C/svg%3E");
+  --ic-mic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='9' y='3' width='6' height='11' rx='3'/%3E%3Cpath d='M5 11a7 7 0 0 0 14 0M12 18v3'/%3E%3C/svg%3E");
+  --ic-layout:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='3' width='18' height='18' rx='2'/%3E%3Cpath d='M3 9h18M9 21V9'/%3E%3C/svg%3E");
+  --ic-undo:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 14 4 9l5-5'/%3E%3Cpath d='M4 9h10.5a5.5 5.5 0 0 1 0 11H11'/%3E%3C/svg%3E");
+  --ic-sliders:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6'/%3E%3C/svg%3E");
+  --ic-help:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Cpath d='M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3M12 17h.01'/%3E%3C/svg%3E");
+  --ic-spark:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z'/%3E%3Cpath d='M19 15l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7z'/%3E%3C/svg%3E");
+  --ic-plus:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z'/%3E%3Cpath d='M14 3v6h6M12 12v6M9 15h6'/%3E%3C/svg%3E");
+  --ic-pin:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z'/%3E%3Ccircle cx='12' cy='10' r='2.5'/%3E%3C/svg%3E");
+  --ic-arrow:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12h14M13 6l6 6-6 6'/%3E%3C/svg%3E");
+  --ic-doc:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z'/%3E%3Cpath d='M14 3v6h6M8 13h8M8 17h5'/%3E%3C/svg%3E");
+  --ic-chart:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 20V10M10 20V4M16 20v-7M22 20H2'/%3E%3C/svg%3E");
+  --ic-cal:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='5' width='18' height='16' rx='2'/%3E%3Cpath d='M3 10h18M8 3v4M16 3v4'/%3E%3C/svg%3E");
+  --ic-folder:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z'/%3E%3C/svg%3E");
+  --ic-save:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 3v12M7 10l5 5 5-5M5 21h14'/%3E%3C/svg%3E");
+  --ic-coins:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M15 9.2c-.5-1-1.6-1.7-3-1.7-1.9 0-3 1-3 2.3 0 3 6 1.6 6 4.6 0 1.3-1.2 2.3-3 2.3-1.4 0-2.6-.7-3-1.7M12 6v1.5M12 16.5V18'/%3E%3C/svg%3E");
+  --ic-send:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M22 2 11 13M22 2l-7 20-4-9-9-4z'/%3E%3C/svg%3E");
+}
+
+/* ================================================================
+   V72 DESIGN: ruhiger, einheitlicher Auftritt (Wunsch Dölf 01.11.2026:
+   «professioneller»). Eine Markenfarbe (Bordeaux wie die Word-Berichte),
+   Inter als Schrift, Symbole statt Emojis in der Bedienung, feinere
+   Karten und Fenster. Nur Darstellung – an Daten und Abläufen ändert
+   sich nichts. Steht bewusst am Ende: überschreibt die alten Regeln.
+   ================================================================ */
+:root { --ink:#1b2430; --muted:#667085; --line:#e3e6eb; --bg:#f4f5f7; --brand:#651B32; --brand-600:#521526; --brand-50:#f8f1f3; --brand-100:#efdfe4; --accent:#651B32; --ok:#2e7d4f; --warn:#b42318; --focus:0 0 0 3px rgba(101,27,50,.18); }
+body { font-family:'Inter',-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; font-feature-settings:'cv11','ss01'; color:var(--ink); -webkit-font-smoothing:antialiased; }
+button, select, input, textarea { font-family:inherit; }
+:focus-visible { outline:none; box-shadow:var(--focus); }
+
+/* Symbole (Masken, nehmen die Textfarbe an) */
+.ic::before, #startBtn::before, #ivBtn::before, #dashBtn::before, #undoBtn::before, #ansichtBtn::before,
+body.einfach #fkBtn::before, body.einfach #swarmBtn::before, #sendBtn::before, #wlWas::before, #wlNaechst::after {
+  content:''; display:inline-block; width:15px; height:15px; flex:0 0 auto; background:currentColor;
+  -webkit-mask:var(--i) center/contain no-repeat; mask:var(--i) center/contain no-repeat; }
+#startBtn { --i:var(--ic-home); } #ivBtn { --i:var(--ic-mic); } #dashBtn { --i:var(--ic-layout); } #undoBtn { --i:var(--ic-undo); }
+#ansichtBtn { --i:var(--ic-sliders); } body.einfach #fkBtn { --i:var(--ic-help); } body.einfach #swarmBtn { --i:var(--ic-spark); }
+#sendBtn { --i:var(--ic-send); } #wlWas { --i:var(--ic-plus); } #wlNaechst { --i:var(--ic-arrow); }
+
+/* Kopf */
+header { min-height:54px; padding:8px 18px; gap:6px; border-bottom:1px solid var(--line); box-shadow:0 1px 0 rgba(16,24,40,.02); }
+header h1 { font-size:15px; font-weight:700; letter-spacing:-.01em; margin-right:12px; display:flex; align-items:center; gap:9px; }
+header h1::before { content:''; width:22px; height:22px; border-radius:6px; background:var(--brand);
+  box-shadow:inset 0 0 0 5px var(--brand), inset 0 0 0 7px rgba(255,255,255,.85); }
+header button { display:inline-flex; align-items:center; gap:7px; font-size:13px; font-weight:500; color:var(--ink); background:transparent; border:1px solid transparent; border-radius:8px; padding:7px 11px; }
+header button:hover { background:#f2f4f7; }
+header button.primary, header button.primary:hover { background:transparent; border-color:transparent; color:var(--ink); }
+header button.primary:hover { background:#f2f4f7; }
+#ivBtn, #ivBtn:hover { background:#fff; border-color:var(--brand); color:var(--brand); font-weight:600; }
+#ivBtn:hover { background:var(--brand-50); }
+#ansichtBtn { border-color:var(--line); }
+#boardSelect { font-size:13px; font-weight:500; color:var(--ink); border:1px solid var(--line); border-radius:8px; padding:7px 30px 7px 10px; background-color:#fff; max-width:280px; }
+header .sub b, #verTag { font-size:11px; font-weight:500; color:var(--muted); }
+.userTag { font-size:12px; }
+
+/* Wegweiser-Leiste */
+#wegLeiste { background:#fff; border-bottom:1px solid var(--line); padding:8px 18px; gap:8px 26px; font-size:13.5px; }
+#wegLeiste .wl-lab { font-size:10.5px; font-weight:600; letter-spacing:.06em; color:var(--muted); }
+#wegLeiste .wl-txt { color:var(--ink); }
+#wegLeiste .wl-fehlt { color:#b54708; font-weight:500; }
+#wegLeiste .wl-tag { display:inline-block; font-size:11px; font-weight:600; color:var(--brand); background:var(--brand-50); border:1px solid var(--brand-100); border-radius:999px; padding:1px 8px; margin-right:6px; vertical-align:1px; }
+#wegLeiste .wl-sep { width:1px; align-self:stretch; background:var(--line); }
+#wegLeiste button { display:inline-flex; align-items:center; gap:7px; font-size:13px; font-weight:600; border-radius:8px; padding:7px 13px; min-height:34px; border:1px solid var(--line); color:var(--ink); background:#fff; }
+#wegLeiste button:hover { background:#f2f4f7; }
+#wegLeiste button.wl-haupt { background:var(--brand); border-color:var(--brand); color:#fff; box-shadow:0 1px 2px rgba(16,24,40,.1); }
+#wegLeiste button.wl-haupt:hover { background:var(--brand-600); }
+
+/* Wand */
+#wallCanvas { background:#fff; }
+.lane-label { background:#fafbfc; border-right:1px solid var(--line); }
+.lane-label b { font-size:12px; font-weight:600; color:var(--ink); }
+.lane-label span { font-size:10.5px; }
+.lane-row.alt { background:#fcfcfd; }
+.phase-head { background:#fff; border-bottom:1px solid var(--line); }
+.phase-head:hover { background:#fafbfc; }
+.phase-head b { font-size:12.5px; font-weight:600; }
+.phase-sep { border-left:1px dashed #d0d5dd; }
+.postit { border-radius:7px; font-size:11.8px; line-height:1.4; padding:8px 10px; border:1px solid rgba(16,24,40,.07);
+  box-shadow:0 1px 2px rgba(16,24,40,.06), 0 2px 6px rgba(16,24,40,.06); }
+.postit:hover { box-shadow:0 2px 4px rgba(16,24,40,.08), 0 6px 14px rgba(16,24,40,.09); }
+.ms-flag { background:var(--brand); border-radius:6px; font-weight:600; letter-spacing:.01em; box-shadow:0 1px 3px rgba(16,24,40,.2); }
+.ms-line { border-color:var(--brand) !important; }
+.todoTag { color:var(--brand); }
+
+/* Seitenleiste */
+aside { border-left:1px solid var(--line); }
+.ki-tools { background:#fff; padding:10px 12px; }
+.ki-tools { flex-wrap:wrap; }
+.ki-tools button { flex:1 1 40%; font-size:12.5px; font-weight:500; color:var(--ink); border-radius:8px; padding:6px 8px; white-space:nowrap; }
+body.einfach .ki-tools button { display:inline-flex; align-items:center; justify-content:center; gap:7px; font-size:13px; padding:7px 10px; }
+.ki-tools button:hover { background:#f2f4f7; }
+.ki-head { padding:11px 14px; }
+.ki-head b { font-size:13px; font-weight:600; }
+#chatInput { border:1px solid var(--line); border-radius:8px; }
+#sendBtn { display:inline-flex; align-items:center; gap:7px; background:var(--brand); border-radius:8px; font-size:13px; font-weight:600; padding:0 14px; }
+#sendBtn:hover { background:var(--brand-600); }
+
+/* Zielleiste */
+#goalbar { padding:10px 18px; box-shadow:none; border-top:1px solid var(--line); }
+#goalbar label { font-size:10.5px; font-weight:600; letter-spacing:.06em; }
+#goalInput { border-radius:8px; padding:8px 11px; }
+#smartBtn, #swarmBtn, #fpBtn, #prioBtn, #agBtn { display:inline-flex; align-items:center; gap:7px; font-size:13px; font-weight:600; border-radius:8px; padding:8px 14px; }
+#swarmBtn, #swarmBtn:hover { background:#fff; color:var(--brand); border:1px solid var(--brand); }
+#swarmBtn:hover { background:var(--brand-50); }
+#smartBtn { background:var(--brand); }
+#smartBtn:hover { background:var(--brand-600); }
+
+/* Fenster */
+#overlay { background:rgba(16,24,40,.45); backdrop-filter:blur(2px); }
+.modal { border-radius:14px; padding:22px 24px; box-shadow:0 20px 50px rgba(16,24,40,.25), 0 0 0 1px rgba(16,24,40,.05); }
+.modal h3 { font-size:17px; font-weight:650; letter-spacing:-.01em; margin-bottom:10px; }
+.modal label { color:var(--muted); }
+.modal input[type=text], .modal textarea, .modal select { border-radius:8px; border-color:var(--line); }
+.modal .btnrow button { border-radius:8px; font-weight:600; background:#fff; color:var(--ink); }
+.modal .btnrow button:hover { background:#f2f4f7; }
+.modal .btnrow .go { background:var(--brand); border-color:var(--brand); color:#fff; }
+.modal .btnrow .go:hover { background:var(--brand-600); }
+
+/* «Was willst du erstellen?» */
+.ww-liste { gap:10px; }
+.ww-opt { border-radius:12px; padding:14px 16px; align-items:center; transition:border-color .15s, box-shadow .15s; }
+.ww-opt:hover { border-color:#d0d5dd; box-shadow:0 1px 3px rgba(16,24,40,.08); }
+.ww-opt .ww-ic { width:38px; height:38px; flex:0 0 38px; border-radius:10px; background:var(--brand-50); color:var(--brand); display:flex; align-items:center; justify-content:center; font-size:0; }
+.ww-opt .ww-ic::before { content:''; width:19px; height:19px; background:currentColor; -webkit-mask:var(--i) center/contain no-repeat; mask:var(--i) center/contain no-repeat; }
+.ww-opt b { font-size:14.5px; font-weight:600; }
+.ww-opt .ww-vorher { color:#b54708; }
+.ww-opt .ww-ok { color:var(--ok); }
+.ww-opt button { background:var(--brand); border-color:var(--brand); border-radius:8px; font-weight:600; }
+.ww-opt button:hover { background:var(--brand-600); }
+
+/* Interview */
+.iv-los .go { background:var(--brand); border-radius:10px; }
+.iv-los .go:hover { background:var(--brand-600); }
+.iv-bar div, #ivBalken { background:var(--brand) !important; }
+.iv-chips button { background:#fff; color:var(--ink); border-color:var(--line); }
+.iv-chips button:hover { background:var(--brand-50); border-color:var(--brand-100); }
+.iv-vorlagen button:hover { border-color:var(--brand); }
+.iv-zz { border-left-color:var(--brand); }
+
+/* Übersicht */
+.dash-sec, .tile { border-radius:12px; border-color:var(--line); }
+
+/* Handy: Kopf kompakter, damit mehr Wand sichtbar bleibt */
+@media (max-width:800px) {
+  header { padding:6px 10px; gap:4px; min-height:0; }
+  body.einfach header h1 { width:auto; font-size:14px; margin-right:auto; }
+  header h1::before { width:18px; height:18px; border-radius:5px; box-shadow:inset 0 0 0 4px var(--brand), inset 0 0 0 6px rgba(255,255,255,.85); }
+  header button { padding:6px 8px; font-size:12.5px; }
+  #boardSelect { max-width:62vw; font-size:12.5px; padding:6px 26px 6px 8px; }
+  .userTag, header .sub { display:none; }
+}
 </style>
 </head>
 <body>
 
 <header>
   <h1>OSTO/SYMA Prozesswand</h1>
-  <button id="startBtn" title="Startbildschirm: die drei wichtigsten Wege &ndash; in einfacher Sprache">&#127968; Start</button>
-  <button id="ivBtn" title="Interview: Die Wand stellt dir kurze Fragen und baut sich beim Antworten selbst auf">&#127908; Interview</button>
+  <button id="startBtn" title="Startbildschirm: die drei wichtigsten Wege &ndash; in einfacher Sprache">Start</button>
+  <button id="ivBtn" title="Interview: Die Wand stellt dir kurze Fragen und baut sich beim Antworten selbst auf">Interview</button>
   <button id="dashBtn" class="primary">Dashboard</button>
   <button id="guideBtn" title="Den Prozess Schritt f&uuml;r Schritt durchgehen">&#9654; Schritt f&uuml;r Schritt</button>
   <button id="wegBtn" title="Was m&ouml;chtest du tun? Erst ausw&auml;hlen, dann erkl&auml;rt die Wand wof&uuml;r und wie">&#10067; Wegweiser</button>
@@ -332,7 +521,7 @@ body.einfach .lane-label b { font-size:12.5px; }
   <span class="userTag" id="userTag"></span>
   <button id="logoutBtn" style="display:none">Abmelden</button>
   <span class="savedTag" id="savedTag"></span>
-  <button id="undoBtn" style="display:none" title="Letzte &Auml;nderung r&uuml;ckg&auml;ngig machen">&#8617; Retour</button>
+  <button id="undoBtn" style="display:none" title="Letzte &Auml;nderung r&uuml;ckg&auml;ngig machen">Retour</button>
   <button id="addPhase">+ Phase</button>
   <button id="addMs">+ Meilenstein</button>
   <button id="connectBtn">Verbinden</button>
@@ -341,6 +530,7 @@ body.einfach .lane-label b { font-size:12.5px; }
   <button id="ansichtBtn" title="Umschalten zwischen einfacher Ansicht (nur das N&ouml;tigste) und Profi-Ansicht (alle Werkzeuge)">&#128736; Profi-Ansicht</button>
   <input type="file" id="importFile" accept=".json" style="display:none">
 </header>
+<nav id="wegLeiste" aria-label="Wegweiser: wo du stehst und was als N&auml;chstes dran ist"></nav>
 
 <div id="main">
   <div id="wallScroll"><div id="wallCanvas"></div></div>
@@ -351,7 +541,7 @@ body.einfach .lane-label b { font-size:12.5px; }
       <button id="docsBtn">Dokumente</button>
       <button id="exportBtn">Export</button>
     </div>
-    <div class="ki-head"><b>&#129302; KI-Moderator</b><span style="flex:1"></span><button id="kiWipe">Verlauf l&ouml;schen</button><button id="keyBtn">API-Schl&uuml;ssel</button></div>
+    <div class="ki-head"><b>KI-Moderator</b><span style="flex:1"></span><button id="kiWipe">Verlauf l&ouml;schen</button><button id="keyBtn">API-Schl&uuml;ssel</button></div>
     <div id="kiLog"></div>
     <div class="ki-foot">
       <div id="chatRow">
@@ -422,7 +612,7 @@ body.einfach .lane-label b { font-size:12.5px; }
 <script>
 "use strict";
 
-const APP_VERSION = 'V71';
+const APP_VERSION = 'V72';
 /* V49: einheitlicher Wegweiser nach jedem «An Claude kopieren» */
 function claudeHinweis() {
   sysMsg('📋 Kopiert! Jetzt: 1. Claude öffnen (claude.ai bzw. deine Prozesswand-Sitzung) → 2. ins Schreibfeld klicken → 3. Cmd+V (einfügen) → 4. Senden. Mehr braucht es nicht.', true);
@@ -613,6 +803,39 @@ function normalizeState(d) {
     /* V71: KI-Fahrplan – Anwendungen und Stundensatz für den Sparpotenzial-Rechner */
     fahrplan: d.fahrplan && typeof d.fahrplan === 'object' && Array.isArray(d.fahrplan.faelle) ? d.fahrplan : null
   };
+  /* V72 Sicherheit (Prüfung 31.10.2026): eine präparierte Wand-Datei konnte über Felder
+     wie owner, id oder due fremden Code in die Seite schmuggeln (Import-Vorschau reichte).
+     Darum hier alle Felder auf Typ und Format prüfen; Text bleibt Text, Zahlen bleiben Zahlen. */
+  const ID = v => typeof v === 'string' && /^[A-Za-z0-9_-]{1,80}$/.test(v);
+  const ZAHL = (v, d) => { const n = Number(v); return v !== null && v !== '' && typeof v !== 'boolean' && isFinite(n) ? n : d; };
+  const FARBE = v => typeof v === 'string' && /^#[0-9a-fA-F]{3,8}$/.test(v) ? v : null;
+  const DATUM = v => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : undefined;
+  const OBJ = x => !!x && typeof x === 'object' && !Array.isArray(x);
+  const idMap = {};
+  const neu = (a, pf) => { if (ID(a)) return a; const n = uid(pf); idMap[String(a)] = n; return n; };
+  s.phases = s.phases.filter(OBJ).map(p => { p.id = neu(p.id, 'ph'); if (p.name != null) p.name = String(p.name); return p; });
+  s.postits = s.postits.filter(OBJ).map(p => {
+    p.id = neu(p.id, 'p'); p.x = ZAHL(p.x, 0); p.y = ZAHL(p.y, 0);
+    p.color = FARBE(p.color) || PALETTE[0];
+    p.text = p.text == null ? '' : String(p.text);
+    if (p.owner != null) p.owner = String(p.owner);
+    if (p.status != null && !['offen', 'arbeit', 'erledigt'].includes(p.status)) p.status = 'offen';
+    if (p.rang != null) p.rang = ZAHL(p.rang, undefined);
+    if (p.erledigtAm != null) p.erledigtAm = DATUM(p.erledigtAm);
+    return p; });
+  s.connections = s.connections.filter(OBJ)
+    .map(c => ({ id: neu(c.id, 'c'), from: idMap[c.from] || c.from, to: idMap[c.to] || c.to }))
+    .filter(c => ID(c.from) && ID(c.to));
+  s.milestones = s.milestones.filter(OBJ).map(m => { m.id = neu(m.id, 'm'); m.x = ZAHL(m.x, 0);
+    m.label = m.label == null ? '' : String(m.label); m.due = DATUM(m.due); if (m.due === undefined) delete m.due; return m; });
+  s.lanes = s.lanes.filter(l => OBJ(l) && ID(l.key)).map(l => { if (l.color != null) l.color = FARBE(l.color) || undefined; return l; });
+  s.agenten = s.agenten.filter(a => OBJ(a) && ID(a.id)).map(a => { a.farbe = FARBE(a.farbe) || '#cccccc'; return a; });
+  s.befragungen = s.befragungen.filter(OBJ).map(b => { b.frist = DATUM(b.frist) || ''; return b; });
+  if (s.fahrplan) {
+    const z = v => (v === null || v === undefined || v === '' || !isFinite(+v)) ? null : +v;
+    s.fahrplan.satz = z(s.fahrplan.satz);
+    s.fahrplan.faelle = s.fahrplan.faelle.filter(OBJ).map(f => { f.name = String(f.name == null ? '' : f.name); f.std = z(f.std); f.proz = z(f.proz) || 0; return f; });
+  }
   s.phases.forEach(p => { if (typeof p.w !== 'number' || p.w < 80) p.w = PHASE_W; });
   return s;
 }
@@ -631,11 +854,14 @@ function activateBoard(id) {
   if (!b) { b = { id: uid('b'), name: 'Meine Wand', state: defaultState() }; collection.boards.push(b); collection.activeId = b.id; }
   collection.activeId = b.id; state = b.state;
   renderBoardSelect(); refreshFromState(); agentenKnopfZeigen();
+  wandNachObenLinks();
 }
+/* V72: neue oder gewechselte Wand beginnt oben links bei Phase 1 */
+function wandNachObenLinks() { const sc = document.getElementById('wallScroll'); if (sc) { sc.scrollLeft = 0; sc.scrollTop = 0; } }
 function newBoardFrom(name, st, activate) {
   const b = { id: uid('b'), name: name || 'Neue Wand', state: st || defaultState() };
   collection.boards.push(b);
-  if (activate !== false) { collection.activeId = b.id; state = b.state; renderBoardSelect(); refreshFromState(); }
+  if (activate !== false) { collection.activeId = b.id; state = b.state; renderBoardSelect(); refreshFromState(); wandNachObenLinks(); }
   save();
   return b;
 }
@@ -717,7 +943,7 @@ function render() {
 
   lanes().forEach((l, i) => {
     h += '<div class="lane-row' + (i % 2 ? ' alt' : '') + '" data-laneidx="' + i + '" style="left:' + LABEL_W + 'px;top:' + (HEADER_H + i*LANE_H) + 'px;width:' + W + 'px;height:' + LANE_H + 'px"></div>';
-    h += '<div class="lane-label" data-lane="' + l.key + '" title="' + esc(laneEinfach(l.key)) + '" style="top:' + (HEADER_H + i*LANE_H) + 'px;height:' + LANE_H + 'px">' + laneLabelInhalt(l) + '</div>';
+    h += '<div class="lane-label" data-lane="' + esc(l.key) + '" title="' + esc(laneEinfach(l.key)) + '" style="top:' + (HEADER_H + i*LANE_H) + 'px;height:' + LANE_H + 'px">' + laneLabelInhalt(l) + '</div>';
   });
 
   s.phases.forEach((p, i) => {
@@ -735,9 +961,9 @@ function render() {
     const x = LABEL_W + clamp(m.x, 0, W);
     const short = (m.label || '').split(/\s[–-]\sKriterien/)[0];
     const late = isOverdue(m.due);
-    const dueTxt = m.due ? ' &middot; ' + fmtDue(m.due) + (late ? ' &#9888;' : '') : '';
+    const dueTxt = m.due ? ' &middot; ' + esc(fmtDue(m.due)) + (late ? ' &#9888;' : '') : '';
     h += '<div class="ms-line" style="left:' + x + 'px;top:' + HEADER_H + 'px;height:' + H + 'px"></div>';
-    h += '<div class="ms-flag" data-mid="' + m.id + '" style="left:' + x + 'px;top:' + flagTop + 'px' + (late ? ';background:#a02020' : '') + '" title="Entscheid-Punkt (Tor): ' + esc(m.label) + (m.due ? ' – Zieldatum ' + fmtDue(m.due) : '') + ' – hier schaust du die Ergebnisse an und sagst Ja (weiter) oder Nein (stopp)">&#9670; ' + esc(short) + dueTxt + '</div>';
+    h += '<div class="ms-flag" data-mid="' + esc(m.id) + '" style="left:' + x + 'px;top:' + flagTop + 'px' + (late ? ';background:#a02020' : '') + '" title="Entscheid-Punkt (Tor): ' + esc(m.label) + (m.due ? ' – Zieldatum ' + esc(fmtDue(m.due)) : '') + ' – hier schaust du die Ergebnisse an und sagst Ja (weiter) oder Nein (stopp)">&#9670; ' + esc(short) + dueTxt + '</div>';
   });
 
   s.postits.forEach(p => {
@@ -757,7 +983,7 @@ function render() {
       ? '<span class="todoTag" title="Unbelegt: Es ist nicht festgehalten, woher die Annahme hinter dieser Karte stammt. Doppelklick &rarr; Feld &laquo;Beleg&raquo; ausf&uuml;llen." style="color:#b3391f;font-weight:700">&#9679; unbelegt</span>'
       : '';
     const prio = mode === 'lean' && istArbeitsLane(laneKeyOfY(p.y)) && depsOk(p);
-    h += '<div class="postit st-' + st + (prio ? ' prio' : '') + (connectSrc === p.id ? ' sel' : '') + '" data-pid="' + p.id + '" style="left:' + (LABEL_W + p.x) + 'px;top:' + (HEADER_H + p.y) + 'px;background:' + (p.color || PALETTE[0]) + '"><span class="dot ' + st + '"></span>' + esc(p.text) + (prio ? '<span class="prioTag">&#10148; als N&auml;chstes</span>' : '') + tds + typTag + persTag + owTag + rgTag + beTag + '</div>';
+    h += '<div class="postit st-' + st + (prio ? ' prio' : '') + (connectSrc === p.id ? ' sel' : '') + '" data-pid="' + esc(p.id) + '" style="left:' + (LABEL_W + p.x) + 'px;top:' + (HEADER_H + p.y) + 'px;background:' + (p.color || PALETTE[0]) + '"><span class="dot ' + st + '"></span>' + esc(p.text) + (prio ? '<span class="prioTag">&#10148; als N&auml;chstes</span>' : '') + tds + typTag + persTag + owTag + rgTag + beTag + '</div>';
   });
 
   h += '<svg id="conns" width="' + (LABEL_W + W) + '" height="' + (HEADER_H + H) + '"><defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#1f5fae"/></marker></defs>';
@@ -768,7 +994,7 @@ function render() {
     const bx = LABEL_W + b.x + PI_W/2, by = HEADER_H + b.y + 28;
     const mx = (ax + bx) / 2;
     const d = 'M' + ax + ',' + ay + ' C' + mx + ',' + ay + ' ' + mx + ',' + by + ' ' + bx + ',' + by;
-    h += '<path class="cas" d="' + d + '"/><path class="vis" d="' + d + '"/><path class="hit" data-cid="' + c.id + '" d="' + d + '"/>';
+    h += '<path class="cas" d="' + d + '"/><path class="vis" d="' + d + '"/><path class="hit" data-cid="' + esc(c.id) + '" d="' + d + '"/>';
   });
   h += '</svg>';
 
@@ -776,6 +1002,7 @@ function render() {
   syncLaneLabels();
   if (guide) markGuideCard();
   fpKnopfZeigen();
+  try { wegweiserZeigen(); } catch (e) { console.warn('Wegweiser:', e); }
 }
 const wallScrollEl = document.getElementById('wallScroll');
 function syncLaneLabels() {
@@ -800,6 +1027,7 @@ wallScrollEl.addEventListener('wheel', e => {
 
 /* ---------- Interaktion (Delegation) ---------- */
 let drag = null;
+let zugInfo = null; // V72: war der letzte Druck auf eine Karte ein Ziehen? (dann kein Öffnen beim Loslassen)
 
 canvas.addEventListener('pointerdown', e => {
   if (previewState) return;
@@ -841,6 +1069,7 @@ document.addEventListener('pointermove', e => {
 document.addEventListener('pointerup', () => {
   if (!drag) return;
   const d = drag;
+  if (d.type === 'pi') zugInfo = { moved: !!d.moved, t: Date.now() };
   const moved = d.moved || d.type === 'resize';
   drag = null;
   if (d.type === 'resize') {
@@ -925,6 +1154,9 @@ canvas.addEventListener('click', e => {
     }
     return;
   }
+  /* V72: in der einfachen Ansicht oeffnet ein einfacher Klick/Tipp die Karte (vorher nur Doppelklick – Befund Sandra/Peter) */
+  const piK = e.target.closest('.postit');
+  if (piK && istEinfach() && !(zugInfo && zugInfo.moved && Date.now() - zugInfo.t < 500)) { openPostitModal(piK.dataset.pid); return; }
   const fit = e.target.closest('.phase-fit');
   if (fit) { fitPhase(+fit.dataset.fi); return; }
   const zoom = e.target.closest('.phase-zoom');
@@ -995,7 +1227,7 @@ function openPostitModal(id) {
     + '<label>Farbe</label><div class="swatches">' + sw + '</div>'
     + '<div style="display:flex;gap:8px;margin-top:10px">'
     + '<div style="flex:1"><label>Task-Typ</label><select id="mTyp" style="width:100%;font:inherit;font-size:12.5px;padding:6px 8px;border:1px solid var(--line);border-radius:6px">'
-    + '<option value="auto"' + ((card.typ || 'auto') === 'auto' ? ' selected' : '') + '>auto &ndash; KI erledigt selbst&auml;ndig</option>'
+    + '<option value="auto"' + ((card.typ || 'auto') === 'auto' ? ' selected' : '') + '>normal &ndash; ohne Freigabe (wer es macht: rechts)</option>'
     + '<option value="freigabe"' + (card.typ === 'freigabe' ? ' selected' : '') + '>freigabe &ndash; wirkt erst nach deiner Freigabe</option>'
     + '<option value="input"' + (card.typ === 'input' ? ' selected' : '') + '>input &ndash; braucht menschlichen Input</option></select></div>'
     + '<div style="flex:1"><label>Verantwortlich (wer f&uuml;hrt aus)</label>' + ownerSelect('mOwner', card.owner)
@@ -1699,6 +1931,14 @@ function ivDatum(t) {
   if (m) return iso(new Date(Date.now() + (+m[1]) * (m[2] === 'monat' ? 30.5 : 7) * 86400000));
   if (/ende\s+(jahr|dieses jahres)/.test(t)) return heute.getFullYear() + '-12-31';
   const MON = ['januar', 'februar', 'märz', 'april', 'mai', 'juni', 'juli', 'august', 'september', 'oktober', 'november', 'dezember'];
+  /* V72: «12. Juni 2027» ist ein genauer Tag – nicht das Monatsende (Befund Sandra: wurde zu 30.06.) */
+  m = t.match(/(\d{1,2})\.?\s*(januar|februar|märz|maerz|april|mai|juni|juli|august|september|oktober|november|dezember)\s*(\d{4})?/);
+  if (m) {
+    const mi = MON.indexOf(m[2] === 'maerz' ? 'märz' : m[2]);
+    let j = m[3] ? +m[3] : heute.getFullYear();
+    if (!m[3] && mi < heute.getMonth()) j++;
+    return iso(new Date(Date.UTC(j, mi, +m[1])));
+  }
   m = t.match(/(januar|februar|märz|maerz|april|mai|juni|juli|august|september|oktober|november|dezember)\s*(\d{4})?/);
   if (m) {
     const mi = MON.indexOf(m[1] === 'maerz' ? 'märz' : m[1]);
@@ -1960,7 +2200,7 @@ async function ivAbschluss() {
     + '<label class="iv-lab" for="ivSmart">Dein Ziel in einem Satz</label>'
     + '<textarea id="ivSmart" rows="4">' + esc(ivSmartRegel()) + '</textarea><div id="ivKi"></div>'
     + '<label class="iv-lab" for="ivName">Name der Wand</label>'
-    + '<input type="text" id="ivName" value="' + esc(ivKurz(A.ziel, 38)) + '">'
+    + '<input type="text" id="ivName" value="' + esc(ivWandName(A)) + '">'
     + '<div class="iv-los"><button class="go" id="ivUebernehmen">&#10003; Wand &uuml;bernehmen</button><button class="zurueck" id="ivZurueck">&larr; Antworten &auml;ndern</button></div>'
     + '<div style="margin-top:14px">' + zz('Bis wann', A.wann) + zz('Schritte', A.schritte) + zz('Gibt frei', A.wer_e) + zz('Führt', A.wer_f) + '</div>'
     + '<p class="iv-nach">Deine bisherigen Wände bleiben unverändert. Die neue Wand kommt dazu.</p>';
@@ -1982,6 +2222,18 @@ async function ivAbschluss() {
     } catch (e) { kasten.innerHTML = ''; }
   }
 }
+/* V72: kurzer Wandname statt abgeschnittenem Zielsatz («Mieterausbau bis März 2027») */
+function ivWandName(A) {
+  const MON = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
+  const v = IV_VORLAGEN.find(x => x.id === iv.vorlage);
+  const d = ivWeissNicht(A.wann) ? '' : ivDatum(A.wann);
+  const bis = d ? ' bis ' + MON[+d.slice(5, 7) - 1] + ' ' + d.slice(0, 4) : '';
+  if (v && v.id === 'kifahrplan') return 'KI-Fahrplan' + bis;
+  if (v && v.id !== 'eigen') return v.name.replace(/\s*\/.*$/, '') + bis;
+  const z = String(A.ziel || '').trim().replace(/\s+/g, ' ');
+  const kurz = z.length > 32 ? z.slice(0, 32).replace(/\s\S*$/, '') : z;
+  return (kurz || 'Mein Projekt') + bis;
+}
 function ivUebernehmen() {
   const ziel = document.getElementById('ivSmart').value.trim();
   const name = document.getElementById('ivName').value.trim() || 'Interview';
@@ -1995,13 +2247,19 @@ function ivUebernehmen() {
   newBoardFrom(name, st, true);
   if (ziel) { state.goal = ziel; goalInput.value = ziel; autoResizeGoal(); } // Nutzer hat das Ziel eben bestaetigt
   save(); render();
+  /* V72: Wand beginnt oben links bei Phase 1 (Befund Sandra/Marco: startete mitten in Phase 3) */
+  const sc = document.getElementById('wallScroll'); sc.scrollLeft = 0; sc.scrollTop = 0;
+  const ns = naechsterSchritt(), nFragen = offeneFragen().length;
   openModal('<h3>&#10003; Deine Wand &laquo;' + esc(name) + '&raquo; ist angelegt</h3>'
-    + '<p style="font-size:13px;margin:2px 0 6px">Was m&ouml;chtest du jetzt tun?</p>'
+    + '<p style="font-size:13px;margin:2px 0 6px">Oben in der Leiste steht ab jetzt immer, wo du stehst und was als N&auml;chstes dran ist.'
+    + (nFragen ? ' ' + nFragen + ' Frage' + (nFragen > 1 ? 'n sind' : ' ist') + ' noch offen.' : '') + ' Was m&ouml;chtest du jetzt tun?</p>'
+    + (state.fahrplan ? startBigBtn('ivNxFp', '💰', 'Sparpotenzial rechnen', 'Rechner in Franken pro Jahr und die Entscheidungsvorlage für Geschäftsleitung, IT und Fachbereich.') : '')
+    + startBigBtn('ivNxWeiter', '👉', ns.art === 'frage' ? 'Offene Fragen beantworten' : 'Den nächsten Schritt machen', esc('Als Nächstes: ' + ns.txt.slice(0, 110)))
     + startBigBtn('ivNxKi', '🤖', 'Die KI ergänzt den Rest', 'Sie füllt die leeren Ebenen und Phasen aus deinen Antworten. Du siehst zuerst eine Vorschau.')
-    + startBigBtn('ivNxDash', '☀️', 'Was ist als Nächstes dran?', 'Die Übersicht zeigt, was auf dich wartet und wo du entscheiden musst.')
-    + startBigBtn('ivNxWand', '🧱', 'Wand anschauen', 'Karten verschieben, anklicken, ergänzen.'));
+    + startBigBtn('ivNxWand', '🧱', 'Wand anschauen', 'Karte antippen zum Öffnen, ziehen zum Verschieben.'));
+  const fpb = document.getElementById('ivNxFp'); if (fpb) fpb.onclick = () => { closeModal(); openFahrplan(); };
+  document.getElementById('ivNxWeiter').onclick = () => { closeModal(); ns.tun(); };
   document.getElementById('ivNxKi').onclick = () => { closeModal(); document.getElementById('swarmBtn').click(); };
-  document.getElementById('ivNxDash').onclick = () => { closeModal(); openDash(); };
   document.getElementById('ivNxWand').onclick = closeModal;
 }
 /* KI-Struktur kennt die Interview-Antworten: Zeitrahmen und Kontext vorbelegen */
@@ -2151,12 +2409,27 @@ function ladeFahrplanBeispiel() {
   /* Dossier: 3–4 h auf unter 45 Min. ≈ 75 %; Post: halbiert ist eine Annahme, in Phase 1 zählen */
   f[0].proz = 75; f[1].proz = 50; f[2].risiko = 'mittel'; f[3].aufwand = 'tief';
   st.kiLog = state.kiLog; st.kiConvo = state.kiConvo; st.solo = state.solo;
-  previewState = st; previewMeta = { import: true, ziel: 'KI-Fahrplan: Versicherungsbroker' };
+  /* V72: im Übungs-Modus gleich als Wand öffnen – vorher stand das fertige Beispiel als
+     «Vorschau des KI-Entwurfs» da, und Rechner wie Wegweiser fehlten (Befund Marco) */
+  if (uebungsModus) {
+    syncActive();
+    newBoardFrom('Beispiel: KI-Fahrplan Versicherungsbroker', st, true);
+    sysMsg('🧭 Beispiel «KI-Fahrplan»: ein Versicherungsbroker mit 5 Personen (anonymisiert). Oben «🎯 Was willst du erstellen?» → «Sparpotenzial und Entscheidungsvorlage».', true);
+    return;
+  }
+  previewState = st; previewMeta = { import: true, ziel: 'KI-Fahrplan: Versicherungsbroker', name: 'Beispiel: KI-Fahrplan Versicherungsbroker' };
   document.getElementById('previewBar').style.display = 'flex';
   render();
   sysMsg('🧭 Beispiel «KI-Fahrplan» geladen: ein Versicherungsbroker mit 5 Personen (anonymisiert). Oben «Als neue Wand» wählen, dann unten «💰 Sparpotenzial» öffnen: Rechner und Entscheidungsvorlage.', true);
 }
 document.getElementById('fpBtn').onclick = () => openFahrplan();
+/* V72: Esc schliesst das offene Fenster (Befund Peter) – zuerst Fenster, dann Lupe, dann Übersicht */
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape') return;
+  if (overlay.style.display === 'flex') { closeModal(); return; }
+  if (document.getElementById('lupe').style.display === 'block') { closeLupe(); return; }
+  if (document.getElementById('dash').style.display === 'block') closeDash();
+});
 document.getElementById('ivBtn').onclick = () => openInterview();
 document.getElementById('ivZu').onclick = () => ivSchliessen(false);
 document.getElementById('ivWandZeigen').onclick = () => { document.body.classList.toggle('iv-wand'); if (previewState) ivZeichnen(); };
@@ -2167,7 +2440,10 @@ document.getElementById('authProbe').onclick = () => { location.search = '?beisp
    braucht; «Profi-Ansicht» holt alle Werkzeuge zurueck. Nur die Anzeige
    wechselt, an den Daten aendert sich nichts.
    ================================================================ */
-const EINFACH_TEXTE = { dashBtn: '☀️ Was ist dran?', fkBtn: '❓ Weiter fragen', exportBtn: '📤 Teilen', swarmBtn: '🤖 KI ergänzt die Wand' };
+/* V72: «Was ist dran?» beantwortet jetzt die Wegweiser-Leiste – der Knopf heisst darum «Übersicht».
+   Berichte und Sicherung erreicht die einfache Ansicht über «🎯 Was willst du erstellen?»
+   (so bleibt es bei höchstens 10 Knöpfen); in der Profi-Ansicht bleiben beide Knöpfe. */
+const EINFACH_TEXTE = { dashBtn: 'Übersicht', fkBtn: 'Weiter fragen', swarmBtn: 'KI ergänzt die Wand' }; // Symbole kommen aus dem CSS (V72 Design)
 function istEinfach() { return document.body.classList.contains('einfach'); }
 function ansichtSetzen(einfach) {
   document.body.classList.toggle('einfach', einfach);
@@ -2177,7 +2453,7 @@ function ansichtSetzen(einfach) {
     if (b.dataset.profi === undefined) b.dataset.profi = b.innerHTML;
     if (einfach) b.textContent = EINFACH_TEXTE[id]; else b.innerHTML = b.dataset.profi;
   });
-  document.getElementById('ansichtBtn').innerHTML = einfach ? '&#128736; Profi-Ansicht' : '&#10024; Einfache Ansicht';
+  document.getElementById('ansichtBtn').innerHTML = einfach ? 'Profi-Ansicht' : 'Einfache Ansicht';
   if (state) render();
 }
 /* Ebenen-Beschriftung: in der einfachen Ansicht Alltagssprache zuerst */
@@ -2225,7 +2501,7 @@ function agModellSelect(a) {
 }
 function agZeile(a) {
   const kn = 'font:inherit;font-size:12px;cursor:pointer;border:1px solid var(--line);background:#f6f7f9;border-radius:6px;padding:4px 8px';
-  let h = '<div class="ag-row" data-agid="' + a.id + '" style="border:1px solid var(--line);border-left:7px solid ' + esc(a.farbe || '#ccc') + ';border-radius:8px;padding:10px 12px;margin-bottom:10px">';
+  let h = '<div class="ag-row" data-agid="' + esc(a.id) + '" style="border:1px solid var(--line);border-left:7px solid ' + esc(a.farbe || '#ccc') + ';border-radius:8px;padding:10px 12px;margin-bottom:10px">';
   h += '<div style="display:flex;gap:6px;align-items:center">'
      + '<input type="text" class="ag-name" value="' + esc(a.name) + '" style="flex:1;font-weight:700">'
      + '<button class="ag-up" style="' + kn + '" title="nach oben">&#9650;</button>'
@@ -2359,6 +2635,9 @@ document.getElementById('exportBtn').onclick = () => {
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob); a.download = 'prozesswand-export.json'; a.click();
   URL.revokeObjectURL(a.href);
+  /* V72: vorher kam kommentarlos eine JSON-Datei – jetzt sagt die Wand, was das ist */
+  sysMsg('💾 Sicherung gespeichert im Ordner «Downloads»: prozesswand-export.json. Damit liest du die Wand später wieder ein. '
+    + 'Sie enthält alles, auch hinterlegte Namen und Mail-Adressen – nicht weitergeben. Für andere Leute: «📄 Berichte».', true);
 };
 document.getElementById('importFile').addEventListener('change', e => {
   const f = e.target.files[0]; if (!f) return;
@@ -2727,6 +3006,8 @@ async function agentJSON(role, system, user, maxTok) {
 
 document.getElementById('swarmBtn').onclick = () => {
   if (previewState) return;
+  /* V72: ohne Konto zuerst das Gratis-Konto erklaeren – nicht erst ein Fachformular ausfuellen lassen */
+  if (istEinfach() && !kiBereit()) { openKeyModal(() => document.getElementById('swarmBtn').click()); return; }
   if (istAgentenWand()) { openAgentenSchwarmModal(); return; }
   openModal('<h3>&#129302; Projekt strukturieren (KI)</h3>'
     + '<p style="font-size:12px;color:var(--muted);margin:0">Sechs Agenten (Architekt &rarr; Planer &rarr; Kritiker &rarr; Verbinder &rarr; Lean &rarr; Optimierer) bauen einen Entwurf nach deiner Methodik. Du siehst zuerst eine Vorschau.</p>'
@@ -3484,7 +3765,7 @@ document.getElementById('boardSelect').onchange = e => {
 };
 document.getElementById('pvNeu').onclick = () => {
   const st = previewState;
-  const nm = 'KI: ' + ((previewMeta && previewMeta.ziel) ? previewMeta.ziel.slice(0, 38) : 'Entwurf');
+  const nm = (previewMeta && previewMeta.name) || ('KI: ' + ((previewMeta && previewMeta.ziel) ? previewMeta.ziel.slice(0, 38) : 'Entwurf'));
   endPreview();
   newBoardFrom(nm, st, true);
   sysMsg('✅ Entwurf als neue Wand «' + nm + '» angelegt. Deine bisherige Wand ist unverändert – oben links umschaltbar.');
@@ -3592,7 +3873,7 @@ const DOC_CSS = 'body{font-family:Calibri,Arial,sans-serif;font-size:9.5pt;color
   + '.foot{font-size:8.5pt;color:#666666;margin-top:16pt;border-top:.5pt solid #C9CCC4;padding-top:4pt}';
 
 function docKopf(title) {
-  const logo = collection.logo ? '<img class="logo" src="' + collection.logo + '">' : '';
+  const logo = collection.logo ? '<img class="logo" src="' + esc(collection.logo) + '">' : '';
   return '<table class="kopfzeile"><tr>'
     + '<td><h1>' + esc(title) + '</h1><div class="proj">' + esc(boardName()) + '</div></td>'
     + '<td style="text-align:right;width:35%">' + logo + '<div class="meta">Prozesswand &middot; ' + heute() + '</div></td>'
@@ -3623,11 +3904,15 @@ function xlsShell(sheetName, bodyTable, opts) {
 function downloadDoc(filename, html) {
   const blob = new Blob(['﻿' + html], { type: 'application/msword' });
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = filename; a.click(); URL.revokeObjectURL(a.href);
+  downloadGemeldet(filename);
 }
 function downloadXls(filename, html) {
   const blob = new Blob(['﻿' + html], { type: 'application/vnd.ms-excel' });
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = filename; a.click(); URL.revokeObjectURL(a.href);
+  downloadGemeldet(filename);
 }
+/* V72: nach jedem Download sagen, wo die Datei liegt (Befund Nutzertest: «keine Rückmeldung») */
+function downloadGemeldet(filename) { sysMsg('📥 Gespeichert im Ordner «Downloads»: ' + filename, true); }
 function ulOrPlatz(items, platz) {
   const li = (items||[]).filter(Boolean).map(t => '<li>' + esc(t) + '</li>').join('');
   return li ? '<ul>' + li + '</ul>' : '<p class="platz">[' + platz + ']</p>';
@@ -4121,7 +4406,7 @@ function genTermin() {
   const gantt = (a, b2) => { let g = ''; for (let w = 0; w < WKS; w++) g += '<td class="' + (w >= a && w <= b2 ? 'gt' : 'g') + '"></td>'; return g; };
   const dia = pos => { let g = ''; for (let w = 0; w < WKS; w++) g += (w === pos ? '<td class="g c" style="color:#651B32;font-weight:bold">&#9670;</td>' : '<td class="g"></td>'); return g; };
   const nbWks = '<td class="nb" colspan="' + WKS + '"></td>';
-  const logo = collection.logo ? '<img src="' + collection.logo + '" class="logo">' : '';
+  const logo = collection.logo ? '<img src="' + esc(collection.logo) + '" class="logo">' : '';
   let rows = '';
   /* Kopfbereich wie Vorlage: Leerzeile, Titel, Projekt+Meta, Leerzeile */
   rows += '<tr><td class="nb" colspan="' + (6 + WKS) + '">&nbsp;</td></tr>';
@@ -4161,7 +4446,7 @@ function genTermin() {
 }
 
 function genKosten() {
-  const logo = collection.logo ? '<img src="' + collection.logo + '" class="logo">' : '';
+  const logo = collection.logo ? '<img src="' + esc(collection.logo) + '" class="logo">' : '';
   let r = 0, rows = '';
   const tr = (cls, html) => { r++; rows += '<tr' + (cls ? ' class="' + cls + '"' : '') + '>' + html + '</tr>'; };
   const nb = n => '<td class="nb"></td>'.repeat(n);
@@ -4396,7 +4681,7 @@ function ownerKurz(v) {
   if (!t) return '';
   if (t === 'claude_code') return '🤖 KI';
   const o = OWNER_OPTS.find(x => x[0] === t);
-  return o ? '👤 ' + o[1].replace(/^👤 /, '').split(' – ')[0] : '👤 ' + t;
+  return o ? '👤 ' + o[1].replace(/^👤 /, '').split(' – ')[0] : '👤 ' + esc(t);
 }
 function ownerSelect(id, cur, cls, cid) {
   const bekannt = OWNER_OPTS.some(o => o[0] === (cur || '').trim());
@@ -4409,12 +4694,13 @@ function ownerSelect(id, cur, cls, cid) {
 }
 /* Kann die KI diesen Schritt allein erledigen? Nein, sobald ein Konto, Geld,
    ein Gerät oder ein Mensch nötig ist – dann gehört er einer Person. */
-const NUR_MENSCH = /\b(konto|account|zugang|zugriff|anmeld|login|passwort|schlüssel|ssh|token|lizenz|abo|kauf|bestell|zahl|bezahl|rechnung|kreditkarte|budget|vertrag|unterschr|unterzeichn|bewillig|freigab|entscheid|go\/?no.?go|gate|tor\b|besprech|sitzung|termin|treffen|anruf|telefon|interview|rekrutier|akquis|anfrag|kontaktier|einladen|tester|kunde|apple|testflight|dns|domain|hosting|server\s?mieten|installier|gerät|handy|iphone|aufnehm|diktat|fotograf|vor ort|baustelle|begehung|mentor|behörde|amt|datenschutzstelle)/i;
+const NUR_MENSCH = /\b(konto|account|zugang|zugriff|anmeld|login|passwort|schlüssel|ssh|token|lizenz|abo|kauf|bestell|zahl|bezahl|rechnung|kreditkarte|budget|vertrag|unterschr|unterzeichn|bewillig|freigab|entscheid|go\/?no.?go|gate|tor\b|besprech|sitzung|termin|treffen|anruf|telefon|interview|rekrutier|akquis|anfrag|kontaktier|einladen|tester|kunde|apple|testflight|dns|domain|hosting|server\s?mieten|installier|gerät|handy|iphone|aufnehm|diktat|fotograf|vor ort|baustelle|begehung|mentor|behörde|amt|datenschutzstelle|workshop|pre-?mortem|gespräch|review|retrospektiv|abstimm|kläre|klären|befrag|erheb|bestätig|anspruchsgrupp|präsentier|schulung|pilotbetrieb|patient|spital|klinik)/i;
 function ownerVorschlag(c) {
   if ((c.owner || '').trim()) return c.owner.trim();
   const typ = taskTyp(c);
   if (typ === 'freigabe' || typ === 'input') return 'doelf';
-  return NUR_MENSCH.test(cleanTxt(c.text || '') + ' ' + (c.todos || []).map(t => t.t).join(' ')) ? 'doelf' : 'claude_code';
+  /* V72: auch den Auftrag lesen – «Mit Kodierung, IT und Finanzen klären» steht oft erst dort (Befund Spital-Wand) */
+  return NUR_MENSCH.test(cleanTxt(c.text || '') + ' ' + (c.todos || []).map(t => t.t).join(' ') + ' ' + (c.auftrag || '')) ? 'doelf' : 'claude_code';
 }
 function openOwnerModal() {
   if (previewState) return;
@@ -4798,7 +5084,7 @@ function makeZip(files) {
 document.getElementById('docsBtn').onclick = () => {
   if (previewState) return;
   const logoRow = collection.logo
-    ? '<img src="' + collection.logo + '" style="max-height:40px;vertical-align:middle"> <button id="logoDel" style="font-size:11px">Logo entfernen</button>'
+    ? '<img src="' + esc(collection.logo) + '" style="max-height:40px;vertical-align:middle"> <button id="logoDel" style="font-size:11px">Logo entfernen</button>'
     : '<input type="file" id="logoFile" accept="image/*"> <span style="font-size:11px;color:var(--muted)">wird oben in jedem Dokument platziert</span>';
   openModal('<h3>Dokumente aus der Prozesswand</h3>'
     + '<p style="font-size:12px;color:var(--muted);margin:0 0 6px">Erzeugt Dokumente direkt aus den Karten-Daten der Wand «' + esc(boardName()) + '». Knöpfe mit 🤖 holen zuerst einen KI-Entwurf, den du liest und freigibst – exportiert wird immer nur, was du bestätigt hast.</p>'
@@ -5144,6 +5430,7 @@ async function fkFollowup(antwort) {
 
 document.getElementById('fkBtn').onclick = () => {
   if (previewState) return;
+  if (istEinfach() && !kiBereit()) { openKeyModal(() => document.getElementById('fkBtn').click()); return; }
   const opts = ['<option value="all">Gesamtprozess (alle Phasen und Ebenen)</option>']
     .concat(state.phases.map((p, i) => '<option value="p' + i + '">Nur Phase ' + (i + 1) + ': ' + esc(p.name) + '</option>'))
     .concat(lanes().map(l => '<option value="l' + l.key + '">Nur Ebene: ' + esc(fkLaneName(l.key)) + '</option>')).join('');
@@ -5444,6 +5731,196 @@ document.getElementById('dashBtn').onclick = openDash;
 document.getElementById('dashClose').onclick = closeDash;
 document.getElementById('dash').addEventListener('click', e => { if (e.target === document.getElementById('dash')) closeDash(); });
 
+/* ================================================================
+   V72: WEGWEISER-LEISTE (Wunsch Dölf, 01.11.2026: «es muss geführt sein –
+   oben, wo man steht, was als Nächstes, was man will, was möglich ist und
+   was vorher noch zu machen ist»). Alles wird aus den Wand-Daten gerechnet:
+   keine KI, keine Kosten. Messlatte: ein 9-jähriges Kind findet den
+   nächsten Klick ohne Anleitung.
+   ================================================================ */
+/* «Weiss ich noch nicht» – nur für diese Sitzung nach hinten stellen (Funktion statt const: render() läuft schon vor dieser Zeile) */
+function wwSpaeter() { return wwSpaeter.s || (wwSpaeter.s = new Set()); }
+function aktuellePhase() {
+  for (let i = 0; i < state.phases.length; i++) {
+    const t = tasksOfPhase(i);
+    if (!t.length || t.some(c => (c.status || 'offen') !== 'erledigt')) return i;
+  }
+  return Math.max(0, state.phases.length - 1);
+}
+function torKurz(m) { return String((m && m.label) || '').split(/\s[–-]\sKriterien/)[0].replace(/^\s*(Entscheid\s*:|Tor\s*:|Tor\s+)\s*/i, '') || 'Entscheid'; }
+function istFrageKarte(c) {
+  if ((c.status || 'offen') === 'erledigt') return false;
+  return /^\s*❓/u.test(c.text || '') || taskTyp(c) === 'input';
+}
+function offeneFragen(bisPhase) {
+  return state.postits.filter(istFrageKarte)
+    .map(c => ({ c, i: phaseIndexOfX(c.x) }))
+    .filter(x => bisPhase === undefined || x.i <= bisPhase)
+    .sort((a, b) => (wwSpaeter().has(a.c.id) - wwSpaeter().has(b.c.id)) || (a.i - b.i) || (a.c.y - b.c.y) || (a.c.x - b.c.x));
+}
+function frageText(c) {
+  return cleanTxt(String(c.text || '')).replace(/^\s*❓\s*/u, '')
+    .replace(/^\s*(Lücke|Luecke|Offene Frage|Frage)\s*:\s*/i, '')
+    .replace(/\s*\[offen[^\]]*\]\s*/gi, ' ').replace(/\s+/g, ' ').trim() || 'Offene Frage';
+}
+/* Wie viele Stellen der Wand sind noch [offen]? (nur Offenes zählt) */
+function offenStellen() {
+  let n = 0;
+  const z = t => { n += (String(t || '').match(/\[offen/gi) || []).length; };
+  state.postits.forEach(c => { if ((c.status || 'offen') !== 'erledigt') z(c.text); });
+  state.milestones.forEach(m => z(m.label));
+  state.phases.forEach(p => ['ziel', 'was', 'wer', 'wie', 'wann', 'input', 'output'].forEach(k => z(p[k])));
+  z(state.goal);
+  return n;
+}
+function offeneAufgaben(i) {
+  return tasksOfPhase(i).filter(c => (c.status || 'offen') !== 'erledigt').sort((a, b) => {
+    const ra = typeof a.rang === 'number' ? a.rang : 9999, rb = typeof b.rang === 'number' ? b.rang : 9999;
+    return ra !== rb ? ra - rb : (a.x - b.x || a.y - b.y);
+  });
+}
+/* Der EINE nächste Schritt: offene Frage vor Freigabe vor Aufgabe vor Tor */
+function naechsterSchritt() {
+  if (!state.phases.length) return { art: 'start', txt: 'Leg dein Projekt an: Das Interview stellt dir 8 kurze Fragen.', knopf: 'Interview starten', tun: () => openInterview() };
+  const akt = aktuellePhase();
+  const fr = offeneFragen(akt + 1), frJetzt = fr.filter(x => !wwSpaeter().has(x.c.id));
+  if (frJetzt.length) return { art: 'frage', c: frJetzt[0].c, txt: frageText(frJetzt[0].c), mehr: frJetzt.length - 1, knopf: 'Beantworten', tun: () => frageBeantworten(frJetzt[0].c.id) };
+  const offen = offeneAufgaben(akt);
+  const frei = offen.find(c => taskTyp(c) === 'freigabe');
+  if (frei) return { art: 'freigabe', c: frei, txt: 'Freigeben: ' + cleanTxt(frei.text), knopf: 'Freigabe ansehen', tun: () => karteZeigen(frei.id, true) };
+  if (offen.length) return { art: 'aufgabe', c: offen[0], txt: cleanTxt(offen[0].text), mehr: 0, knopf: 'Ansehen', tun: () => karteZeigen(offen[0].id, true) };
+  const g = gateOfPhase(akt);
+  if (tasksOfPhase(akt).length && g) return { art: 'tor', txt: 'Phase ' + (akt + 1) + ' ist erledigt. Jetzt entscheiden: ' + torKurz(g), knopf: 'Tor ansehen', tun: () => openMilestoneModal(g.id) };
+  /* zurückgestellte Fragen kommen wieder, sobald sonst nichts mehr ansteht */
+  if (fr.length) return { art: 'frage', c: fr[0].c, txt: frageText(fr[0].c), mehr: fr.length - 1, knopf: 'Beantworten', tun: () => frageBeantworten(fr[0].c.id) };
+  if (!tasksOfPhase(akt).length) return { art: 'leer', txt: 'In Phase ' + (akt + 1) + ' stehen noch keine Aufgaben.', knopf: 'Aufgabe anlegen', tun: () => aufgabeAnlegen(akt) };
+  return { art: 'fertig', txt: 'Alle Aufgaben sind erledigt.', knopf: 'Abschlussbericht', tun: () => wwErstellen('abschluss') };
+}
+function aufgabeAnlegen(i) {
+  if (previewState) return;
+  const c = addCard(i, arbeitsLanes()[0], 'Neue Aufgabe');
+  save(); render(); karteZeigen(c.id, true);
+}
+/* Karte auf der Wand anfahren, kurz aufleuchten lassen und (wenn gewünscht) öffnen */
+function karteZeigen(id, oeffnen) {
+  const c = getPostit(id); if (!c) return;
+  const sc = document.getElementById('wallScroll');
+  try { sc.scrollTo({ left: Math.max(0, c.x - 140), top: Math.max(0, c.y - 30), behavior: 'smooth' }); } catch (e) { sc.scrollLeft = Math.max(0, c.x - 140); }
+  const el = canvas.querySelector('.postit[data-pid="' + id + '"]');
+  if (el) { el.classList.remove('iv-neu'); void el.offsetWidth; el.classList.add('iv-neu'); }
+  if (oeffnen) openPostitModal(id);
+}
+function wegweiserZeigen() {
+  const el = document.getElementById('wegLeiste'); if (!el) return;
+  if (!state || previewState) { el.classList.remove('an'); el.innerHTML = ''; return; }
+  const n = state.phases.length, ns = naechsterSchritt();
+  let h = '';
+  if (n) {
+    const akt = aktuellePhase(), g = gateOfPhase(akt);
+    /* Heisst das Tor wie die Phase (Interview-Wände), reicht «Tor am Phasenende» – so bleibt Platz für «Datum fehlt» */
+    const torName = g ? (torKurz(g).trim() === String(state.phases[akt].name).trim() ? 'Tor am Phasenende' : 'Tor: ' + torKurz(g)) : '';
+    const ort = 'Phase ' + (akt + 1) + ' von ' + n + ' · ' + state.phases[akt].name + (g ? ' → ' + torName + (g.due ? ' bis ' + fmtDue(g.due) : ' (Datum fehlt)') : '');
+    h += '<div class="wl-teil"><span class="wl-lab">Hier stehst du</span><span class="wl-txt" title="' + esc(ort) + '">Phase ' + (akt + 1) + ' von ' + n + ' &middot; ' + esc(state.phases[akt].name)
+      + (g ? ' &rarr; ' + esc(torName) + (g.due ? ' bis ' + esc(fmtDue(g.due)) : ' <span class="wl-fehlt">(Datum fehlt)</span>') : '') + '</span></div>';
+  }
+  h += '<div class="wl-teil"><span class="wl-lab">Als N&auml;chstes</span><span class="wl-txt" title="' + esc(ns.txt) + '">'
+    + (ns.art === 'frage' ? '<span class="wl-tag">Offene Frage</span>' : '') + esc(ns.art === 'freigabe' ? ns.txt.replace(/^Freigeben: /, '') : ns.txt)
+    + (ns.mehr ? ' <span class="wl-fehlt">(+' + ns.mehr + ' weitere Frage' + (ns.mehr > 1 ? 'n' : '') + ')</span>' : '')
+    + '</span><button class="wl-haupt" id="wlNaechst">' + esc(ns.knopf) + '</button></div>';
+  if (n) h += '<div class="wl-teil wl-ziel"><button id="wlWas" title="Projektauftrag, Projektstand, Terminplan, KI &ndash; mit dem, was daf&uuml;r noch fehlt"><span class="wl-lang">Was willst du erstellen?</span><span class="wl-kurz">Erstellen</span></button></div>';
+  el.innerHTML = h; el.classList.add('an');
+  document.getElementById('wlNaechst').onclick = ns.tun;
+  const w = document.getElementById('wlWas'); if (w) w.onclick = openWasWillst;
+}
+/* Offene Frage beantworten: die Antwort ersetzt die ❓-Karte (Retour macht es rückgängig) */
+function frageBeantworten(id) {
+  const c = getPostit(id); if (!c || previewState) return;
+  const rest = offeneFragen().length - 1;
+  openModal('<h3>Offene Frage</h3>'
+    + '<p style="font-size:15px;margin:4px 0 10px;line-height:1.45">' + esc(frageText(c)) + '</p>'
+    + '<label for="fbAntw">Deine Antwort</label><textarea id="fbAntw" rows="3" placeholder="Kurz und konkret: ein Name, ein Datum, ein Betrag"></textarea>'
+    + '<p style="font-size:12px;color:var(--muted);margin:6px 0 0">Die Antwort ersetzt die Frage-Karte auf der Wand (mit &laquo;Retour&raquo; r&uuml;ckg&auml;ngig). Weisst du es noch nicht, bleibt die Frage offen &ndash; erfunden wird nichts.'
+    + (rest > 0 ? ' Danach ' + (rest === 1 ? 'ist noch 1 Frage' : 'sind noch ' + rest + ' Fragen') + ' offen.' : '') + '</p>'
+    + '<div class="btnrow"><button class="go" id="fbOk">Speichern</button><button id="fbNein">Weiss ich noch nicht</button><button id="fbWand">Auf der Wand zeigen</button></div>');
+  const ta = document.getElementById('fbAntw');
+  setTimeout(() => ta.focus(), 30);
+  document.getElementById('fbOk').onclick = () => {
+    const a = ta.value.trim(); if (!a) { ta.focus(); return; }
+    const f = frageText(c).replace(/\s*(ungeklärt|fehlen|fehlt|offen|unklar|nicht festgelegt)\s*[.!]?$/i, '');
+    c.text = f + ' → ' + a;
+    c.status = 'erledigt'; stempelErledigt(c);
+    if (c.typ === 'input') delete c.typ;
+    c.beleg = 'Auskunft vom ' + heute();
+    wwSpaeter().delete(c.id);
+    save(); render(); closeModal();
+    sysMsg('✓ Antwort eingetragen – sie steht jetzt auf der Wand: «' + c.text.slice(0, 90) + '»', true);
+    const nx = offeneFragen(aktuellePhase() + 1).find(x => !wwSpaeter().has(x.c.id));
+    if (nx) setTimeout(() => frageBeantworten(nx.c.id), 120);
+  };
+  document.getElementById('fbNein').onclick = () => { wwSpaeter().add(c.id); closeModal(); render(); };
+  document.getElementById('fbWand').onclick = () => { closeModal(); karteZeigen(c.id, false); };
+}
+/* «Was willst du erstellen?» – jede Möglichkeit mit dem, was dafür noch fehlt */
+function wwOptionen() {
+  const g1 = gateOfPhase(0), fr = offeneFragen().length, offen = offenStellen();
+  const toreOhneDatum = state.milestones.filter(m => !m.due).length;
+  const erledigt = state.postits.filter(c => istArbeitsLane(laneKeyOfY(c.y)) && (c.status || 'offen') === 'erledigt').length;
+  const ki = kiBereit();
+  const L = [];
+  if (state.fahrplan) L.push({ id: 'fahrplan', ic: '💰', titel: 'Sparpotenzial und Entscheidungsvorlage', satz: 'Rechner in Franken pro Jahr und die Vorlage für Geschäftsleitung, IT und Fachbereich (Word).', vorher: [], knopf: 'Öffnen' });
+  L.push({ id: 'auftrag', ic: '📄', titel: 'Projektauftrag (Word)', satz: 'Für die Entscheider: Ausgangslage, Ziel, Phasen, Tore mit Kriterien, Aufgaben und ein Block zum Unterschreiben.',
+    vorher: [].concat(state.goal ? [] : ['Ziel unten in der Zielleiste eintragen'],
+      g1 && !g1.due ? ['Datum für das erste Tor (Doppelklick auf das rote Fähnchen)'] : [],
+      fr ? [fr + ' offene Frage' + (fr > 1 ? 'n' : '') + ' beantworten (oben «Beantworten»)'] : []),
+    hinweis: offen ? offen + ' Stellen sind noch [offen]. Sie stehen gelb im Dokument, damit du sie im Gespräch klärst.' : '',
+    trotzdem: true, knopf: 'Erstellen' });
+  L.push({ id: 'stand', ic: '📊', titel: 'Projektstand (Word)', satz: 'Wo das Projekt steht: Phasen, Erledigtes, nächste Entscheide, Risiken.',
+    vorher: erledigt ? [] : ['Noch keine Aufgabe erledigt – der Bericht zeigt dann vor allem den Plan'], trotzdem: true, knopf: 'Erstellen' });
+  L.push({ id: 'termin', ic: '🗓', titel: 'Terminplan (Excel)', satz: 'Phasen und Entscheid-Tore auf einer Zeitachse.',
+    vorher: toreOhneDatum ? [toreOhneDatum + ' Tor' + (toreOhneDatum > 1 ? 'e' : '') + ' ohne Datum (Doppelklick auf das Fähnchen)'] : [], trotzdem: true, knopf: 'Erstellen' });
+  L.push({ id: 'ki', ic: '🤖', titel: 'KI ergänzt die Wand', satz: 'Die KI schlägt fehlende Schritte, Risiken und Kriterien vor. Du entscheidest, was bleibt.',
+    vorher: ki ? [] : ['Gratis-Konto anlegen (kein eigener Schlüssel nötig)'], knopf: ki ? 'Starten' : 'Gratis-Konto' });
+  L.push({ id: 'alle', ic: '🗂', titel: 'Alle Dokumente', satz: 'Abschlussbericht, wissenschaftliche Arbeit, Aufgaben für Claude Code und mehr.', vorher: [], knopf: 'Zeigen' });
+  L.push({ id: 'sicherung', ic: '💾', titel: 'Sicherung der Wand (.json)', satz: 'Nur für dich: damit liest du die Wand später wieder ein. Enthält alles, auch Namen und Mail-Adressen – nicht weitergeben.', vorher: [], knopf: 'Speichern' });
+  return L;
+}
+function openWasWillst() {
+  if (previewState) return;
+  const IK = { fahrplan: 'coins', auftrag: 'doc', stand: 'chart', termin: 'cal', ki: 'spark', alle: 'folder', sicherung: 'save' };
+  const h = wwOptionen().map(o => '<div class="ww-opt"><span class="ww-ic" style="--i:var(--ic-' + (IK[o.id] || 'doc') + ')" aria-hidden="true">' + o.ic + '</span><div class="ww-body"><b>' + esc(o.titel) + '</b><p>' + esc(o.satz) + '</p>'
+    + (o.vorher.length
+      ? '<div class="ww-vorher">&#9888; Vorher noch: ' + o.vorher.map(esc).join(' &middot; ') + (o.trotzdem ? ' &ndash; erstellen geht trotzdem.' : '') + '</div>'
+      : '<div class="ww-ok">&#10003; Bereit</div>')
+    + (o.hinweis ? '<p>' + esc(o.hinweis) + '</p>' : '')
+    + '</div><button data-ww="' + o.id + '">' + esc(o.knopf) + '</button></div>').join('');
+  openModal('<h3>Was willst du erstellen?</h3>'
+    + '<p style="font-size:12.5px;color:var(--muted);margin:0">Alles entsteht aus deiner Wand. Was noch fehlt, steht dabei. Fehlendes wird nie erfunden, sondern als [offen] markiert.</p>'
+    + '<div class="ww-liste">' + h + '</div><div class="btnrow"><button id="mCancel">Schliessen</button></div>', true);
+  modalBox.querySelectorAll('[data-ww]').forEach(b => { b.onclick = () => wwErstellen(b.dataset.ww); });
+  document.getElementById('mCancel').onclick = closeModal;
+}
+function wwErstellen(id) {
+  closeModal();
+  const name = boardName();
+  if (id === 'fahrplan') { openFahrplan(); return; }
+  if (id === 'auftrag') {
+    if (kiBereit()) { kiBericht('auftrag'); return; }
+    downloadDoc('Projektauftrag - ' + name + '.doc', genAuftrag(''));
+    sysMsg('📄 Projektauftrag erstellt. Die Ausgangslage bleibt [offen] – mit einem Konto schreibt die KI dafür einen Entwurf, den du prüfst.', true);
+    return;
+  }
+  if (id === 'stand') {
+    if (kiBereit()) { kiBericht('rapport'); return; }
+    downloadDoc('Projektstand - ' + name + '.doc', genAbschluss());
+    return;
+  }
+  if (id === 'termin') { downloadXls('Terminplan - ' + name + '.xls', genTermin()); return; }
+  if (id === 'abschluss') { downloadDoc('Abschlussbericht - ' + name + '.doc', genAbschluss()); return; }
+  if (id === 'ki') { document.getElementById('swarmBtn').click(); return; }
+  if (id === 'alle') { document.getElementById('docsBtn').click(); return; }
+  if (id === 'sicherung') { document.getElementById('exportBtn').click(); return; }
+}
+
 let todoWerFilter = '';
 /* V53: Kritiker fragen – 2–3 Sätze Einwand zu genau diesem Entscheid, nur auf Klick */
 async function fragKritiker(x, btn) {
@@ -5567,7 +6044,9 @@ function renderDash() {
   }
   h += '</div>';
 
-  /* D2: status.json aus GitHub – Raw-URL, Polling beim Öffnen + Refresh-Knopf */
+  /* D2: status.json aus GitHub – Raw-URL, Polling beim Öffnen + Refresh-Knopf.
+     V72: in der einfachen Ansicht nur, wenn ein Repo oder eine status.json eingetragen ist */
+  const ghStart = h.length, ghZeigen = !istEinfach() || (state.statusUrl || '').trim() || (state.ghRepo || '').trim();
   h += '<div class="dash-sec"><h3>Projekt-Status aus GitHub (status.json) <span style="font-weight:400;color:var(--muted);font-size:11px">die Wand liest nur &ndash; sie schreibt nichts</span></h3>'
     + '<div style="display:flex;gap:6px;margin:4px 0"><input type="text" id="ghUrl" value="' + esc(state.statusUrl || '') + '" placeholder="https://raw.githubusercontent.com/&hellip;/status.json" style="flex:1;font:inherit;font-size:12px;padding:6px 8px;border:1px solid var(--line);border-radius:6px">'
     + '<button id="ghRefresh" style="font:inherit;font-size:12px;font-weight:700;cursor:pointer;border:0;border-radius:6px;background:var(--accent);color:#fff;padding:6px 12px">&#8635; Aktualisieren</button>'
@@ -5608,8 +6087,11 @@ function renderDash() {
     h += '<div style="font-size:12px;color:var(--muted)">Raw-URL der status.json eintragen (&ouml;ffentliches Repo, kein Token n&ouml;tig). Wird beim &Ouml;ffnen des Dashboards und per Knopf gelesen. Enth&auml;lt nur Task-Titel und Status, nie Inhalte.</div>';
   }
   h += '</div>';
+  if (!ghZeigen) h = h.slice(0, ghStart);
 
-  /* T-020: Befragungen – Umfragen an Anspruchsgruppen, Rücklauf pro Person, Auswertung pro Gruppe */
+  /* T-020: Befragungen – Umfragen an Anspruchsgruppen, Rücklauf pro Person, Auswertung pro Gruppe.
+     V72: in der einfachen Ansicht nur, wenn schon Befragungen bestehen (Antworten liest nur das Betreiber-Konto) */
+  const befStart = h.length, befZeigen = !istEinfach() || (state.befragungen || []).length;
   h += '<div class="dash-sec"><h3>Befragungen <span style="font-weight:400;color:var(--muted);font-size:11px">Umfragen und Interviews an Anspruchsgruppen &ndash; Versand bleibt immer dein Handklick</span></h3>';
   h += '<div class="btnrow" style="margin:4px 0"><button class="go" id="befNeu" style="font-size:12px">+ Neue Befragung an Anspruchsgruppen</button>'
     + ((state.befragungen || []).length ? '<button id="befRefresh" style="font-size:12px">&#8635; R&uuml;cklauf aktualisieren</button>' : '') + '</div>';
@@ -5624,7 +6106,7 @@ function renderDash() {
     const fristUm = bef.frist && isOverdue(bef.frist);
     h += '<div style="border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin:8px 0">'
       + '<div style="font-size:13px"><b>' + esc(bef.titel) + '</b> <span style="color:var(--muted);font-size:11px">' + esc(bef.erstellt || '') + (bef.quelle === 'fragekatalog' ? ' &middot; aus dem Fragekatalog' : '') + '</span>'
-      + (bef.frist ? ' <span style="font-size:11px;' + (fristUm ? 'color:#a33;font-weight:700' : 'color:var(--muted)') + '">Frist ' + fmtDue(bef.frist) + (fristUm ? ' &#9888;' : '') + '</span>' : '')
+      + (bef.frist ? ' <span style="font-size:11px;' + (fristUm ? 'color:#a33;font-weight:700' : 'color:var(--muted)') + '">Frist ' + esc(fmtDue(bef.frist)) + (fristUm ? ' &#9888;' : '') + '</span>' : '')
       + (nAntw !== null ? ' <span style="background:#dff0e2;color:#2f8a4c;border-radius:9px;padding:0 8px;font-size:11px;font-weight:700">' + nAntw + ' Antwort(en)'
         + (pers.length ? ' &middot; ' + pers.filter(p => befHatGeantwortet(bef, p.name)).length + '/' + pers.length + ' geantwortet' : '') + '</span>' : '')
       + '<button class="bef-del" data-bi="' + bi + '" style="float:right;font-size:11px;padding:1px 7px">&#10005;</button></div>'
@@ -5661,6 +6143,7 @@ function renderDash() {
     h += '</div>';
   });
   h += '</div>';
+  if (!befZeigen) h = h.slice(0, befStart);
 
   const todos = [];
   state.postits.forEach(c => (Array.isArray(c.todos) ? c.todos : []).forEach((t, j) => todos.push({ c, t, j })));
@@ -5708,7 +6191,7 @@ function renderDash() {
     const items = all.filter(t => (t.c.status||'offen') === st);
     h += '<div class="kan-col ' + cls + '"><h4>' + lbl + ' <span class="kc">' + items.length + '</span></h4>';
     items.forEach(t => {
-      h += '<div class="kan-card" data-cid="' + t.c.id + '"><span class="kp">P' + (t.i+1) + ' · ' + esc(state.phases[t.i].name.slice(0,24)) + '</span><br>' + esc(cleanTxt(t.c.text).slice(0, 110)) + '</div>';
+      h += '<div class="kan-card" data-cid="' + esc(t.c.id) + '"><span class="kp">P' + (t.i+1) + ' · ' + esc(state.phases[t.i].name.slice(0,24)) + '</span><br>' + esc(cleanTxt(t.c.text).slice(0, 110)) + '</div>';
     });
     h += '</div>';
   });
@@ -5858,7 +6341,7 @@ function renderLupe() {
   const i = lupeIdx, p = state.phases[i]; if (!p) return closeLupe();
   document.getElementById('lupeTitle').textContent = p.name;
   document.getElementById('lupeNo').textContent = 'Phase ' + (i+1) + ' von ' + state.phases.length;
-  const gate = state.milestones.filter(m => Math.abs(clamp(m.x,0,canvasW(state)) - (phaseLeft(i)+p.w)) < p.w*0.5);
+  const g0 = gateOfPhase(i), gate = g0 ? [g0] : []; // V72: nur das Tor dieser Phase (vorher zeigte die Lupe auch das Nachbar-Tor)
   const eif = (k, lbl, full) => '<div class="' + (full?'full':'') + '"><label>' + lbl + '</label><textarea data-ei="' + k + '">' + esc(p[k]||'') + '</textarea></div>';
   let h = '<div class="lupe-tools">'
     + '<button class="lupe-tool" data-kind="schritte">&#129302; Schritte ergänzen</button>'
@@ -6089,11 +6572,13 @@ async function initAuth() {
   if (new URLSearchParams(location.search).has('beispiel')) {
     uebungsModus = true;
     authGate.style.display = 'none'; // V60: hart ausblenden – nie ein Anmelde-Fenster in der Übung
-    document.getElementById('userTag').textContent = '🧪 Übungs-Modus (temporär)';
+    document.getElementById('userTag').textContent = 'Übungs-Modus (wird nicht gespeichert)';
     loadCollection(null);
     ladeBeispiel();
     document.getElementById('pvNeu').click();
-    state.goal = 'Bis Ende Oktober 2026 verwandeln wir die Brachfläche in einen Gemeinschaftsgarten mit 20 Beeten – eröffnet mit einem Quartierfest.';
+    const zielMon = new Date(); zielMon.setMonth(zielMon.getMonth() + 8);
+    const MONATE = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
+    state.goal = 'Bis Ende ' + MONATE[zielMon.getMonth()] + ' ' + zielMon.getFullYear() + ' verwandeln wir die Brachfläche in einen Gemeinschaftsgarten mit 20 Beeten – eröffnet mit einem Quartierfest.';
     goalInput.value = state.goal; autoResizeGoal(); save(); render();
     sysMsg('🧪 Übungs-Modus: Das Beispielprojekt «Quartier-Gemeinschaftsgarten» ist geladen – klick dich frei durch, kaputt geht nichts. Nichts wird gespeichert: Beim Neuladen beginnt die Übung frisch. Für richtiges Arbeiten die Seite ohne Zusatz öffnen und ein Konto erstellen.', true);
     if (new URLSearchParams(location.search).has('interview')) openInterview();

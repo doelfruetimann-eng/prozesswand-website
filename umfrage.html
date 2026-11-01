@@ -99,6 +99,9 @@ button.go { background:var(--bordeaux); color:#fff; border-color:var(--bordeaux)
 'use strict';
 /* Gleiche Supabase-Instanz wie die Prozesswand (öffentlicher Publishable Key, Schreiben erlaubt, Lesen nur angemeldet – siehe docs/supabase-umfragen.sql) */
 const SUPABASE_URL = 'https://bvbjxofdcugpfsccwlzv.supabase.co';
+/* Sicherheit (01.11.2026): die KI-Umfrage spricht NUR mit dem eigenen Dienst – die Adresse im Link
+   wird nicht mehr übernommen (ein gefälschter Link konnte Antworten an einen fremden Server schicken). */
+const KI_UMFRAGE_URL = SUPABASE_URL + '/functions/v1/hyper-worker';
 const SUPABASE_ANON_KEY = 'sb_publishable_eK2xQpV8jfkeMKcC40QDhQ_4Oj2ip--';
 
 function b64uEnc(s) { return btoa(unescape(encodeURIComponent(s))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,''); }
@@ -211,7 +214,7 @@ function kiZeigen(txt, wer) {
   d.scrollIntoView({ block: 'nearest' });
 }
 async function kiNaechste() {
-  const r = await fetch(def.ki, {
+  const r = await fetch(KI_UMFRAGE_URL, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ def: { t: def.t, i: def.i, q: (def.q || []).map(x => x.f), max: kiMax() }, verlauf: kiVerlauf })
