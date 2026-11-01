@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>OSTO/SYMA Prozesswand</title>
+<title>Prozesswand</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧱</text></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -493,6 +493,19 @@ body.einfach .ki-tools button { display:inline-flex; align-items:center; justify
 
 /* Übersicht */
 .dash-sec, .tile { border-radius:12px; border-color:var(--line); }
+/* V73: Vorschau-Leiste im ruhigen Design – eine Hauptfarbe statt vier */
+#previewBar { background:#1b2430; border-radius:12px; padding:9px 12px 9px 16px; gap:8px; box-shadow:0 12px 30px rgba(16,24,40,.3); }
+#previewBar b { font-weight:600; margin-right:6px; }
+#previewBar button { background:rgba(255,255,255,.1) !important; color:#fff !important; border:1px solid rgba(255,255,255,.22) !important; border-radius:8px; font-weight:600; padding:7px 12px; }
+#previewBar button:hover { background:rgba(255,255,255,.18) !important; }
+#previewBar #pvNeu { background:var(--brand) !important; border-color:var(--brand) !important; }
+#previewBar #pvNeu:hover { background:var(--brand-600) !important; }
+#savedTag { z-index:50; }
+/* V73: grosser Knopf «Foto aufnehmen oder auswählen» (das echte Datei-Feld ist versteckt) */
+.foto-wahl { display:flex !important; align-items:center; justify-content:center; gap:8px; width:100%; min-height:52px; margin:0;
+  border:2px dashed var(--brand-100); border-radius:12px; background:var(--brand-50); color:var(--brand) !important;
+  font-size:14px !important; font-weight:600 !important; text-transform:none !important; letter-spacing:0 !important; cursor:pointer; }
+.foto-wahl:hover { border-color:var(--brand); }
 
 /* Handy: Kopf kompakter, damit mehr Wand sichtbar bleibt */
 @media (max-width:800px) {
@@ -508,7 +521,7 @@ body.einfach .ki-tools button { display:inline-flex; align-items:center; justify
 <body>
 
 <header>
-  <h1>OSTO/SYMA Prozesswand</h1>
+  <h1 title="Prozesswand &ndash; Projektwand nach der OSTO-Systemmethodik">Prozesswand</h1>
   <button id="startBtn" title="Startbildschirm: die drei wichtigsten Wege &ndash; in einfacher Sprache">Start</button>
   <button id="ivBtn" title="Interview: Die Wand stellt dir kurze Fragen und baut sich beim Antworten selbst auf">Interview</button>
   <button id="dashBtn" class="primary">Dashboard</button>
@@ -528,7 +541,7 @@ body.einfach .ki-tools button { display:inline-flex; align-items:center; justify
   <span id="viewSeg" title="Ansicht: Lean zeigt nur das Wichtigste und markiert, was als N&auml;chstes dran ist &ndash; Komplett zeigt alles. Es geht nichts verloren, nur die Anzeige wechselt."><button data-v="lean">Lean</button><button data-v="mittel">Mittel</button><button data-v="voll">Komplett</button></span>
   <button id="fsBtn" title="Vollbildmodus ein/aus">&#x26F6; Vollbild</button>
   <button id="ansichtBtn" title="Umschalten zwischen einfacher Ansicht (nur das N&ouml;tigste) und Profi-Ansicht (alle Werkzeuge)">&#128736; Profi-Ansicht</button>
-  <input type="file" id="importFile" accept=".json" style="display:none">
+  <input type="file" id="importFile" accept=".json,.md,.txt" style="display:none">
 </header>
 <nav id="wegLeiste" aria-label="Wegweiser: wo du stehst und was als N&auml;chstes dran ist"></nav>
 
@@ -563,7 +576,7 @@ body.einfach .ki-tools button { display:inline-flex; align-items:center; justify
 </div>
 
 <div id="previewBar">
-  <b>Vorschau des KI-Entwurfs</b>
+  <b id="pvTitel">Vorschau des KI-Entwurfs</b>
   <button id="pvNeu">Als neue Wand</button>
   <button id="pvErsetzen">Wand ersetzen</button>
   <button id="pvErgaenzen">Erg&auml;nzen</button>
@@ -598,7 +611,7 @@ body.einfach .ki-tools button { display:inline-flex; align-items:center; justify
 <div id="authGate">
   <div class="auth-card" id="authForm" data-mode="login">
     <h2 id="authTitle">Anmelden</h2>
-    <p>OSTO/SYMA Prozesswand &ndash; bitte anmelden, um deine Wand zu laden.</p>
+    <p>Prozesswand &ndash; bitte anmelden, um deine Wand zu laden.</p>
     <input type="email" id="authEmail" placeholder="E-Mail" autocomplete="username">
     <input type="password" id="authPw" placeholder="Passwort" autocomplete="current-password">
     <button id="authSubmit">Anmelden</button>
@@ -612,7 +625,7 @@ body.einfach .ki-tools button { display:inline-flex; align-items:center; justify
 <script>
 "use strict";
 
-const APP_VERSION = 'V72';
+const APP_VERSION = 'V74';
 /* V49: einheitlicher Wegweiser nach jedem «An Claude kopieren» */
 function claudeHinweis() {
   sysMsg('📋 Kopiert! Jetzt: 1. Claude öffnen (claude.ai bzw. deine Prozesswand-Sitzung) → 2. ins Schreibfeld klicken → 3. Cmd+V (einfügen) → 4. Senden. Mehr braucht es nicht.', true);
@@ -1692,6 +1705,8 @@ function openStart() {
   const aus = localStorage.getItem('pw-start') === 'aus';
   openModal('<h3>&#127968; Start &ndash; was m&ouml;chtest du tun?</h3>'
     + startBigBtn('stIv', '🎤', 'Interview: Die Wand fragt, du antwortest', 'Acht kurze Fragen. Beim Antworten baut sich deine Wand selbst auf. Kein Vorwissen nötig.')
+    + startBigBtn('stChat', '💬', 'Projekt aus einem Chat', 'Du hast mit ChatGPT, Claude oder Copilot über dein Projekt gesprochen? Brief einfügen – die Wand fragt nur noch, was fehlt.')
+    + startBigBtn('stFoto', '📷', 'Foto einer Papierwand', 'Du hast schon an einer Wand aus Papier gearbeitet? Foto hochladen – die KI baut daraus die digitale Wand.')
     + startBigBtn('stHeute', '☀️', 'Zeig mir, was heute zu tun ist', 'Öffnet die Übersicht: was fertig ist, was auf dich wartet, wo du entscheiden musst.')
     + startBigBtn('stZiel', '🎯', 'Mit einem Ziel starten', 'Du schreibst dein Ziel in deinen Worten – die Wand macht es mit dir SMART und baut daraus das Projekt.')
     + startBigBtn('stNeu', '✨', 'Neues Projekt starten', 'Die Wand stellt dir eine Frage nach der anderen und baut daraus dein Projekt.')
@@ -1702,6 +1717,8 @@ function openStart() {
     + '<label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);margin-top:10px;cursor:pointer">'
     + '<input type="checkbox" id="stAus"' + (aus ? ' checked' : '') + '> Diesen Start beim &Ouml;ffnen nicht mehr zeigen (der Knopf &#127968; Start oben bringt ihn jederzeit zur&uuml;ck)</label>');
   document.getElementById('stIv').onclick = () => { closeModal(); openInterview(); };
+  document.getElementById('stFoto').onclick = () => { closeModal(); openFotoImport(); };
+  document.getElementById('stChat').onclick = () => { closeModal(); openChatImport(); };
   document.getElementById('stHeute').onclick = () => { closeModal(); openDash(); };
   document.getElementById('stZiel').onclick = startMitZiel;
   document.getElementById('stNeu').onclick = startNeuesProjekt;
@@ -1991,6 +2008,8 @@ function ivBauen() {
     });
   });
   if (V.fest && A.ziel) V.fest.forEach(([pi, ebene, text]) => { if (pi < n) legen(pi, ebene, { text, typ: 'auto', k: 'fest' }); });
+  /* V74: offene Fragen aus dem Chat-Brief – die Wegweiser-Leiste führt danach durch */
+  if (iv.brief && Array.isArray(iv.brief.offen)) iv.brief.offen.slice(0, 8).forEach(t => legen(0, 'reflexion', { text: '❓ [offen] ' + t, typ: 'input', k: 'brief' }));
   /* Phasen so breit, dass keine Karte eine andere verdeckt */
   const breite = namen.map((_, pi) => {
     const max = Math.max(1, ...keys.map(e => (zellen[pi + '|' + e] || []).length));
@@ -2077,6 +2096,10 @@ function ivVorlageZeigen() {
   body.insertAdjacentHTML('beforeend', '<p class="iv-nach">&#129517; <b>KI-Fahrplan:</b> zeigt einem KMU, wo KI am meisten spart, und führt bis zur Entscheidungsvorlage für die Geschäftsleitung. '
     + '<a href="#" id="ivFpBsp">Fertiges Beispiel ansehen</a></p>');
   document.getElementById('ivFpBsp').onclick = e => { e.preventDefault(); ivSchliessen(false); ladeFahrplanBeispiel(); };
+  body.insertAdjacentHTML('beforeend', '<p class="iv-nach">&#128247; <b>Schon eine Papierwand?</b> <a href="#" id="ivFoto">Foto hochladen</a> &ndash; die KI baut daraus die digitale Wand.</p>'
+    + '<p class="iv-nach">&#128172; <b>Schon mit einem Chat besprochen?</b> <a href="#" id="ivChat">Projekt-Brief einfügen</a> &ndash; die Wand fragt nur noch, was fehlt.</p>');
+  document.getElementById('ivChat').onclick = e => { e.preventDefault(); ivSchliessen(false); openChatImport(); };
+  document.getElementById('ivFoto').onclick = e => { e.preventDefault(); ivSchliessen(false); openFotoImport(); };
   body.querySelectorAll('[data-v]').forEach(b => b.onclick = () => { iv.vorlage = b.dataset.v; ivZeichnen(); ivFrage(0); });
 }
 function ivFrage(i) {
@@ -2101,6 +2124,7 @@ function ivFrage(i) {
     + '<div class="iv-los"><button class="go" id="ivWeiter">Weiter &rarr;</button><button class="zurueck" id="ivZurueck">&larr; zur&uuml;ck</button></div>'
     + '<div id="ivKi"></div>';
   ivChipsVerdrahten();
+  if (iv.brief) document.getElementById('ivBody').insertAdjacentHTML('afterbegin', '<p class="iv-nach" style="margin-top:0">&#128172; Aus deinem Chat übernommen – prüf die Antwort und ergänze, was fehlt.</p>');
   const erstes = document.querySelector('#ivBody textarea, #ivBody input[type=text]');
   if (erstes && window.innerWidth > 800) erstes.focus();
   document.getElementById('ivWeiter').onclick = () => ivAntwort(f);
@@ -2229,6 +2253,7 @@ function ivWandName(A) {
   const d = ivWeissNicht(A.wann) ? '' : ivDatum(A.wann);
   const bis = d ? ' bis ' + MON[+d.slice(5, 7) - 1] + ' ' + d.slice(0, 4) : '';
   if (v && v.id === 'kifahrplan') return 'KI-Fahrplan' + bis;
+  if (iv.brief && iv.brief.titel) return ivKurz(iv.brief.titel, 40).replace(/…$/, '') + bis;
   if (v && v.id !== 'eigen') return v.name.replace(/\s*\/.*$/, '') + bis;
   const z = String(A.ziel || '').trim().replace(/\s+/g, ' ');
   const kurz = z.length > 32 ? z.slice(0, 32).replace(/\s\S*$/, '') : z;
@@ -2239,6 +2264,7 @@ function ivUebernehmen() {
   const name = document.getElementById('ivName').value.trim() || 'Interview';
   const st = previewState || ivBauen();
   st.interview = { vorlage: iv.vorlage, antworten: Object.assign({}, iv.antworten), datum: new Date().toISOString().slice(0, 10) };
+  if (iv.brief) st.interview.brief = { titel: iv.brief.titel || '', weitere: iv.brief.weitere || '', offen: (iv.brief.offen || []).slice(0, 10) };
   st.goal = ''; st.kiLog = []; st.kiConvo = []; // neue Wand, eigener Verlauf
   if (iv.vorlage === 'kifahrplan') st.fahrplan = fpAusInterview(iv.antworten);
   previewState = null; previewMeta = null;
@@ -2273,7 +2299,8 @@ function ivSwarmVorbelegen() {
     k.value = [v && v.id !== 'eigen' ? 'Projektart: ' + v.name : '',
       !ivWeissNicht(a.wer_e) ? 'Gibt frei: ' + a.wer_e : '', !ivWeissNicht(a.wer_f) ? 'Führt: ' + a.wer_f : '',
       !ivWeissNicht(a.betroffen) ? 'Betroffen: ' + a.betroffen : '', !ivWeissNicht(a.risiko) ? 'Risiken: ' + a.risiko : '',
-      !ivWeissNicht(a.erfolg) ? 'Erfolg: ' + a.erfolg : ''].filter(Boolean).join('\n');
+      !ivWeissNicht(a.erfolg) ? 'Erfolg: ' + a.erfolg : '',
+      state.interview.brief && state.interview.brief.weitere ? 'Weitere Angaben aus dem Chat: ' + state.interview.brief.weitere : ''].filter(Boolean).join('\n');
   }
 }
 /* ================================================================
@@ -2641,6 +2668,8 @@ document.getElementById('exportBtn').onclick = () => {
 };
 document.getElementById('importFile').addEventListener('change', e => {
   const f = e.target.files[0]; if (!f) return;
+  /* V74: Markdown/Text = Projekt-Brief aus einem Chat */
+  if (/\.(md|txt)$/i.test(f.name)) { const rb = new FileReader(); rb.onload = () => openChatImport(String(rb.result || '')); rb.readAsText(f); e.target.value = ''; return; }
   const r = new FileReader();
   r.onload = () => {
     try {
@@ -2768,11 +2797,12 @@ function kiBereit() { return !!getKey() || !!currentUser; }
 /* Neuere Modelle lehnen temperature ab (400). V71: haiku-5 dazu – Haiku 4.5
    nahm sie noch. Gleiche Liste im Vermittler-Dienst halten! */
 function nimmtTemperatur(model) { return !/opus-4-[789]|opus-5|sonnet-5|haiku-5|fable|mythos/.test(model); }
-async function vermittlerClaude(system, user, model, maxTok, temperature) {
+async function vermittlerClaude(system, user, model, maxTok, temperature, bilder) {
   let tok = '';
   try { const { data } = await sb.auth.getSession(); tok = (data && data.session && data.session.access_token) || ''; } catch (e) {}
   if (!tok) throw new Error('Bitte zuerst anmelden – oder unter «API-Schlüssel» einen eigenen Schlüssel hinterlegen.');
   const body = { model, system, user, maxTok: maxTok || 2000 };
+  if (Array.isArray(bilder) && bilder.length) body.bilder = bilder; // V73: Fotos (base64, JPEG/PNG)
   if (typeof temperature === 'number' && nimmtTemperatur(model)) body.temperature = temperature;
   let res, data;
   try {
@@ -2790,21 +2820,25 @@ async function vermittlerClaude(system, user, model, maxTok, temperature) {
 
 /* Modell-Wahl (V59, Kostenentscheid 04.08.2026): Denk-Rollen auf Opus 5, automatischer Rückfall auf Sonnet */
 const CHAT_MODEL = 'claude-opus-5-5'; // V71: Alltag und Denk-Rollen auf Opus 5.5, Fleissarbeit auf Haiku 5.5
-async function callClaude(system, user, model, maxTok, temperature) {
-  try { return await rawClaude(system, user, model, maxTok, temperature); }
+async function callClaude(system, user, model, maxTok, temperature, bilder) {
+  try { return await rawClaude(system, user, model, maxTok, temperature, bilder); }
   catch (e) {
-    if (/model/i.test(e.message) && model !== MODEL_FALLBACK) return rawClaude(system, user, MODEL_FALLBACK, maxTok, temperature);
+    if (/model/i.test(e.message) && model !== MODEL_FALLBACK) return rawClaude(system, user, MODEL_FALLBACK, maxTok, temperature, bilder);
     throw e;
   }
 }
-async function rawClaude(system, user, model, maxTok, temperature) {
+/* bilder (V73, optional): [{ media_type: 'image/jpeg', data: '<base64>' }] – gehen vor dem Text an die KI */
+async function rawClaude(system, user, model, maxTok, temperature, bilder) {
   const key = cleanKey(getKey());
   if (!key) {
-    if (currentUser) return vermittlerClaude(system, user, model, maxTok, temperature);
+    if (currentUser) return vermittlerClaude(system, user, model, maxTok, temperature, bilder);
     throw new Error('Kein API-Schlüssel hinterlegt.');
   }
   if (!/^sk-ant-/.test(key)) throw new Error('Der gespeicherte API-Schlüssel sieht unvollständig aus – bitte über «API-Schlüssel» komplett neu einfügen (beginnt mit sk-ant-…).');
-  const body = { model, max_tokens: maxTok || 2000, system, messages: [{ role: 'user', content: user }] };
+  const inhalt = Array.isArray(bilder) && bilder.length
+    ? bilder.map(b => ({ type: 'image', source: { type: 'base64', media_type: b.media_type, data: b.data } })).concat([{ type: 'text', text: user }])
+    : user;
+  const body = { model, max_tokens: maxTok || 2000, system, messages: [{ role: 'user', content: inhalt }] };
   // Neuere Modelle (Opus 4.7/4.8, Sonnet 5, Fable/Mythos) akzeptieren temperature nicht mehr (API-Fehler) – dort weglassen.
   // Determinismus wird bei diesen Modellen über den Prompt gesteuert (VERBATIM_REGEL).
   /* V68: opus-5 fehlte in der Liste – jeder Opus-5-Aufruf lief zuerst in einen
@@ -2830,7 +2864,7 @@ async function rawClaude(system, user, model, maxTok, temperature) {
     data = await res.json().catch(() => null);
   }
   if (!res.ok) throw new Error((data && data.error && data.error.message) || ('HTTP ' + res.status));
-  return (data.content || []).map(b => b.text || '').join('');
+  return (data.content || []).filter(b => !b.type || b.type === 'text').map(b => b.text || '').join('');
 }
 
 /* ---------- KI-Moderator (Chat) ---------- */
@@ -3729,6 +3763,7 @@ function buildPreview(cfg, phasen, plaene, kritik, arch) {
 function endPreview() {
   previewState = null; previewMeta = null;
   document.getElementById('previewBar').style.display = 'none';
+  document.getElementById('pvTitel').textContent = 'Vorschau des KI-Entwurfs';
 }
 document.getElementById('pvVerwerfen').onclick = () => { endPreview(); render(); sysMsg('Entwurf verworfen – deine Wand ist unverändert.'); };
 document.getElementById('pvErsetzen').onclick = () => {
@@ -3879,7 +3914,7 @@ function docKopf(title) {
     + '<td style="text-align:right;width:35%">' + logo + '<div class="meta">Prozesswand &middot; ' + heute() + '</div></td>'
     + '</tr></table><div class="hr"></div>'
     + (ssot() ? '<div style="font-size:9pt;font-weight:bold;color:#651B32;margin:2pt 0">Bei Widerspruch gilt: ' + esc(ssot()) + '</div>' : '')
-    + '<div class="note">Automatisch aus der OSTO/SYMA-Prozesswand erzeugt.</div>';
+    + '<div class="note">Automatisch aus der Prozesswand erzeugt.</div>';
 }
 function docFoot() {
   return '<div class="foot">' + esc(boardName()) + ' &middot; erzeugt am ' + heute() + ' aus der Prozesswand &middot; Entwurf zur Vervollständigung</div>';
@@ -4542,7 +4577,7 @@ function genLandkarte() {
   const gy = TOP + HEADER_H + lanes().length * LANE_H + 16;
   s += '<text x="12" y="' + gy + '" font-size="9.5" font-weight="bold" fill="#333333">Gesamtziel:</text>';
   s += '<text x="72" y="' + gy + '" font-size="9.5" fill="#333333">' + tspan(state.goal, 200) + '</text>';
-  s += '<text x="12" y="' + (gy + 16) + '" font-size="8.5" fill="#666666">&#9670; Entscheid-Tor &#183; Punkt: grau=offen, blau=in Arbeit, gr&#252;n=erledigt &#183; Pfeile: Ablauf/R&#252;ckkopplung &#183; erzeugt aus der OSTO/SYMA Prozesswand'
+  s += '<text x="12" y="' + (gy + 16) + '" font-size="8.5" fill="#666666">&#9670; Entscheid-Tor &#183; Punkt: grau=offen, blau=in Arbeit, gr&#252;n=erledigt &#183; Pfeile: Ablauf/R&#252;ckkopplung &#183; erzeugt aus der Prozesswand'
     + (ssot() ? ' &#183; Bei Widerspruch gilt: ' + esc(ssot()).slice(0, 80) : '') + '</text>';
   s += '</svg>';
   return s;
@@ -4577,7 +4612,7 @@ function genClaudeAuftrag(sel) {
   const L = [];
   L.push('# Auftrag: ' + boardName());
   L.push('');
-  L.push('Quelle: OSTO/SYMA-Prozesswand · Stand ' + heute() + (sel === null ? ' · gesamter Prozess' : ' · nur Phase ' + (sel + 1)));
+  L.push('Quelle: Prozesswand · Stand ' + heute() + (sel === null ? ' · gesamter Prozess' : ' · nur Phase ' + (sel + 1)));
   if (ssot()) L.push('**Bei Widerspruch gilt: ' + ssot() + '**');
   L.push('');
   L.push('## Gesamtziel');
@@ -4871,7 +4906,7 @@ const TASKS_SCRIPT = [
 const TASKS_README = [
 '# Tasks der Prozesswand – so wird daraus die status.json',
 '',
-'Dieses ZIP kommt aus der OSTO/SYMA-Prozesswand. Inhalt:',
+'Dieses ZIP kommt aus der Prozesswand. Inhalt:',
 '- tasks/  – pro Schritt eine Auftragsdatei (MD mit Frontmatter) für ein LLM',
 '- build_status.py – baut aus den Task-Dateien die status.json',
 '',
@@ -5098,7 +5133,7 @@ document.getElementById('docsBtn').onclick = () => {
     + '<button class="go" id="dMgmt" title="Eine Seite f&uuml;r Entscheider: Lage, Kennzahlen, n&auml;chste Entscheide, Risiken &ndash; die KI schreibt den Entwurf, du gibst frei">&#129302; Management-Zusammenfassung (.doc)</button>'
     + '<button class="go" id="dRapport" title="Stand je Phase, Erledigtes, anstehende Entscheide, Risiken + KI-Ausblick (du gibst frei) &ndash; der freigegebene Text bleibt als Karte erhalten">&#129302; Zwischenrapport (.doc)</button>'
     + '<button class="go" id="dAuftrag" title="Ausgangslage als KI-Entwurf (du gibst frei), Ziele, Tore, Massnahmen, Lieferergebnisse, Freigabe-Block">&#129302; Auftragsbeschrieb (.doc)</button>'
-    + '<button class="go" id="dAbschluss" title="Zwischen- oder Abschlussbericht: Ziel, Tore, Phasen, Erledigtes, Offenes, Risiken &ndash; direkt aus den Karten">Abschlussbericht (.doc)</button>'
+    + '<button class="go" id="dAnalyse" title="Bericht zum Zeigen: Zeitplan, Fortschritt, Risiko-Matrix, Anspruchsgruppen, Architektur-Skizze, n&auml;chste Schritte &ndash; Grafiken aus der Wand, Texte als KI-Entwurf zum Pr&uuml;fen">&#128200; Projekt-Analyse mit Grafiken</button><button class="go" id="dAbschluss" title="Zwischen- oder Abschlussbericht: Ziel, Tore, Phasen, Erledigtes, Offenes, Risiken &ndash; direkt aus den Karten">Abschlussbericht (.doc)</button>'
     + '<button class="go" id="dWiss" title="Ger&uuml;st einer Projektarbeit: Methodik-Kapitel (OSTO, acht Ebenen, Zeitachse, KI-Regeln) + Stand aus der Wand &ndash; ohne KI">Wissenschaftliche Arbeit (.doc)</button></div>'
     + '<label style="margin-top:12px">Arbeitsblätter (Excel)</label>'
     + '<div class="btnrow" style="margin-top:4px"><button class="go" id="dTermin">Terminprogramm (.xls)</button></div>'
@@ -5107,7 +5142,7 @@ document.getElementById('docsBtn').onclick = () => {
     + state.phases.map((p, i) => '<option value="' + i + '">Phase ' + (i + 1) + ' &ndash; ' + esc(p.name.slice(0, 34)) + '</option>').join('')
     + '</select><button class="go" id="dCC">Auftrag (.md)</button><button class="go" id="dTasks">Tasks (.zip)</button><button class="go" id="dTasksGh" title="Aufgaben direkt ins konfigurierte GitHub-Repo legen (ohne ZIP-Umweg)">Tasks &rarr; GitHub</button><button id="dGhCfg" title="Repo und Schl&uuml;ssel f&uuml;r die direkte &Uuml;bertragung einstellen">&#9881; GitHub</button></div>'
     + '<label style="margin-top:12px">Projekt einlesen</label>'
-    + '<div class="btnrow" style="margin-top:4px"><button class="go" id="dImport" title="Fertige Strukturdatei (JSON) aus dem Chat einlesen &ndash; mit Vorschau; die Zielleiste bleibt unber&uuml;hrt">Import (JSON)</button>'
+    + '<div class="btnrow" style="margin-top:4px"><button class="go" id="dChat" title="Projekt-Brief aus ChatGPT, Claude oder Copilot einfügen – die Wand fragt nur noch, was fehlt">&#128172; Projekt aus einem Chat</button><button class="go" id="dFoto" title="Foto einer Moderationswand aus Papier: die KI liest Zettel, Phasen und Tore &ndash; mit Vorschau">&#128247; Foto einer Papierwand</button><button class="go" id="dImport" title="Fertige Strukturdatei (JSON) aus dem Chat einlesen &ndash; mit Vorschau; die Zielleiste bleibt unber&uuml;hrt">Import (JSON)</button>'
     + '<button class="go" id="dRepoWand" title="Claude analysiert ein ganzes Repo und schickt die fertige Strukturdatei &ndash; im Abo, keine API-Kosten">&rarr; Wand aus einem Repo (Claude)</button></div>'
     + '<div style="font-size:10.5px;color:var(--muted);margin-top:3px">&laquo;Wand aus einem Repo&raquo; kopiert dir den fertigen Auftrag f&uuml;r Claude. Dort einf&uuml;gen &rarr; du bekommst die Strukturdatei zur&uuml;ck &rarr; hier mit &laquo;Import&raquo; einlesen (mit Vorschau).</div>'
     + '<label style="margin-top:12px">Umfrage auswerten <span style="font-weight:400;text-transform:none">(liest die Antworten aus Supabase &ndash; nur du kannst das)</span></label>'
@@ -5227,6 +5262,9 @@ document.getElementById('docsBtn').onclick = () => {
   };
   document.getElementById('dGhCfg').onclick = () => openGhModal();
   document.getElementById('dImport').onclick = () => { closeModal(); document.getElementById('importFile').click(); };
+  document.getElementById('dFoto').onclick = () => { closeModal(); openFotoImport(); };
+  document.getElementById('dChat').onclick = () => { closeModal(); openChatImport(); };
+  document.getElementById('dAnalyse').onclick = () => { closeModal(); openAnalyse(); };
   document.getElementById('dRepoWand').onclick = async () => {
     const vor = ghRepoCfg() || 'besitzer/repo';
     const repo = (prompt('Welches GitHub-Repo soll Claude zu einer Prozesswand machen?\n(Schreibweise: besitzer/name)', vor) || '').trim();
@@ -5836,8 +5874,9 @@ function wegweiserZeigen() {
 function frageBeantworten(id) {
   const c = getPostit(id); if (!c || previewState) return;
   const rest = offeneFragen().length - 1;
-  openModal('<h3>Offene Frage</h3>'
-    + '<p style="font-size:15px;margin:4px 0 10px;line-height:1.45">' + esc(frageText(c)) + '</p>'
+  const unles = /\[unleserlich\]/i.test(c.text || ''); // V73: Zettel vom Foto, den die KI nicht lesen konnte
+  openModal('<h3>' + (unles ? 'Was steht auf diesem Zettel?' : 'Offene Frage') + '</h3>'
+    + '<p style="font-size:15px;margin:4px 0 10px;line-height:1.45">' + esc(unles ? 'Vom Foto gelesen: «' + c.text + '»' : frageText(c)) + '</p>'
     + '<label for="fbAntw">Deine Antwort</label><textarea id="fbAntw" rows="3" placeholder="Kurz und konkret: ein Name, ein Datum, ein Betrag"></textarea>'
     + '<p style="font-size:12px;color:var(--muted);margin:6px 0 0">Die Antwort ersetzt die Frage-Karte auf der Wand (mit &laquo;Retour&raquo; r&uuml;ckg&auml;ngig). Weisst du es noch nicht, bleibt die Frage offen &ndash; erfunden wird nichts.'
     + (rest > 0 ? ' Danach ' + (rest === 1 ? 'ist noch 1 Frage' : 'sind noch ' + rest + ' Fragen') + ' offen.' : '') + '</p>'
@@ -5847,7 +5886,7 @@ function frageBeantworten(id) {
   document.getElementById('fbOk').onclick = () => {
     const a = ta.value.trim(); if (!a) { ta.focus(); return; }
     const f = frageText(c).replace(/\s*(ungeklärt|fehlen|fehlt|offen|unklar|nicht festgelegt)\s*[.!]?$/i, '');
-    c.text = f + ' → ' + a;
+    c.text = unles ? a : f + ' → ' + a;
     c.status = 'erledigt'; stempelErledigt(c);
     if (c.typ === 'input') delete c.typ;
     c.beleg = 'Auskunft vom ' + heute();
@@ -5876,6 +5915,8 @@ function wwOptionen() {
     trotzdem: true, knopf: 'Erstellen' });
   L.push({ id: 'stand', ic: '📊', titel: 'Projektstand (Word)', satz: 'Wo das Projekt steht: Phasen, Erledigtes, nächste Entscheide, Risiken.',
     vorher: erledigt ? [] : ['Noch keine Aufgabe erledigt – der Bericht zeigt dann vor allem den Plan'], trotzdem: true, knopf: 'Erstellen' });
+  L.push({ id: 'analyse', ic: '📈', titel: 'Projekt-Analyse mit Grafiken', satz: 'Ein Bericht zum Zeigen: Zeitplan, Fortschritt, Risiko-Matrix, Beteiligte, Systeme und nächste Schritte. Als PDF speicherbar.',
+    vorher: [].concat(state.goal ? [] : ['Ziel unten in der Zielleiste eintragen'], ki ? [] : ['Für Texte und Schätzungen: Gratis-Konto (ohne geht es auch, dann bleiben sie [offen])']), trotzdem: true, knopf: 'Erstellen' });
   L.push({ id: 'termin', ic: '🗓', titel: 'Terminplan (Excel)', satz: 'Phasen und Entscheid-Tore auf einer Zeitachse.',
     vorher: toreOhneDatum ? [toreOhneDatum + ' Tor' + (toreOhneDatum > 1 ? 'e' : '') + ' ohne Datum (Doppelklick auf das Fähnchen)'] : [], trotzdem: true, knopf: 'Erstellen' });
   L.push({ id: 'ki', ic: '🤖', titel: 'KI ergänzt die Wand', satz: 'Die KI schlägt fehlende Schritte, Risiken und Kriterien vor. Du entscheidest, was bleibt.',
@@ -5886,7 +5927,7 @@ function wwOptionen() {
 }
 function openWasWillst() {
   if (previewState) return;
-  const IK = { fahrplan: 'coins', auftrag: 'doc', stand: 'chart', termin: 'cal', ki: 'spark', alle: 'folder', sicherung: 'save' };
+  const IK = { fahrplan: 'coins', auftrag: 'doc', stand: 'chart', analyse: 'layout', termin: 'cal', ki: 'spark', alle: 'folder', sicherung: 'save' };
   const h = wwOptionen().map(o => '<div class="ww-opt"><span class="ww-ic" style="--i:var(--ic-' + (IK[o.id] || 'doc') + ')" aria-hidden="true">' + o.ic + '</span><div class="ww-body"><b>' + esc(o.titel) + '</b><p>' + esc(o.satz) + '</p>'
     + (o.vorher.length
       ? '<div class="ww-vorher">&#9888; Vorher noch: ' + o.vorher.map(esc).join(' &middot; ') + (o.trotzdem ? ' &ndash; erstellen geht trotzdem.' : '') + '</div>'
@@ -5914,11 +5955,544 @@ function wwErstellen(id) {
     downloadDoc('Projektstand - ' + name + '.doc', genAbschluss());
     return;
   }
+  if (id === 'analyse') { openAnalyse(); return; }
   if (id === 'termin') { downloadXls('Terminplan - ' + name + '.xls', genTermin()); return; }
   if (id === 'abschluss') { downloadDoc('Abschlussbericht - ' + name + '.doc', genAbschluss()); return; }
   if (id === 'ki') { document.getElementById('swarmBtn').click(); return; }
   if (id === 'alle') { document.getElementById('docsBtn').click(); return; }
   if (id === 'sicherung') { document.getElementById('exportBtn').click(); return; }
+}
+
+/* ================================================================
+   V73: FOTO DER PAPIERWAND → DIGITALE WAND (Wunsch Dölf 01.11.2026,
+   der «Wow-Moment» für Moderatoren). Die KI (CHAT_MODEL, mit Bild) liest
+   Phasen, Ebenen, Zettel, Tore und Pfeile vom Foto. Regeln: nur was sichtbar
+   ist; Unleserliches bleibt [unleserlich]; geschätzte Ebenen werden markiert
+   (checked:false). Das Ergebnis geht als Vorschau an die previewBar –
+   übernommen wird erst per Knopf. Beleg jeder Karte: das Foto.
+   ================================================================ */
+const FOTO_MAX_PX = 2000, FOTO_MAX = 2;
+const FOTO_SYS = 'Du überträgst das Foto einer Moderationswand (Papier, Post-its, Flipchart) in die digitale Prozesswand nach der OSTO-Systemmethodik. '
+  + 'Die digitale Wand hat PHASEN (Spalten, Zeitachse von links nach rechts) und 8 EBENEN (Zeilen von oben nach unten), Schlüssel in Klammern: '
+  + 'reflexion (Was schiefgehen kann: Risiken, Störungen, Retrospektive), input (Wer helfen kann: Fachleute, Unterlagen), '
+  + 'mgmt1 (Wer oben entscheidet: Auftraggeber, strategische Führung), mgmt2 (Wer das Projekt führt: Projektleitung, Sitzungsrhythmus), '
+  + 'sache (Zwischenziele, Meilensteine), handlung (Was zu tun ist: Aufgaben), doku (Was dabei herauskommt: Dokumente, Ergebnisse), '
+  + 'anspruch (Wen es betrifft: Anspruchsgruppen, Betroffene).\n'
+  + 'REGELN: 1) Übertrage NUR, was auf dem Foto steht. Nichts erfinden, nichts ergänzen, nicht umformulieren (offensichtliche Tippfehler darfst du korrigieren). '
+  + '2) Unleserliches: den lesbaren Teil übernehmen und für den Rest [unleserlich] schreiben; ganz unleserliche Zettel: text "[unleserlich]". '
+  + '3) Phasen = Spaltenüberschriften. Fehlen sie, die Spalten aber sind erkennbar: "Phase 1", "Phase 2" …; ohne erkennbare Spalten genau eine Phase "Phase 1". '
+  + '4) Ebene: Sind die Zeilen beschriftet, gilt die Beschriftung. Sonst ordne nach Inhalt zu und setze "sicher": false. '
+  + '5) Tore/Meilensteine (Linien, Rauten, «Entscheid», «Go/No-Go», «Meilenstein») als tore; nach_phase = Index der Phase, an deren Ende das Tor steht (0 = erste Phase). '
+  + '6) Pfeile zwischen Zetteln als verbindungen (von/nach = Index in karten). '
+  + '7) Mehrere Fotos zeigen dieselbe Wand von links nach rechts: Phasen fortlaufend nummerieren, Doppeltes nur einmal. '
+  + '8) Ist auf dem Bild keine Projektwand, liefere leere Listen und einen Hinweis.\n'
+  + 'Antworte NUR mit JSON in dieser Form: {"titel":"kurzer Name der Wand oder leer","phasen":[{"name":"…"}],'
+  + '"karten":[{"text":"…","phase":0,"ebene":"handlung","sicher":true}],"tore":[{"nach_phase":0,"text":"…"}],'
+  + '"verbindungen":[{"von":0,"nach":1}],"hinweise":["kurz, z. B. was schwer lesbar war"]}';
+/* Foto im Browser verkleinern (max. 2000 px, JPEG) – spart Kosten und Ladezeit */
+function fotoVerkleinern(file) {
+  return new Promise((ok, nein) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      const f = Math.min(1, FOTO_MAX_PX / Math.max(img.naturalWidth, img.naturalHeight));
+      const w = Math.max(1, Math.round(img.naturalWidth * f)), h = Math.max(1, Math.round(img.naturalHeight * f));
+      const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+      const g = cv.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, w, h); g.drawImage(img, 0, 0, w, h);
+      URL.revokeObjectURL(url);
+      const d = cv.toDataURL('image/jpeg', 0.85);
+      ok({ media_type: 'image/jpeg', data: d.split(',')[1], vorschau: d, w, h });
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); nein(new Error('Dieses Bild kann der Browser nicht öffnen (zum Beispiel HEIC). Bitte als JPG oder PNG speichern und nochmals wählen.')); };
+    img.src = url;
+  });
+}
+function openFotoImport() {
+  if (previewState) { sysMsg('Zuerst die offene Vorschau übernehmen oder verwerfen – dann kann das Foto gelesen werden.', true); return; }
+  if (!kiBereit()) { openKeyModal(() => openFotoImport()); return; }
+  let bilder = [];
+  openModal('<h3>Foto einer Papierwand</h3>'
+    + '<p style="font-size:13px;margin:2px 0 8px">Fotografiere deine Moderationswand oder dein Flipchart. Die KI liest Zettel, Phasen und Tore und baut daraus die digitale Wand. Du siehst zuerst eine Vorschau.</p>'
+    + '<ul style="font-size:12.5px;color:var(--muted);margin:0 0 10px;padding-left:18px">'
+    + '<li>Die ganze Wand, gerade von vorne, bei gutem Licht.</li>'
+    + '<li>Lange Wand: bis zu ' + FOTO_MAX + ' Fotos, von links nach rechts.</li>'
+    + '<li>Das Foto geht zur Auswertung an die KI (Anthropic). Fotografiere keine vertraulichen Personendaten.</li></ul>'
+    + '<label class="foto-wahl" for="fotoDatei">Foto aufnehmen oder auswählen</label>'
+    + '<input type="file" id="fotoDatei" accept="image/*" multiple style="position:absolute;left:-9999px">'
+    + '<div id="fotoVorschau" style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap"></div>'
+    + '<div class="btnrow"><button class="go" id="fotoLos" disabled>Wand erkennen</button><button id="mCancel">Abbrechen</button></div>');
+  document.getElementById('mCancel').onclick = closeModal;
+  const los = document.getElementById('fotoLos'), vs = document.getElementById('fotoVorschau');
+  document.getElementById('fotoDatei').onchange = async e => {
+    const dateien = [...e.target.files].slice(0, FOTO_MAX);
+    if (e.target.files.length > FOTO_MAX) sysMsg('Es werden die ersten ' + FOTO_MAX + ' Fotos verwendet.', true);
+    vs.innerHTML = '<span style="font-size:12.5px;color:var(--muted)">Foto wird vorbereitet …</span>';
+    try { bilder = await Promise.all(dateien.map(fotoVerkleinern)); }
+    catch (err) { bilder = []; vs.innerHTML = '<span style="font-size:12.5px;color:var(--warn)">' + esc(err.message) + '</span>'; los.disabled = true; return; }
+    vs.innerHTML = bilder.map(b => '<img src="' + b.vorschau + '" alt="Foto der Wand" style="max-height:110px;max-width:48%;border-radius:8px;border:1px solid var(--line)">').join('');
+    los.disabled = !bilder.length;
+  };
+  los.onclick = async () => {
+    if (!bilder.length) return;
+    los.disabled = true; los.textContent = 'Die KI liest das Foto …';
+    vs.insertAdjacentHTML('beforeend', '<p style="width:100%;font-size:12.5px;color:var(--muted);margin:6px 0 0">Das dauert etwa 20 bis 60 Sekunden.</p>');
+    try {
+      const user = (bilder.length > 1 ? 'Hier sind ' + bilder.length + ' Fotos derselben Wand, von links nach rechts.' : 'Hier ist das Foto der Wand.') + ' Übertrage sie in die digitale Prozesswand.';
+      const t = await callClaude(FOTO_SYS, user, CHAT_MODEL, 6000, undefined, bilder.map(b => ({ media_type: b.media_type, data: b.data })));
+      const erg = extractJSON(t);
+      const st = fotoWandBauen(erg);
+      if (!st.postits.length) {
+        los.disabled = false; los.textContent = 'Nochmals versuchen';
+        vs.insertAdjacentHTML('beforeend', '<p style="width:100%;font-size:12.5px;color:var(--warn);margin:6px 0 0">Auf dem Foto hat die KI keine Zettel erkannt. '
+          + esc((Array.isArray(erg.hinweise) ? erg.hinweise : []).join(' ')) + '</p>');
+        return;
+      }
+      closeModal();
+      previewState = st; previewMeta = { import: true, foto: true, ziel: st._titel || 'Papierwand', name: 'Foto: ' + (st._titel || 'Papierwand vom ' + heute()) };
+      delete st._titel;
+      document.getElementById('pvTitel').textContent = 'Vorschau vom Foto';
+      document.getElementById('previewBar').style.display = 'flex';
+      render();
+      const unles = st.postits.filter(c => /\[unleserlich\]/i.test(c.text)).length;
+      const unsicher = st.postits.filter(c => c.checked === false).length;
+      sysMsg('📷 Vom Foto erkannt: ' + st.phases.length + ' Phasen, ' + st.postits.length + ' Zettel, ' + st.milestones.length + ' Tore.'
+        + (unles ? ' ' + unles + ' Zettel sind (teilweise) unleserlich – sie erscheinen nach dem Übernehmen oben unter «Als Nächstes».' : '')
+        + (unsicher ? ' Bei ' + unsicher + ' Zetteln hat die KI die Ebene geschätzt – bitte prüfen.' : '')
+        + ((erg.hinweise || []).length ? ' Hinweis der KI: ' + (erg.hinweise || []).slice(0, 3).join(' ') : '')
+        + ' Oben wählen: «Als neue Wand», Ersetzen, Ergänzen oder Verwerfen. Deine Zielleiste bleibt unverändert.');
+    } catch (err) {
+      los.disabled = false; los.textContent = 'Nochmals versuchen';
+      vs.insertAdjacentHTML('beforeend', '<p style="width:100%;font-size:12.5px;color:var(--warn);margin:6px 0 0">Das hat nicht geklappt: ' + esc(err.message) + '</p>');
+    }
+  };
+}
+
+/* ================================================================
+   V74: PROJEKT AUS EINEM CHAT (Wunsch Dölf 01.11.2026). Wer irgendwo
+   (ChatGPT, Claude, Copilot) über ein Projekt spricht, lässt sich am Schluss
+   einen «Projekt-Brief» als MD-Datei geben. Die Überschriften entsprechen den
+   8 Interview-Fragen: die Wand füllt das Interview damit vor und fragt nur
+   noch, was im Chat offen blieb. Ohne KI lesbar (feste Überschriften);
+   ist es nur ein Gesprächsverlauf ohne Überschriften, macht die KI zuerst
+   den Brief daraus (wenn KI bereit). Nichts wird erfunden.
+   ================================================================ */
+const BRIEF_PROMPT = 'Fasse unser Gespräch als «Projekt-Brief» für die Prozesswand zusammen.\n'
+  + 'Regeln:\n'
+  + '- Nur was wir besprochen haben. Nichts erfinden. Fehlt etwas, schreib: weiss ich nicht\n'
+  + '- Kurze Stichworte, Listen mit «- »\n'
+  + '- Genau diese Überschriften, in dieser Reihenfolge, als Markdown-Datei (.md):\n\n'
+  + '# Projekt-Brief: <kurzer Projektname>\n## Ziel\n## Bis wann\n## Grosse Schritte\n## Wer gibt frei\n## Wer führt\n'
+  + '## Wen betrifft es\n## Was könnte schiefgehen\n## Nächste Aufgaben\n## Woran merken wir den Erfolg\n## Offene Fragen\n## Weitere Angaben';
+/* Reihenfolge zählt: spezifische Muster zuerst («Nächste Schritte» ist start, nicht schritte) */
+const BRIEF_FELDER = [
+  ['erfolg', /erfolg|geklappt|gemessen|messen wir/],
+  ['offen', /offene\s+fragen|^offen\b|^unklar/],
+  ['weitere', /weitere|sonstig|zusatz|notizen|kosten|budget|systeme|unterlagen/],
+  ['start', /n(ä|ae)chste\s+(aufgaben|schritte|to.?dos)|^to.?dos?$|^aufgaben$/],
+  ['schritte', /gro(ss|ß)e\s+schritte|phasen|vorgehen|etappen|schritte/],
+  ['wann', /bis\s+wann|termin|deadline|zeitrahmen|zeitplan|^wann/],
+  ['wer_e', /gibt\s+frei|freigabe|entscheid|auftraggeb/],
+  ['wer_f', /f(ü|ue)hrt|leitung|projektleit|verantwortlich/],
+  ['betroffen', /betrifft|betroffen|beteiligt|anspruch|stakeholder|mitmachen/],
+  ['risiko', /schief|risik|gefahr|sorgen/],
+  ['ziel', /ziel|worum|vorhaben|idee|zweck/]
+];
+const BRIEF_LISTEN = ['schritte', 'betroffen', 'risiko', 'start', 'offen'];
+function briefLesen(text) {
+  const zeilen = String(text || '').replace(/\r/g, '').split('\n');
+  const out = { titel: '', antworten: {}, offen: [], weitere: '', erkannt: 0 };
+  let key = null, puffer = [];
+  const ablegen = () => {
+    if (!key) return;
+    /* «1. Schritt» ist eine Aufzählung, «30. Juni 2027» ein Datum */
+    const teile = puffer.map(z => z.replace(/^\s*([-*•]|\d+[.)](?!\s*(jan|feb|m(ä|ae)r|apr|mai|jun|jul|aug|sep|okt|nov|dez)))\s+/i, '').trim()).filter(Boolean);
+    puffer = [];
+    if (!teile.length) return;
+    const leer = teile.every(t => /^(weiss ich nicht|weiß ich nicht|unbekannt|offen|keine angabe|n\/a|-|–)\.?$/i.test(t));
+    if (key === 'offen') { if (!leer) out.offen = teile.slice(0, 10).map(t => ivKurz(t, 140)); return; }
+    if (key === 'weitere') { if (!leer) out.weitere = teile.join('\n').slice(0, 3000); return; }
+    out.antworten[key] = leer ? IV_WEISS : (BRIEF_LISTEN.includes(key) ? teile.join('\n') : teile.join(' ')).slice(0, 1500);
+  };
+  zeilen.forEach(z => {
+    const t = z.trim();
+    const h1 = t.match(/^#\s+(.+)$/);
+    if (h1 && !out.titel) { out.titel = ivKurz(h1[1].replace(/^projekt[-\s]?brief\s*:?\s*/i, '').replace(/[<>]/g, ''), 50); return; }
+    const h = t.match(/^#{2,4}\s+(.+?)\s*:?$/) || t.match(/^\*\*(.+?)\*\*\s*:?$/);
+    if (h) {
+      ablegen();
+      const titel = h[1].toLowerCase().replace(/[?:*]/g, '').trim();
+      const f = BRIEF_FELDER.find(([, re]) => re.test(titel));
+      key = f ? f[0] : null;
+      if (f) out.erkannt++;
+      return;
+    }
+    if (key) puffer.push(z);
+  });
+  ablegen();
+  /* «Wer gibt frei» / «Wer führt» als ein Abschnitt «Wer»: nicht aufteilen, sondern beim Interview nachfragen lassen */
+  return out;
+}
+function openChatImport(vorText) {
+  if (previewState) { sysMsg('Zuerst die offene Vorschau übernehmen oder verwerfen – dann kann der Brief gelesen werden.', true); return; }
+  openModal('<h3>Projekt aus einem Chat</h3>'
+    + '<p style="font-size:13px;margin:2px 0 8px">Du hast mit ChatGPT, Claude oder Copilot über dein Projekt gesprochen? Lass dir am Schluss einen <b>Projekt-Brief</b> geben. Die Wand übernimmt alles daraus und fragt nur noch, was fehlt.</p>'
+    + '<ol style="font-size:12.5px;margin:0 0 10px;padding-left:20px;color:var(--muted)">'
+    + '<li>Diesen Auftrag kopieren und am Ende deines Chats einfügen: <button type="button" id="ciKopie" style="font:inherit;font-size:12px;font-weight:600;border:1px solid var(--line);border-radius:7px;background:#fff;padding:4px 10px;cursor:pointer">Auftrag kopieren</button></li>'
+    + '<li>Die Antwort des Chats (den Brief) hier einfügen – oder die .md-Datei wählen.</li></ol>'
+    + '<textarea id="ciText" rows="9" placeholder="# Projekt-Brief: …&#10;## Ziel&#10;…">' + esc(vorText || '') + '</textarea>'
+    + '<div style="margin-top:6px"><label class="foto-wahl" for="ciDatei" style="min-height:40px">Datei wählen (.md oder .txt)</label>'
+    + '<input type="file" id="ciDatei" accept=".md,.txt,text/markdown,text/plain" style="position:absolute;left:-9999px"></div>'
+    + '<div id="ciInfo" style="font-size:12.5px;color:var(--muted);margin-top:8px"></div>'
+    + '<div class="btnrow"><button class="go" id="ciLos">Wand bauen</button><button id="mCancel">Abbrechen</button></div>', true);
+  document.getElementById('mCancel').onclick = closeModal;
+  const ta = document.getElementById('ciText'), info = document.getElementById('ciInfo');
+  document.getElementById('ciKopie').onclick = async function () {
+    try { await navigator.clipboard.writeText(BRIEF_PROMPT); this.textContent = '✓ kopiert'; }
+    catch (e) { ta.value = BRIEF_PROMPT; ta.select(); this.textContent = 'Im Feld markiert – jetzt kopieren'; }
+  };
+  document.getElementById('ciDatei').onchange = e => {
+    const f = e.target.files[0]; if (!f) return;
+    if (f.size > 500000) { info.textContent = 'Die Datei ist zu gross (höchstens 500 KB).'; return; }
+    const r = new FileReader(); r.onload = () => { ta.value = String(r.result || ''); info.textContent = '✓ «' + f.name + '» geladen.'; }; r.readAsText(f);
+  };
+  document.getElementById('ciLos').onclick = async function () {
+    let text = ta.value.trim();
+    if (!text) { ta.focus(); return; }
+    let b = briefLesen(text);
+    /* Kein Brief, sondern ein ganzer Gesprächsverlauf: die KI macht zuerst den Brief daraus */
+    if (b.erkannt < 2) {
+      if (!kiBereit()) { info.innerHTML = 'Im Text fehlen die Überschriften des Projekt-Briefs. Lass ihn im Chat mit dem kopierten Auftrag erstellen – oder melde dich an, dann macht die KI den Brief aus dem Gesprächsverlauf.'; return; }
+      this.disabled = true; this.textContent = 'Die KI liest den Chat …';
+      try {
+        text = await callClaude(BRIEF_PROMPT.replace('unser Gespräch', 'den folgenden Gesprächsverlauf') + '\nAntworte NUR mit dem Brief.', text.slice(0, 60000), IV_MODELL, 2500);
+        b = briefLesen(text);
+      } catch (e) { info.textContent = 'Das hat nicht geklappt: ' + e.message; this.disabled = false; this.textContent = 'Wand bauen'; return; }
+      if (b.erkannt < 2) { info.textContent = 'Aus dem Text liess sich kein Projekt-Brief machen. Bitte im Chat mit dem kopierten Auftrag erstellen.'; this.disabled = false; this.textContent = 'Wand bauen'; return; }
+    }
+    closeModal();
+    briefInsInterview(b);
+  };
+}
+/* Interview mit den Antworten aus dem Brief vorbefüllen und bei der ersten Lücke weitermachen */
+function briefInsInterview(b) {
+  openInterview();
+  iv.vorlage = 'eigen';
+  iv.antworten = Object.assign({}, b.antworten);
+  iv.brief = { titel: b.titel, offen: b.offen, weitere: b.weitere };
+  ivZeichnen();
+  const fehlt = ivFragen().findIndex(f => (f.felder ? f.felder.map(x => x.k) : [f.k]).some(k => !(k in iv.antworten)));
+  const zielFehlt = !iv.antworten.ziel || iv.antworten.ziel === IV_WEISS; // das Ziel ist Pflicht
+  ivFrage(zielFehlt ? 0 : fehlt < 0 ? ivFragen().length : fehlt);   // alles da → gleich zum Abschluss
+}
+
+/* ================================================================
+   V74: ERGEBNIS-PAKET «PROJEKT-ANALYSE» (Wunsch Dölf 01.11.2026: «eine
+   saubere Analyse mit Grafiken, Architektur … so wie ich mit dir arbeite»).
+   Ein Bericht als Webseite (druckbar als PDF): Auf einen Blick, Landkarte,
+   Zeitplan, Fortschritt je Phase, Risiko-Matrix, Anspruchsgruppen-Karte,
+   Architektur-Skizze, nächste Schritte. Die GRAFIKEN rechnet die Wand selbst
+   aus den Daten. Die KI liefert nur einen ENTWURF (Texte + Schätzungen), den
+   du prüfst und änderst – erst «Übernehmen & erstellen» druckt ihn (Regel:
+   kein LLM im Exportpfad ohne Freigabe). Schätzungen stehen als Schätzung da.
+   ================================================================ */
+const ANALYSE_SYS = 'Du bereitest für die Prozesswand eine Projekt-Analyse vor (Schweizer Schreibweise, ss statt ß, einfache Sprache). '
+  + 'Regeln: NUR die gelieferten Fakten verwenden, nichts erfinden; Unbekanntes als [offen]. Schätzungen sind erlaubt, wo verlangt, und gelten als Schätzung. '
+  + 'Liefere NUR JSON: {"ausgangslage":"3–5 Sätze: Worum geht es, wo steht das Projekt?","empfehlung":"3–5 Sätze: Was jetzt wichtig ist, was zuerst zu klären ist",'
+  + '"risiken":[{"nr":1,"wahrscheinlichkeit":1,"auswirkung":1}],"anspruch":[{"nr":1,"einfluss":1,"betroffenheit":1}],'
+  + '"architektur":{"systeme":[{"name":"…","art":"Quelle|Werkzeug|Ablage|Kanal|Person"}],"fluesse":[{"von":"Name","nach":"Name","was":"kurz"}]}}. '
+  + 'Werte 1 = tief, 2 = mittel, 3 = hoch; nr bezieht sich auf die nummerierten Listen. '
+  + 'architektur NUR aus Systemen, Programmen, Datenquellen und Kanälen, die in den Fakten genannt sind (z. B. ERP, Mailpostfach, Excel, Website) – sonst leere Listen.';
+function analyseDaten() {
+  const istRisiko = c => laneKeyOfY(c.y) === 'reflexion' && (c.status || 'offen') !== 'erledigt' && !/^\s*(❓|↻)/u.test(c.text || '');
+  const risiken = state.postits.filter(istRisiko).map(c => cleanTxt(c.text)).slice(0, 12);
+  const anspruch = anspruchKarten().filter(c => !/^\s*👥?\s*review/i.test(c.text || '')).map(c => cleanTxt(c.text).replace(/^👥\s*/u, '')).slice(0, 12);
+  const fragen = offeneFragen().map(x => frageText(x.c)).slice(0, 10);
+  const karten = state.postits.filter(c => ['input', 'handlung', 'doku', 'sache', 'mgmt1', 'mgmt2'].includes(laneKeyOfY(c.y))).map(c => cleanTxt(c.text)).slice(0, 80);
+  return { risiken, anspruch, fragen, karten };
+}
+async function openAnalyse() {
+  if (previewState) return;
+  if (!state.phases.length) { sysMsg('Zuerst eine Wand anlegen (Interview, Chat-Brief oder Foto) – dann gibt es etwas zu analysieren.', true); return; }
+  const ohneKi = () => { closeModal(); analyseErstellen(null); };
+  if (!kiBereit()) {
+    openModal('<h3>Projekt-Analyse</h3><p style="font-size:13px">Die Wand erstellt den Bericht mit allen Grafiken aus deinen Daten. Ohne Konto fehlen die Texte und die Schätzungen der KI (Risiko-Bewertung, Einfluss der Beteiligten, Architektur) – sie stehen dann als [offen] da.</p>'
+      + '<div class="btnrow"><button class="go" id="anOhne">Ohne KI erstellen</button><button id="anKonto">Gratis-Konto für die KI</button><button id="mCancel">Abbrechen</button></div>');
+    document.getElementById('anOhne').onclick = ohneKi;
+    document.getElementById('anKonto').onclick = () => openKeyModal(() => openAnalyse());
+    document.getElementById('mCancel').onclick = closeModal;
+    return;
+  }
+  const d = analyseDaten();
+  openModal('<h3>Projekt-Analyse</h3><p style="font-size:13px;margin:2px 0 8px">Die KI schreibt einen Entwurf (Ausgangslage, Empfehlung) und schätzt Risiken, Einfluss der Beteiligten und die Systeme. Du prüfst alles, bevor der Bericht entsteht. Kosten: etwa 5 Rappen.</p>'
+    + '<div id="anStatus" style="font-size:12.5px;color:var(--muted)">Die KI arbeitet … (etwa 20–40 Sekunden)</div>'
+    + '<div class="btnrow"><button id="anOhne">Ohne KI erstellen</button><button id="mCancel">Abbrechen</button></div>');
+  document.getElementById('anOhne').onclick = ohneKi;
+  let abgebrochen = false;
+  document.getElementById('mCancel').onclick = () => { abgebrochen = true; closeModal(); };
+  const user = wallFaktenText()
+    + '\n\nRISIKEN (nummeriert):\n' + (d.risiken.map((t, i) => (i + 1) + '. ' + t).join('\n') || 'keine')
+    + '\n\nANSPRUCHSGRUPPEN (nummeriert):\n' + (d.anspruch.map((t, i) => (i + 1) + '. ' + t).join('\n') || 'keine')
+    + '\n\nWEITERE KARTEN DER WAND:\n' + d.karten.join('\n')
+    + (state.interview && state.interview.brief && state.interview.brief.weitere ? '\n\nWEITERE ANGABEN:\n' + state.interview.brief.weitere : '')
+    + (state.orga ? '\n\nORGANISATION:\n' + orgaSauber(state.orga) : '');
+  let ki;
+  try { ki = extractJSON(await callClaude(ANALYSE_SYS, user, CHAT_MODEL, 3000)); }
+  catch (e) { if (!abgebrochen) document.getElementById('anStatus').innerHTML = '<span style="color:var(--warn)">KI-Entwurf ging nicht: ' + esc(e.message) + '</span> Du kannst den Bericht ohne KI erstellen.'; return; }
+  if (abgebrochen) return;
+  /* nur brauchbare Schätzungen zählen (gleiche Prüfung wie im Bericht) */
+  const w13 = v => { const z = Math.round(Number(v)); return z >= 1 && z <= 3; };
+  const gueltig = (a, max, k1, k2) => (Array.isArray(a) ? a : []).filter(r => { const nr = Math.round(Number(r && r.nr)); return nr >= 1 && nr <= max && w13(r[k1]) && w13(r[k2]); }).length;
+  const ar = ki.architektur || {}, nSys = (Array.isArray(ar.systeme) ? ar.systeme : []).filter(x => x && x.name).slice(0, 10).length;
+  openModal('<h3>Projekt-Analyse – Entwurf prüfen</h3>'
+    + '<label>Ausgangslage</label><textarea id="anAus" rows="5">' + esc(String(ki.ausgangslage || '[offen]')) + '</textarea>'
+    + '<label>Empfehlung</label><textarea id="anEmp" rows="5">' + esc(String(ki.empfehlung || '[offen]')) + '</textarea>'
+    + '<p style="font-size:12.5px;color:var(--muted);margin:8px 0 0">Schätzungen der KI (im Bericht als Schätzung markiert): ' + gueltig(ki.risiken, d.risiken.length, 'wahrscheinlichkeit', 'auswirkung') + ' von ' + d.risiken.length + ' Risiken bewertet, '
+    + gueltig(ki.anspruch, d.anspruch.length, 'einfluss', 'betroffenheit') + ' von ' + d.anspruch.length + ' Anspruchsgruppen eingeordnet, ' + nSys + ' Systeme in der Architektur-Skizze.</p>'
+    + '<div class="btnrow"><button class="go" id="anOk">Übernehmen &amp; erstellen</button><button id="mCancel">Abbrechen</button></div>', true);
+  document.getElementById('mCancel').onclick = closeModal;
+  document.getElementById('anOk').onclick = () => {
+    ki.ausgangslage = document.getElementById('anAus').value.trim();
+    ki.empfehlung = document.getElementById('anEmp').value.trim();
+    closeModal();
+    berichtKarte('Projekt-Analyse vom ' + heute(), 'Ausgangslage:\n' + ki.ausgangslage + '\n\nEmpfehlung:\n' + ki.empfehlung);
+    analyseErstellen(ki);
+  };
+}
+function analyseErstellen(ki) {
+  const html = genAnalyse(ki);
+  const name = 'Projekt-Analyse - ' + boardName() + '.html';
+  const url = URL.createObjectURL(new Blob([html], { type: 'text/html' }));
+  const w = window.open(url, '_blank');
+  if (!w) { const a = document.createElement('a'); a.href = url; a.download = name; a.click(); downloadGemeldet(name); }
+  else sysMsg('📈 Projekt-Analyse in einem neuen Fenster geöffnet. Dort oben «Als PDF speichern».', true);
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+}
+/* ---------- Grafiken (SVG, aus den Wand-Daten) ---------- */
+const AN_FARBE = { brand: '#651B32', hell: '#F3EBEE', grau: '#667085', linie: '#E3E6EB', gruen: '#2e7d4f', gelb: '#e9b949', rot: '#b42318' };
+function svgZeitplan() {
+  const P = state.phases, n = P.length; if (!n) return '';
+  const tag = d => new Date(d + 'T12:00:00Z').getTime(), TAG = 86400000;
+  const start = tag((state.interview && state.interview.datum) || new Date().toISOString().slice(0, 10));
+  const ende = P.map((p, i) => { const g = gateOfPhase(i); return g && g.due ? tag(g.due) : null; });
+  const bekannt = ende.some(Boolean);
+  /* fehlende Enden schätzen: zwischen bekannten verteilen, sonst 30 Tage je Phase */
+  const est = ende.map(Boolean).map(b => !b);
+  let letzt = start, i = 0;
+  while (i < n) {
+    if (ende[i]) { letzt = ende[i]; i++; continue; }
+    let j = i; while (j < n && !ende[j]) j++;
+    const bis = j < n ? ende[j] : null;
+    for (let k = i; k < j; k++) ende[k] = bis ? letzt + (bis - letzt) * (k - i + 1) / (j - i + 1) : letzt + 30 * TAG * (k - i + 1);
+    i = j;
+  }
+  const t0 = Math.min(start, ...ende.map((e, k) => k ? ende[k - 1] : start)), t1 = Math.max(...ende) + 5 * TAG;
+  const W = 900, L = 190, R = 20, top = 34, zeile = 34, H = top + n * zeile + 50;
+  const x = t => L + (t - t0) / Math.max(1, t1 - t0) * (W - L - R);
+  let s = '<svg viewBox="0 0 ' + W + ' ' + H + '" xmlns="http://www.w3.org/2000/svg" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="12">';
+  /* Monatsraster */
+  const m = new Date(t0); m.setUTCDate(1); m.setUTCHours(12);
+  const MON = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
+  for (let k = 0; k < 40 && m.getTime() <= t1; k++, m.setUTCMonth(m.getUTCMonth() + 1)) {
+    const xm = x(m.getTime()); if (xm < L || xm > W - R - 34) continue;
+    s += '<line x1="' + xm + '" y1="' + (top - 6) + '" x2="' + xm + '" y2="' + (H - 40) + '" stroke="' + AN_FARBE.linie + '"/>'
+      + '<text x="' + (xm + 3) + '" y="' + (top - 10) + '" fill="' + AN_FARBE.grau + '" font-size="10.5">' + MON[m.getUTCMonth()] + ' ' + String(m.getUTCFullYear()).slice(2) + '</text>';
+  }
+  P.forEach((p, k) => {
+    const a = k ? ende[k - 1] : start, b = ende[k], y = top + k * zeile;
+    s += '<text x="0" y="' + (y + 21) + '" fill="#1b2430">' + esc(ivKurz(p.name, 26)) + '</text>'
+      + '<rect x="' + x(a) + '" y="' + (y + 8) + '" width="' + Math.max(4, x(b) - x(a)) + '" height="18" rx="5" fill="' + (est[k] ? AN_FARBE.hell : AN_FARBE.brand) + '"'
+      + (est[k] ? ' stroke="' + AN_FARBE.brand + '" stroke-dasharray="4 3"' : '') + '/>';
+    const g = gateOfPhase(k);
+    if (g) s += '<path d="M' + x(b) + ' ' + (y + 6) + ' l11 11 -11 11 -11 -11z" fill="' + (est[k] ? '#fff' : AN_FARBE.brand) + '" stroke="' + (est[k] ? AN_FARBE.brand : '#fff') + '" stroke-width="1.5"/>';
+  });
+  const xh = x(Date.now());
+  if (xh >= L && xh <= W - R) s += '<line x1="' + xh + '" y1="' + (top - 6) + '" x2="' + xh + '" y2="' + (H - 40) + '" stroke="' + AN_FARBE.rot + '" stroke-width="1.5"/><text x="' + (xh + 3) + '" y="' + (H - 30) + '" fill="' + AN_FARBE.rot + '" font-size="10.5">heute</text>';
+  s += '<text x="' + L + '" y="' + (H - 6) + '" fill="' + AN_FARBE.grau + '" font-size="10.5">' + (bekannt ? 'Gefüllt = Datum am Tor erfasst · gestrichelt = geschätzt' : 'Noch keine Tor-Daten erfasst: alle Balken sind geschätzt (30 Tage je Phase)') + '</text>';
+  return s + '</svg>';
+}
+function svgFortschritt() {
+  const P = state.phases, W = 900, L = 190, zeile = 26, H = 10 + P.length * zeile;
+  let s = '<svg viewBox="0 0 ' + W + ' ' + H + '" xmlns="http://www.w3.org/2000/svg" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="12">';
+  P.forEach((p, i) => {
+    const t = tasksOfPhase(i), e = t.filter(c => c.status === 'erledigt').length, y = 6 + i * zeile, br = W - L - 130;
+    s += '<text x="0" y="' + (y + 13) + '" fill="#1b2430">' + esc(ivKurz(p.name, 26)) + '</text>'
+      + '<rect x="' + L + '" y="' + (y + 3) + '" width="' + br + '" height="12" rx="6" fill="' + AN_FARBE.hell + '"/>'
+      + (t.length ? '<rect x="' + L + '" y="' + (y + 3) + '" width="' + Math.max(e ? 6 : 0, br * e / t.length) + '" height="12" rx="6" fill="' + AN_FARBE.brand + '"/>' : '')
+      + '<text x="' + (L + br + 10) + '" y="' + (y + 13) + '" fill="' + AN_FARBE.grau + '">' + (t.length ? e + ' von ' + t.length : 'keine Aufgaben') + '</text>';
+  });
+  return s + '</svg>';
+}
+function svgMatrix(titelX, titelY, punkte, felder) {
+  /* punkte: [{nr, x:1-3, y:1-3}] → 3×3-Raster, Nummern als Kreise */
+  const W = 420, H = 380, L = 60, T = 16, Z = 100;
+  let s = '<svg viewBox="0 0 ' + W + ' ' + H + '" xmlns="http://www.w3.org/2000/svg" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="12">';
+  for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) {
+    s += '<rect x="' + (L + c * Z) + '" y="' + (T + r * Z) + '" width="' + Z + '" height="' + Z + '" fill="' + felder(c + 1, 3 - r) + '" stroke="#fff" stroke-width="3" rx="6"/>';
+  }
+  ['tief', 'mittel', 'hoch'].forEach((t, i) => {
+    s += '<text x="' + (L + i * Z + Z / 2) + '" y="' + (T + 3 * Z + 18) + '" text-anchor="middle" fill="' + AN_FARBE.grau + '" font-size="11">' + t + '</text>'
+      + '<text x="' + (L - 8) + '" y="' + (T + (2 - i) * Z + Z / 2 + 4) + '" text-anchor="end" fill="' + AN_FARBE.grau + '" font-size="11">' + t + '</text>';
+  });
+  s += '<text x="' + (L + 1.5 * Z) + '" y="' + (H - 6) + '" text-anchor="middle" fill="#1b2430" font-weight="600">' + esc(titelX) + '</text>'
+    + '<text transform="translate(14 ' + (T + 1.5 * Z) + ') rotate(-90)" text-anchor="middle" fill="#1b2430" font-weight="600">' + esc(titelY) + '</text>';
+  const belegt = {};
+  punkte.forEach(p => {
+    const key = p.x + '|' + p.y, k = belegt[key] = (belegt[key] || 0) + 1;
+    const cx = L + (p.x - 1) * Z + 22 + ((k - 1) % 4) * 19, cy = T + (3 - p.y) * Z + 24 + Math.floor((k - 1) / 4) * 22;
+    s += '<circle cx="' + cx + '" cy="' + cy + '" r="9.5" fill="#1b2430"/><text x="' + cx + '" y="' + (cy + 4) + '" text-anchor="middle" fill="#fff" font-size="10.5" font-weight="600">' + p.nr + '</text>';
+  });
+  return s + '</svg>';
+}
+function svgArchitektur(ar) {
+  const sys = (ar && Array.isArray(ar.systeme) ? ar.systeme : []).filter(x => x && x.name).slice(0, 10);
+  if (!sys.length) return '';
+  /* Kästen auf einer Ellipse, geordnet nach Art (Quelle → Person → Kanal → Werkzeug → Ablage, im Uhrzeigersinn ab links).
+     Gerade Pfeile zwischen Punkten einer Ellipse laufen nie durch einen dritten Kasten. */
+  const ARTEN = ['Quelle', 'Person', 'Kanal', 'Werkzeug', 'Ablage'];
+  const artNr = a => { const i = ARTEN.indexOf(String(a || '').trim().replace(/^\w/, c => c.toUpperCase())); return i < 0 ? 3 : i; };
+  const liste = sys.map((x, i) => ({ name: String(x.name), art: ARTEN[artNr(x.art)], o: artNr(x.art) * 100 + i })).sort((a, b) => a.o - b.o);
+  const n = liste.length, W = 900, BW = 156, BH = 46;
+  const H = n <= 2 ? 150 : n <= 4 ? 300 : 380, cx = W / 2, cy = H / 2;
+  const rx = n === 1 ? 0 : W / 2 - BW / 2 - 16, ry = n <= 2 ? 0 : H / 2 - BH / 2 - 12;
+  const pos = {};
+  liste.forEach((x, k) => {
+    const t = Math.PI + 2 * Math.PI * k / n;
+    pos[x.name.toLowerCase()] = Object.assign(x, { x: cx + rx * Math.cos(t), y: cy + ry * Math.sin(t) });
+  });
+  const rand = (p, dx, dy) => { const f = Math.min(dx ? (BW / 2 + 5) / Math.abs(dx) : Infinity, dy ? (BH / 2 + 5) / Math.abs(dy) : Infinity); return [p.x + dx * f, p.y + dy * f]; };
+  let s = '<svg viewBox="0 0 ' + W + ' ' + H + '" xmlns="http://www.w3.org/2000/svg" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="12">'
+    + '<defs><marker id="anPf" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="' + AN_FARBE.brand + '"/></marker></defs>';
+  const etiketten = [], gesehen = {};
+  (Array.isArray(ar.fluesse) ? ar.fluesse : []).slice(0, 16).forEach(f => {
+    const a = pos[String(f && f.von || '').toLowerCase()], b = pos[String(f && f.nach || '').toLowerCase()];
+    if (!a || !b || a === b) return;
+    /* Hin und zurück zwischen denselben Kästen: zweiter Pfeil leicht versetzt */
+    const paar = [a.name, b.name].sort().join('|'), vers = gesehen[paar] ? 7 : 0; gesehen[paar] = 1;
+    const dx = b.x - a.x, dy = b.y - a.y, l = Math.hypot(dx, dy) || 1, nx = -dy / l * vers, ny = dx / l * vers;
+    const [x1, y1] = rand(a, dx, dy), [x2, y2] = rand(b, -dx, -dy);
+    s += '<line x1="' + (x1 + nx) + '" y1="' + (y1 + ny) + '" x2="' + (x2 + nx) + '" y2="' + (y2 + ny) + '" stroke="' + AN_FARBE.brand + '" stroke-width="1.6" marker-end="url(#anPf)"/>';
+    if (f.was) {
+      let lx = (x1 + x2) / 2 + nx * 2, ly = (y1 + y2) / 2 + ny * 2 - 4;
+      while (etiketten.some(e => Math.abs(e[0] - lx) < 90 && Math.abs(e[1] - ly) < 14)) ly += 15;
+      etiketten.push([lx, ly]);
+      s += '<text x="' + lx + '" y="' + ly + '" text-anchor="middle" fill="#344054" font-size="10.5" stroke="#fff" stroke-width="4" paint-order="stroke">' + esc(ivKurz(f.was, 28)) + '</text>';
+    }
+  });
+  Object.values(pos).forEach(p => {
+    s += '<rect x="' + (p.x - BW / 2) + '" y="' + (p.y - BH / 2) + '" width="' + BW + '" height="' + BH + '" rx="10" fill="#fff" stroke="' + AN_FARBE.brand + '" stroke-width="1.4"/>'
+      + '<text x="' + p.x + '" y="' + (p.y - 3) + '" text-anchor="middle" fill="#1b2430" font-weight="600">' + esc(ivKurz(p.name, 20)) + '</text>'
+      + '<text x="' + p.x + '" y="' + (p.y + 13) + '" text-anchor="middle" fill="' + AN_FARBE.grau + '" font-size="10.5">' + esc(p.art) + '</text>';
+  });
+  return s + '</svg>';
+}
+function genAnalyse(ki) {
+  const d = analyseDaten(), f = fortschrittZahlen(), ns = naechsterSchritt(), akt = aktuellePhase();
+  const letzt = state.milestones.filter(m => m.due).map(m => m.due).sort().slice(-1)[0];
+  const zahl = (v) => { const n = Math.round(Number(v)); return n >= 1 && n <= 3 ? n : null; };
+  const rBew = (ki && Array.isArray(ki.risiken) ? ki.risiken : []).map(r => ({ nr: Math.round(Number(r.nr)), x: zahl(r.wahrscheinlichkeit), y: zahl(r.auswirkung) })).filter(r => r.nr >= 1 && r.nr <= d.risiken.length && r.x && r.y);
+  const aBew = (ki && Array.isArray(ki.anspruch) ? ki.anspruch : []).map(r => ({ nr: Math.round(Number(r.nr)), x: zahl(r.betroffenheit), y: zahl(r.einfluss) })).filter(r => r.nr >= 1 && r.nr <= d.anspruch.length && r.x && r.y);
+  const rFarbe = (x, y) => (x * y >= 6 ? '#f6d4d0' : x * y >= 3 ? '#fbedc8' : '#dcefe2');
+  const aFarbe = (x, y) => (y >= 2 && x >= 2 ? '#f3ebee' : '#f6f7f9');
+  const txt = t => t ? '<p>' + esc(t).replace(/\n/g, '<br>') + '</p>' : '<p class="offen">[offen]</p>';
+  const liste = (a, leer) => a.length ? '<ol>' + a.map(t => '<li>' + esc(t) + '</li>').join('') + '</ol>' : '<p class="offen">' + leer + '</p>';
+  const architektur = ki ? svgArchitektur(ki.architektur) : '';
+  const naechste = offeneAufgaben(akt).slice(0, 5).map(c => cleanTxt(c.text));
+  const css = 'body{font-family:Inter,-apple-system,"Segoe UI",Arial,sans-serif;color:#1b2430;margin:0;background:#f4f5f7}'
+    + '.blatt{max-width:960px;margin:24px auto;background:#fff;padding:36px 44px;border-radius:14px;box-shadow:0 1px 3px rgba(16,24,40,.08)}'
+    + 'h1{font-size:26px;margin:4px 0 2px;color:#651B32}h2{font-size:17px;margin:30px 0 8px;padding-top:14px;border-top:1px solid #e3e6eb}'
+    + '.kopf{font-size:12px;color:#667085}.ssot{font-size:11.5px;color:#667085;font-style:italic;margin-bottom:12px}'
+    + '.kacheln{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-top:10px}'
+    + '.k{border:1px solid #e3e6eb;border-radius:12px;padding:12px 14px}.k b{display:block;font-size:22px;color:#651B32}.k span{font-size:12px;color:#667085}'
+    + 'svg{width:100%;height:auto;display:block}.zwei{display:grid;grid-template-columns:1fr 1fr;gap:24px;align-items:start}'
+    + '.hinweis{font-size:12px;color:#667085}.offen{background:#FFF6D5;padding:2px 6px;border-radius:4px;display:inline-block;font-size:13px}'
+    + '.schaetzung{font-size:11.5px;color:#b54708}.leiste{position:sticky;top:0;background:#1b2430;color:#fff;padding:10px 16px;display:flex;gap:10px;align-items:center;justify-content:center}'
+    + '.leiste button{font:inherit;font-weight:600;background:#651B32;color:#fff;border:0;border-radius:8px;padding:8px 14px;cursor:pointer}'
+    + 'ol{padding-left:22px;margin:6px 0}li{margin:3px 0}.karte{overflow-x:auto;border:1px solid #e3e6eb;border-radius:10px}.karte svg{width:auto;max-width:none}'
+    + '@media (max-width:700px){.blatt{padding:20px 16px;margin:0;border-radius:0}.zwei{grid-template-columns:1fr}}'
+    + '@media print{body{background:#fff}.leiste{display:none}.karte{overflow:visible;border:0}.karte svg{width:100%}.blatt{box-shadow:none;margin:0;max-width:none;padding:0}h2{break-after:avoid}svg,.k{break-inside:avoid}}';
+  let b = '<div class="leiste">Projekt-Analyse · ' + esc(boardName()) + ' <button onclick="window.print()">Als PDF speichern</button></div><div class="blatt">'
+    + '<div class="ssot">Bei Widerspruch gilt: die Prozesswand «' + esc(boardName()) + '» (Stand ' + heute() + ').</div>'
+    + '<div class="kopf">Prozesswand · Projekt-Analyse · ' + heute() + '</div><h1>' + esc(boardName()) + '</h1>'
+    + '<p style="margin:6px 0 0;font-size:15px">' + (state.goal ? esc(state.goal) : '<span class="offen">Ziel [offen]</span>') + '</p>'
+    + '<h2>Auf einen Blick</h2><div class="kacheln">'
+    + '<div class="k"><b>' + (akt + 1) + ' / ' + state.phases.length + '</b><span>Phase: ' + esc(state.phases[akt] ? state.phases[akt].name : '') + '</span></div>'
+    + '<div class="k"><b>' + f.pct + ' %</b><span>' + f.erledigt + ' von ' + f.total + ' Aufgaben erledigt</span></div>'
+    + '<div class="k"><b>' + d.fragen.length + '</b><span>offene Fragen</span></div>'
+    + '<div class="k"><b>' + d.risiken.length + '</b><span>Risiken erfasst</span></div>'
+    + '<div class="k"><b>' + (letzt ? fmtDue(letzt) : '–') + '</b><span>' + (letzt ? 'letztes Tor' : 'Termin [offen]') + '</span></div></div>'
+    + '<h2>Ausgangslage</h2>' + txt(ki && ki.ausgangslage) + (ki && ki.ausgangslage ? '<div class="hinweis">KI-Entwurf, geprüft und freigegeben am ' + heute() + '.</div>' : '')
+    + '<h2>Empfehlung</h2>' + txt(ki && ki.empfehlung) + (ki && ki.empfehlung ? '<div class="hinweis">KI-Entwurf, geprüft und freigegeben am ' + heute() + '.</div>' : '')
+    + '<h2>Zeitplan</h2>' + svgZeitplan()
+    + '<h2>Fortschritt je Phase</h2>' + svgFortschritt()
+    + '<h2>Risiken</h2><div class="zwei"><div>' + svgMatrix('Wahrscheinlichkeit', 'Auswirkung', rBew, rFarbe)
+    + (rBew.length ? '<div class="schaetzung">Einordnung: Schätzung der KI – bitte prüfen.</div>' : '<div class="hinweis">Noch nicht bewertet' + (ki ? '' : ' (mit KI-Entwurf schätzt die KI Wahrscheinlichkeit und Auswirkung)') + '.</div>')
+    + '</div><div>' + liste(d.risiken, 'Keine Risiken erfasst.') + '</div></div>'
+    + '<h2>Anspruchsgruppen</h2><div class="zwei"><div>' + svgMatrix('Betroffenheit', 'Einfluss', aBew, aFarbe)
+    + (aBew.length ? '<div class="schaetzung">Einordnung: Schätzung der KI – oben rechts eng einbinden.</div>' : '<div class="hinweis">Noch nicht eingeordnet.</div>')
+    + '</div><div>' + liste(d.anspruch, 'Keine Anspruchsgruppen erfasst.') + '</div></div>'
+    + (architektur ? '<h2>Architektur-Skizze</h2>' + architektur + '<div class="schaetzung">Aus den auf der Wand genannten Systemen abgeleitet (KI) – bitte prüfen.</div>' : '')
+    + '<h2>Projekt-Landkarte</h2><div class="karte">' + genLandkarte() + '</div>'
+    + '<h2>Nächste Schritte</h2><p><b>Als Nächstes:</b> ' + esc(ns.txt) + '</p>'
+    + (naechste.length ? '<p><b>Offene Aufgaben in Phase ' + (akt + 1) + ':</b></p>' + liste(naechste, '') : '')
+    + '<p><b>Offene Fragen:</b></p>' + liste(d.fragen, 'Keine offenen Fragen.')
+    + '<p class="hinweis" style="margin-top:28px">Erstellt mit der Prozesswand (Methode: OSTO-Systemmethodik). Die Grafiken sind aus den Daten der Wand gerechnet; KI-Texte und Schätzungen sind gekennzeichnet. Fehlendes steht als [offen] – nichts wurde erfunden.</p></div>';
+  return '<!DOCTYPE html><html lang="de-CH"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Projekt-Analyse – ' + esc(boardName()) + '</title><style>' + css + '</style></head><body>' + b + '</body></html>';
+}
+/* Aus der KI-Antwort eine Wand bauen – gleiche Anordnung wie beim Interview, ohne Überlappung */
+function fotoWandBauen(erg) {
+  erg = erg && typeof erg === 'object' ? erg : {};
+  const KEYS = OSTO_LANES.map(l => l.key);
+  const ALIAS = { risiko: 'reflexion', risiken: 'reflexion', retro: 'reflexion', experten: 'input', fachleute: 'input', entscheid: 'mgmt1', auftraggeber: 'mgmt1',
+    projektleitung: 'mgmt2', fuehrung: 'mgmt2', meilenstein: 'sache', zwischenziel: 'sache', ziel: 'sache', aufgabe: 'handlung', aufgaben: 'handlung',
+    dokument: 'doku', dokumentation: 'doku', ergebnis: 'doku', anspruchsgruppe: 'anspruch', anspruchsgruppen: 'anspruch', betroffene: 'anspruch' };
+  const text = (v, n) => String(v == null ? '' : v).replace(/\s+/g, ' ').trim().slice(0, n);
+  let namen = (Array.isArray(erg.phasen) ? erg.phasen : []).map(p => text(p && typeof p === 'object' ? p.name : p, 60)).filter(Boolean).slice(0, 12);
+  if (!namen.length) namen = ['Phase 1'];
+  const n = namen.length, heute = new Date().toISOString().slice(0, 10);
+  const zellen = {}, quelle = [];
+  (Array.isArray(erg.karten) ? erg.karten : []).slice(0, 200).forEach((k, idx) => {
+    if (!k || typeof k !== 'object') return;
+    const t = text(k.text, 300); if (!t) return;
+    let ebene = String(k.ebene || '').toLowerCase().trim(), sicher = k.sicher !== false;
+    if (!KEYS.includes(ebene)) { ebene = ALIAS[ebene] || 'handlung'; sicher = false; }
+    const pi = Math.min(Math.max(Math.floor(Number(k.phase)) || 0, 0), n - 1);
+    const z = pi + '|' + ebene;
+    (zellen[z] = zellen[z] || []).push({ t, sicher, idx });
+  });
+  /* Zelle mit vielen Zetteln: zwei Reihen statt einer sehr breiten Phase */
+  const spalten = (pi, e) => { const a = (zellen[pi + '|' + e] || []).length; return a > 4 ? Math.ceil(a / 2) : a; };
+  const breite = namen.map((_, pi) => Math.max(PHASE_W, 16 + Math.max(1, ...KEYS.map(e => spalten(pi, e))) * (PI_W + 10)));
+  const links = i => breite.slice(0, i).reduce((s, w) => s + w, 0);
+  const lauf = 'f' + Date.now().toString(36), nid = (p, i) => p + lauf + '_' + i; // eindeutig, auch bei 200 Zetteln
+  const phases = namen.map((nm, i) => ({ id: nid('ph', i), name: nm, w: breite[i], ziel: '', input: '', output: '', wer: '', was: '', wann: '', wie: '' }));
+  const postits = [], idVon = {};
+  Object.keys(zellen).forEach(z => {
+    const [pi, ebene] = z.split('|'), li = KEYS.indexOf(ebene), liste = zellen[z], zwei = liste.length > 4;
+    liste.forEach((c, j) => {
+      const col = zwei ? Math.floor(j / 2) : j, row = zwei ? j % 2 : 0;
+      const id = nid('p', postits.length);
+      idVon[c.idx] = id;
+      const unles = /\[unleserlich\]/i.test(c.t);
+      postits.push({ id, x: links(+pi) + 8 + col * (PI_W + 10), y: li * LANE_H + (zwei ? 2 + row * 50 : 14),
+        text: c.t, color: LANE_COLOR[ebene] || PALETTE[0], status: 'offen', typ: unles ? 'input' : 'auto',
+        checked: c.sicher, beleg: 'Foto der Papierwand vom ' + fmtDue(heute) });
+    });
+  });
+  const tore = {};
+  (Array.isArray(erg.tore) ? erg.tore : []).forEach(t => {
+    if (!t || typeof t !== 'object') return;
+    const pi = Math.min(Math.max(Math.floor(Number(t.nach_phase)) || 0, 0), n - 1), tx = text(t.text, 200);
+    if (tx) tore[pi] = tore[pi] ? tore[pi] + '; ' + tx : tx;
+  });
+  const milestones = Object.keys(tore).map((pi, i) => ({ id: nid('m', i), x: links(+pi + 1) - 4,
+    label: /Kriterien/i.test(tore[pi]) ? tore[pi] : tore[pi] + ' – Kriterien: [offen]' }));
+  const connections = (Array.isArray(erg.verbindungen) ? erg.verbindungen : [])
+    .filter(v => v && idVon[v.von] && idVon[v.nach] && v.von !== v.nach)
+    .slice(0, 200).map((v, i) => ({ id: nid('c', i), from: idVon[v.von], to: idVon[v.nach] }));
+  const st = normalizeState({ phases, postits, connections, milestones });
+  st.goal = state.goal; st.kiLog = state.kiLog; st.kiConvo = state.kiConvo; st.solo = state.solo;
+  st._titel = text(erg.titel, 50);
+  return st;
 }
 
 let todoWerFilter = '';
@@ -6693,7 +7267,7 @@ document.getElementById('logoutBtn').onclick = async () => {
 })();
 
 document.getElementById('verTag').textContent = APP_VERSION;
-document.title = 'OSTO/SYMA Prozesswand ' + APP_VERSION;
+document.title = 'Prozesswand ' + APP_VERSION; // V73: Name ohne «OSTO/SYMA» – die Methode steht in der Profi-Ansicht und in der wissenschaftlichen Arbeit
 initAuth();
 </script>
 </body>
