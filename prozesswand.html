@@ -360,6 +360,7 @@ body.iv-on #wegLeiste { display:none; }
   --ic-spark:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z'/%3E%3Cpath d='M19 15l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7z'/%3E%3C/svg%3E");
   --ic-plus:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z'/%3E%3Cpath d='M14 3v6h6M12 12v6M9 15h6'/%3E%3C/svg%3E");
   --ic-pin:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z'/%3E%3Ccircle cx='12' cy='10' r='2.5'/%3E%3C/svg%3E");
+  --ic-play:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M10 8.5v7l5.5-3.5z'/%3E%3C/svg%3E");
   --ic-arrow:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12h14M13 6l6 6-6 6'/%3E%3C/svg%3E");
   --ic-doc:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z'/%3E%3Cpath d='M14 3v6h6M8 13h8M8 17h5'/%3E%3C/svg%3E");
   --ic-chart:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 20V10M10 20V4M16 20v-7M22 20H2'/%3E%3C/svg%3E");
@@ -516,6 +517,25 @@ body.einfach .ki-tools button { display:inline-flex; align-items:center; justify
   #boardSelect { max-width:62vw; font-size:12.5px; padding:6px 26px 6px 8px; }
   .userTag, header .sub { display:none; }
 }
+/* V75: Rundgang */
+#rg { position:fixed; left:50%; bottom:18px; transform:translateX(-50%); width:min(720px, calc(100vw - 32px)); z-index:70; background:#1b2430; color:#fff; border-radius:16px; box-shadow:0 12px 40px rgba(16,24,40,.35); padding:14px 18px 14px; font-family:Inter,-apple-system,"Segoe UI",Arial,sans-serif; }
+#rg .rg-kopf { display:flex; align-items:center; gap:10px; }
+#rg #rgZahl { font-size:12px; font-weight:600; color:#c9b2ba; background:rgba(255,255,255,.08); border-radius:999px; padding:2px 9px; flex:0 0 auto; }
+#rg #rgTitel { font-size:16px; flex:1; min-width:0; }
+#rg #rgZu { background:transparent; border:0; color:#c9ccd3; font-size:24px; line-height:1; cursor:pointer; padding:0 4px; }
+#rg #rgText { margin:8px 0 10px; font-size:15px; line-height:1.5; color:#eef0f3; }
+#rg .rg-leiste { height:4px; background:rgba(255,255,255,.12); border-radius:4px; overflow:hidden; }
+#rg #rgBalken { height:100%; width:0; background:#d8a3b3; transition:width .4s; }
+#rg .rg-knoepfe { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
+#rg .rg-knoepfe button { font:inherit; font-size:13px; font-weight:600; min-height:40px; padding:8px 14px; border-radius:10px; border:1px solid rgba(255,255,255,.22); background:transparent; color:#fff; cursor:pointer; }
+#rg .rg-knoepfe button.go { background:#651B32; border-color:#651B32; }
+#rg .rg-knoepfe button:disabled { opacity:.35; cursor:default; }
+#rg .rg-knoepfe .rg-ton { margin-left:auto; }
+#rgFokus { position:absolute; z-index:6; pointer-events:none; border:3px solid #651B32; border-radius:10px; background:rgba(101,27,50,.05); box-shadow:0 0 0 9999px rgba(27,36,48,.12); transition:left .5s, top .5s, width .5s, height .5s; }
+body.rg-on #wallScroll { padding-bottom:210px; }
+body.rg-on #wegLeiste { display:none; }
+@media (max-width:600px) { #rg { bottom:10px; padding:12px 14px; } #rg #rgText { font-size:14px; } #rg .rg-knoepfe .rg-ton { margin-left:0; } }
+@media print { #rg, #rgFokus { display:none !important; } }
 </style>
 </head>
 <body>
@@ -544,6 +564,7 @@ body.einfach .ki-tools button { display:inline-flex; align-items:center; justify
   <input type="file" id="importFile" accept=".json,.md,.txt" style="display:none">
 </header>
 <nav id="wegLeiste" aria-label="Wegweiser: wo du stehst und was als N&auml;chstes dran ist"></nav>
+<div id="rg" role="region" aria-label="Rundgang durch das Projekt" style="display:none"><div class="rg-kopf"><span id="rgZahl"></span><b id="rgTitel"></b><button id="rgZu" title="Rundgang beenden (Esc)" aria-label="Rundgang beenden">&times;</button></div><p id="rgText" aria-live="polite"></p><div class="rg-leiste"><div id="rgBalken"></div></div><div class="rg-knoepfe"><button id="rgZurueck">&larr; Zur&uuml;ck</button><button id="rgPause" class="go">Pause</button><button id="rgWeiter">Weiter &rarr;</button><button id="rgTon" class="rg-ton">Vorlesen: an</button></div></div>
 
 <div id="main">
   <div id="wallScroll"><div id="wallCanvas"></div></div>
@@ -625,7 +646,7 @@ body.einfach .ki-tools button { display:inline-flex; align-items:center; justify
 <script>
 "use strict";
 
-const APP_VERSION = 'V74';
+const APP_VERSION = 'V75';
 /* V49: einheitlicher Wegweiser nach jedem «An Claude kopieren» */
 function claudeHinweis() {
   sysMsg('📋 Kopiert! Jetzt: 1. Claude öffnen (claude.ai bzw. deine Prozesswand-Sitzung) → 2. ins Schreibfeld klicken → 3. Cmd+V (einfügen) → 4. Senden. Mehr braucht es nicht.', true);
@@ -1016,6 +1037,7 @@ function render() {
   if (guide) markGuideCard();
   fpKnopfZeigen();
   try { wegweiserZeigen(); } catch (e) { console.warn('Wegweiser:', e); }
+  if (rg.an) try { rgFokus(false); } catch (e) { console.warn('Rundgang:', e); }
 }
 const wallScrollEl = document.getElementById('wallScroll');
 function syncLaneLabels() {
@@ -2454,6 +2476,7 @@ document.getElementById('fpBtn').onclick = () => openFahrplan();
 document.addEventListener('keydown', e => {
   if (e.key !== 'Escape') return;
   if (overlay.style.display === 'flex') { closeModal(); return; }
+  if (rg.an) { rgEnde(); return; }
   if (document.getElementById('lupe').style.display === 'block') { closeLupe(); return; }
   if (document.getElementById('dash').style.display === 'block') closeDash();
 });
@@ -5917,6 +5940,8 @@ function wwOptionen() {
     vorher: erledigt ? [] : ['Noch keine Aufgabe erledigt – der Bericht zeigt dann vor allem den Plan'], trotzdem: true, knopf: 'Erstellen' });
   L.push({ id: 'analyse', ic: '📈', titel: 'Projekt-Analyse mit Grafiken', satz: 'Ein Bericht zum Zeigen: Zeitplan, Fortschritt, Risiko-Matrix, Beteiligte, Systeme und nächste Schritte. Als PDF speicherbar.',
     vorher: [].concat(state.goal ? [] : ['Ziel unten in der Zielleiste eintragen'], ki ? [] : ['Für Texte und Schätzungen: Gratis-Konto (ohne geht es auch, dann bleiben sie [offen])']), trotzdem: true, knopf: 'Erstellen' });
+  L.push({ id: 'rundgang', ic: '▶', titel: 'Rundgang durch das Projekt', satz: 'Die Wand stellt dein Projekt Phase für Phase vor und liest es vor. Gut für Sitzungen – oder den Bildschirm dabei aufnehmen, dann hast du ein Erklärvideo.',
+    vorher: state.goal ? [] : ['Ziel unten in der Zielleiste eintragen'], trotzdem: true, knopf: 'Starten' });
   L.push({ id: 'termin', ic: '🗓', titel: 'Terminplan (Excel)', satz: 'Phasen und Entscheid-Tore auf einer Zeitachse.',
     vorher: toreOhneDatum ? [toreOhneDatum + ' Tor' + (toreOhneDatum > 1 ? 'e' : '') + ' ohne Datum (Doppelklick auf das Fähnchen)'] : [], trotzdem: true, knopf: 'Erstellen' });
   L.push({ id: 'ki', ic: '🤖', titel: 'KI ergänzt die Wand', satz: 'Die KI schlägt fehlende Schritte, Risiken und Kriterien vor. Du entscheidest, was bleibt.',
@@ -5927,7 +5952,7 @@ function wwOptionen() {
 }
 function openWasWillst() {
   if (previewState) return;
-  const IK = { fahrplan: 'coins', auftrag: 'doc', stand: 'chart', analyse: 'layout', termin: 'cal', ki: 'spark', alle: 'folder', sicherung: 'save' };
+  const IK = { fahrplan: 'coins', auftrag: 'doc', stand: 'chart', analyse: 'layout', rundgang: 'play', termin: 'cal', ki: 'spark', alle: 'folder', sicherung: 'save' };
   const h = wwOptionen().map(o => '<div class="ww-opt"><span class="ww-ic" style="--i:var(--ic-' + (IK[o.id] || 'doc') + ')" aria-hidden="true">' + o.ic + '</span><div class="ww-body"><b>' + esc(o.titel) + '</b><p>' + esc(o.satz) + '</p>'
     + (o.vorher.length
       ? '<div class="ww-vorher">&#9888; Vorher noch: ' + o.vorher.map(esc).join(' &middot; ') + (o.trotzdem ? ' &ndash; erstellen geht trotzdem.' : '') + '</div>'
@@ -5956,12 +5981,156 @@ function wwErstellen(id) {
     return;
   }
   if (id === 'analyse') { openAnalyse(); return; }
+  if (id === 'rundgang') { rgStart(); return; }
   if (id === 'termin') { downloadXls('Terminplan - ' + name + '.xls', genTermin()); return; }
   if (id === 'abschluss') { downloadDoc('Abschlussbericht - ' + name + '.doc', genAbschluss()); return; }
   if (id === 'ki') { document.getElementById('swarmBtn').click(); return; }
   if (id === 'alle') { document.getElementById('docsBtn').click(); return; }
   if (id === 'sicherung') { document.getElementById('exportBtn').click(); return; }
 }
+
+/* ================================================================
+   V75: RUNDGANG – die Wand stellt das Projekt selbst vor (Wunsch Dölf
+   01.11.2026: «kann das Tool ein Erklärvideo machen?»). Ohne KI und ohne
+   Kosten: Die Schritte entstehen aus den Wand-Daten (Ziel, Phasen,
+   Aufgaben, Risiken, Tore, Beteiligte, nächster Schritt), die Wand fährt
+   jede Phase an und hebt sie hervor; vorgelesen wird mit der Stimme des
+   Browsers. Wer ein Video will, nimmt den Bildschirm dabei auf.
+   ================================================================ */
+const rg = { an: false, i: 0, laeuft: false, ton: true, S: [], timer: null, wecker: null, nr: 0 };
+const RG_MONATE = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
+function rgDatum(d) { const p = String(d || '').split('-'); return p.length === 3 ? (+p[2]) + '. ' + RG_MONATE[+p[1] - 1] + ' ' + p[0] : String(d || ''); }
+function rgListe(a) { a = a.filter(Boolean); return a.length <= 1 ? (a[0] || '') : a.slice(0, -1).join(', ') + ' und ' + a[a.length - 1]; }
+function rgKarte(c) { return ivKurz(cleanTxt(c.text).replace(/^\s*(❓|⚠️?|👥|🎯|🧭|✅)\s*/u, '').replace(/\s*\[offen[^\]]*\]\s*/gi, ' ').trim(), 60); }
+function rgSchritte() {
+  const S = [], n = state.phases.length, f = fortschrittZahlen(), akt = aktuellePhase();
+  const ziel = String(state.goal || '').trim();
+  S.push({ titel: boardName(), art: 'start',
+    text: (ziel ? 'Das Ziel: ' + ziel.replace(/\.?$/, '.') : 'Das Ziel ist noch nicht festgehalten.')
+      + ' Das Projekt hat ' + n + (n === 1 ? ' Phase' : ' Phasen') + (f.total ? ' und ' + f.total + (f.total === 1 ? ' Aufgabe.' : ' Aufgaben.') : '.') });
+  state.phases.forEach((p, i) => {
+    const t = tasksOfPhase(i), e = t.filter(c => c.status === 'erledigt').length, offen = offeneAufgaben(i);
+    const risiken = state.postits.filter(c => phaseIndexOfX(c.x) === i && laneKeyOfY(c.y) === 'reflexion' && (c.status || 'offen') !== 'erledigt' && !/^\s*(❓|↻)/u.test(c.text || ''));
+    const fragen = offeneFragen().filter(x => x.i === i).length, g = gateOfPhase(i);
+    let text = !t.length ? 'Hier stehen noch keine Aufgaben. '
+      : e === t.length ? (t.length === 1 ? 'Die Aufgabe ist erledigt. ' : 'Alle ' + t.length + ' Aufgaben sind erledigt. ')
+      : (e === 0 ? (t.length === 1 ? 'Eine Aufgabe ist offen: ' : t.length + ' Aufgaben sind offen, zuerst: ')
+        : e + ' von ' + t.length + ' Aufgaben ' + (e === 1 ? 'ist' : 'sind') + ' erledigt. Offen: ')
+        + rgListe(offen.slice(0, 2).map(rgKarte)) + (offen.length > 2 ? ' und ' + (offen.length - 2) + ' weitere' : '') + '. ';
+    /* Zwischenziel und Ergebnis der Phase (ohne Gesamtziel/Erfolg und ohne Berichts-Schnappschüsse) */
+    const inPhase = lane => state.postits.filter(c => phaseIndexOfX(c.x) === i && laneKeyOfY(c.y) === lane);
+    const zz = inPhase('sache').filter(c => !/^\s*(🎯\s*Ziel:|✅\s*Erfolg:|❓)/u.test(c.text || '')).map(rgKarte).filter(Boolean);
+    const erg = inPhase('doku').filter(c => !c.doc && !/^\s*❓/u.test(c.text || '')).map(rgKarte).filter(Boolean);
+    if (zz.length) text = 'Zwischenziel: ' + rgListe(zz.slice(0, 2)) + '. ' + text;
+    if (erg.length) text += 'Dabei entsteht: ' + rgListe(erg.slice(0, 2)) + '. ';
+    if (risiken.length) text += 'Aufpassen: ' + rgListe(risiken.slice(0, 2).map(rgKarte)) + '. ';
+    if (fragen) text += fragen === 1 ? 'Eine Frage ist noch offen. ' : fragen + ' Fragen sind noch offen. ';
+    if (g) text += 'Am Ende entscheidet das Tor «' + torKurz(g) + '»' + (g.due ? ' am ' + rgDatum(g.due) : '') + '.';
+    S.push({ titel: 'Phase ' + (i + 1) + ' von ' + n + ': ' + p.name + (i === akt ? ' · hier stehst du' : ''), text: text.trim(), phase: i });
+  });
+  const beteiligt = anspruchKarten().filter(c => !/^\s*👥?\s*review/i.test(c.text || '')).map(rgKarte);
+  if (beteiligt.length) S.push({ titel: 'Wen es betrifft', lane: 'anspruch',
+    text: 'Betroffen sind ' + rgListe([...new Set(beteiligt)].slice(0, 5)) + ([...new Set(beteiligt)].length > 5 ? ' und weitere' : '') + '. Sie früh einzubeziehen, macht das Projekt einfacher.' });
+  const ns = naechsterSchritt(), nf = offeneFragen().length;
+  S.push({ titel: 'Wie es weitergeht', art: 'ende',
+    text: (f.total ? f.erledigt + ' von ' + f.total + ' Aufgaben ' + (f.erledigt === 1 ? 'ist' : 'sind') + ' erledigt. ' : '')
+      + 'Als Nächstes: ' + String(ns.txt || '').replace(/\.?$/, '.')
+      + (nf > 1 ? ' Insgesamt sind ' + nf + ' Fragen offen.' : '') });
+  return S;
+}
+/* Für die Stimme: keine Symbole, keine eckigen Klammern */
+function rgSprechText(t) { return String(t || '').replace(/[\p{Extended_Pictographic}️]/gu, '').replace(/[[\]«»]/g, '').replace(/\s+/g, ' ').trim(); }
+function rgDauer(t) { return Math.min(30000, 2600 + 60 * String(t || '').length); }
+function rgStimme() {
+  try {
+    const v = window.speechSynthesis.getVoices() || [];
+    return v.find(x => /^de-CH/i.test(x.lang)) || v.find(x => /^de-DE/i.test(x.lang)) || v.find(x => /^de/i.test(x.lang)) || null;
+  } catch (e) { return null; }
+}
+function rgStillsein() { clearTimeout(rg.timer); clearTimeout(rg.wecker); try { if (window.speechSynthesis) window.speechSynthesis.cancel(); } catch (e) {} }
+function rgStart() {
+  if (previewState || document.body.classList.contains('iv-on')) return;
+  if (!state.phases.length) { sysMsg('Für einen Rundgang braucht die Wand zuerst Phasen – zum Beispiel über das Interview.', true); return; }
+  closeModal(); if (document.getElementById('dash').style.display === 'block') closeDash();
+  rg.S = rgSchritte(); rg.i = 0; rg.an = true; rg.laeuft = true;
+  document.body.classList.add('rg-on');
+  document.getElementById('rg').style.display = 'block';
+  rgZeigen();
+}
+function rgEnde() {
+  rgStillsein(); rg.an = false; rg.laeuft = false;
+  document.body.classList.remove('rg-on');
+  document.getElementById('rg').style.display = 'none';
+  const f = document.getElementById('rgFokus'); if (f) f.remove();
+}
+function rgGehe(i) { if (!rg.an) return; rg.i = Math.max(0, Math.min(rg.S.length - 1, i)); rgZeigen(); }
+function rgZeigen() {
+  rgStillsein();
+  const s = rg.S[rg.i], n = rg.S.length, nr = ++rg.nr;
+  document.getElementById('rgZahl').textContent = (rg.i + 1) + ' / ' + n;
+  document.getElementById('rgTitel').textContent = s.titel;
+  document.getElementById('rgText').textContent = s.text;
+  document.getElementById('rgBalken').style.width = Math.round((rg.i + 1) / n * 100) + '%';
+  document.getElementById('rgZurueck').disabled = rg.i === 0;
+  const pause = document.getElementById('rgPause');
+  pause.textContent = rg.laeuft ? 'Pause' : (rg.i === n - 1 ? 'Nochmals' : 'Abspielen');
+  pause.classList.toggle('rg-play', !rg.laeuft);
+  document.getElementById('rgTon').textContent = rg.ton ? 'Vorlesen: an' : 'Vorlesen: aus';
+  rgFokus(true);
+  if (!rg.laeuft) return;
+  const weiter = () => {
+    if (nr !== rg.nr || !rg.an || !rg.laeuft) return;
+    if (rg.i < n - 1) rg.wecker = setTimeout(() => { if (nr === rg.nr && rg.laeuft) rgGehe(rg.i + 1); }, 900);
+    else { rg.laeuft = false; rgZeigenKnopf(); }
+  };
+  const ss = window.speechSynthesis;
+  if (rg.ton && ss && window.SpeechSynthesisUtterance) {
+    const u = new SpeechSynthesisUtterance(rgSprechText(s.titel.replace(/ · hier stehst du$/, '') + '. ' + s.text));
+    const v = rgStimme(); u.lang = v ? v.lang : 'de-CH'; if (v) u.voice = v; u.rate = 0.95;
+    let fertig = false; const einmal = () => { if (!fertig) { fertig = true; weiter(); } };
+    u.onend = einmal; u.onerror = einmal;
+    try { ss.speak(u); } catch (e) { einmal(); }
+    rg.timer = setTimeout(einmal, rgDauer(s.text) * 2 + 6000); // Sicherheitsnetz: manche Browser melden das Ende nie
+  } else rg.timer = setTimeout(weiter, rgDauer(s.text));
+}
+function rgZeigenKnopf() { const p = document.getElementById('rgPause'); p.textContent = 'Nochmals'; p.classList.add('rg-play'); }
+/* Die besprochene Phase (oder Ebene) anfahren und hervorheben – wird nach jedem render() neu gezeichnet */
+function rgFokus(fahren) {
+  if (!rg.an) return;
+  const s = rg.S[rg.i]; if (!s) return;
+  let f = document.getElementById('rgFokus');
+  if (!f) { f = document.createElement('div'); f.id = 'rgFokus'; f.setAttribute('aria-hidden', 'true'); canvas.appendChild(f); }
+  const sc = document.getElementById('wallScroll');
+  const ziel = (l, t, w, h) => { f.style.display = 'block'; f.style.left = l + 'px'; f.style.top = t + 'px'; f.style.width = w + 'px'; f.style.height = h + 'px'; };
+  let x = 0, y = 0;
+  if (typeof s.phase === 'number' && state.phases[s.phase]) {
+    ziel(LABEL_W + phaseLeft(s.phase), 0, state.phases[s.phase].w, HEADER_H + canvasH());
+    x = LABEL_W + phaseLeft(s.phase) - 24;
+  } else if (s.lane && laneKeys().includes(s.lane)) {
+    const li = laneKeys().indexOf(s.lane);
+    ziel(LABEL_W, HEADER_H + li * LANE_H, canvasW(), LANE_H);
+    y = HEADER_H + li * LANE_H - 40;
+  } else f.style.display = 'none';
+  if (fahren) {
+    try { sc.scrollTo({ left: Math.max(0, x - LABEL_W), top: Math.max(0, y), behavior: 'smooth' }); }
+    catch (e) { sc.scrollLeft = Math.max(0, x - LABEL_W); sc.scrollTop = Math.max(0, y); }
+  }
+}
+document.getElementById('rgZu').onclick = rgEnde;
+document.getElementById('rgZurueck').onclick = () => rgGehe(rg.i - 1);
+document.getElementById('rgWeiter').onclick = () => { if (rg.i < rg.S.length - 1) rgGehe(rg.i + 1); };
+document.getElementById('rgPause').onclick = () => {
+  if (rg.laeuft) { rg.laeuft = false; rgStillsein(); rgZeigen(); return; }
+  rg.laeuft = true;
+  if (rg.i === rg.S.length - 1 && document.getElementById('rgPause').textContent === 'Nochmals') rg.i = 0;
+  rgZeigen();
+};
+document.getElementById('rgTon').onclick = () => { rg.ton = !rg.ton; rgZeigen(); };
+document.addEventListener('keydown', e => {
+  if (!rg.an || overlay.style.display === 'flex' || /input|textarea|select/i.test((e.target && e.target.tagName) || '')) return;
+  if (e.key === 'ArrowRight') { e.preventDefault(); document.getElementById('rgWeiter').click(); }
+  else if (e.key === 'ArrowLeft') { e.preventDefault(); rgGehe(rg.i - 1); }
+});
 
 /* ================================================================
    V73: FOTO DER PAPIERWAND → DIGITALE WAND (Wunsch Dölf 01.11.2026,
@@ -7136,6 +7305,7 @@ async function startApp(user) {
   await loadFromCloud();
   if (new URLSearchParams(location.search).has('agenten')) { agentenWandOeffnen(); return; }
   if (new URLSearchParams(location.search).has('interview')) { openInterview(); return; }
+  if (new URLSearchParams(location.search).has('rundgang')) { setTimeout(rgStart, 400); return; }
   if (mitgenommeneWand()) return;
   startAutoAnzeigen();
 }
@@ -7157,6 +7327,7 @@ async function initAuth() {
     sysMsg('🧪 Übungs-Modus: Das Beispielprojekt «Quartier-Gemeinschaftsgarten» ist geladen – klick dich frei durch, kaputt geht nichts. Nichts wird gespeichert: Beim Neuladen beginnt die Übung frisch. Für richtiges Arbeiten die Seite ohne Zusatz öffnen und ein Konto erstellen.', true);
     if (new URLSearchParams(location.search).has('interview')) openInterview();
     else if (new URLSearchParams(location.search).has('fahrplan')) ladeFahrplanBeispiel();
+    else if (new URLSearchParams(location.search).has('rundgang')) setTimeout(rgStart, 600);
     return;
   }
   if (!window.supabase) {
