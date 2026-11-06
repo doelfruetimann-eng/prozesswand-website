@@ -5,19 +5,19 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Prozesswand – Projekte planen mit KI, einfach wie an der Moderationswand</title>
 <meta name="description" content="Die Prozesswand: Projekte planen wie an der Moderationswand – mit KI-Hilfe, SMART-Zielen, Entscheid-Toren und fertigen Word/Excel-Dokumenten. Gratis ausprobierbar im Browser – Schweizer Werkzeug, mit Beispielprojekt ohne Anmeldung.">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧱</text></svg>">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 22 22'><rect width='22' height='22' rx='6' fill='%23651B32'/><rect x='5' y='5' width='12' height='12' rx='1' fill='%23fff' fill-opacity='.85'/><rect x='7' y='7' width='8' height='8' fill='%23651B32'/></svg>">
 <link rel="canonical" href="https://prozesswand.ch/">
 <meta name="google-site-verification" content="vSEblUxHxWL9DtvPSEYak1JLM9y_YLTcIVV-7Aersgo">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://prozesswand.ch/">
 <meta property="og:title" content="Prozesswand – dein Projekt auf einen Blick">
 <meta property="og:description" content="Projekte planen wie an der Moderationswand – mit KI-Hilfe, Entscheid-Toren und fertigen Dokumenten. Kostenlos im Browser, Beispielprojekt ohne Anmeldung.">
-<meta property="og:image" content="https://prozesswand.ch/og.png">
+<meta property="og:image" content="https://prozesswand.ch/og.png?v=0611">
 <meta property="og:locale" content="de_CH">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Prozesswand – dein Projekt auf einen Blick">
 <meta name="twitter:description" content="Projekte planen wie an der Moderationswand – mit KI-Hilfe, Entscheid-Toren und fertigen Dokumenten.">
-<meta name="twitter:image" content="https://prozesswand.ch/og.png">
+<meta name="twitter:image" content="https://prozesswand.ch/og.png?v=0611">
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -53,6 +53,7 @@ nav { position:sticky; top:0; z-index:50; background:#fff; border-bottom:1px sol
       padding:10px clamp(14px,4vw,32px); }
 .nav-logo { font-weight:700; font-size:19px; color:var(--bordeaux); text-decoration:none;
             display:flex; align-items:center; gap:8px; min-height:44px; }
+.nav-logo img { display:block; height:28px; width:auto; }  /* dasselbe Logo wie im Tool */
 .nav-links { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
 a.btn { display:inline-flex; align-items:center; justify-content:center; gap:8px;
         text-decoration:none; font-weight:700; border-radius:10px;
@@ -146,6 +147,8 @@ details[open] > summary::before { content:"▾"; }
 .preise { display:grid; grid-template-columns:repeat(auto-fill,minmax(min(280px,100%),1fr)); gap:16px; }
 .preise > div { border:1px solid var(--linie); border-radius:12px; padding:18px 20px; font-size:15.5px; }
 .preise b.kopf { color:var(--bordeaux); display:block; margin-bottom:6px; font-size:17px; }
+.preise .zeichen { display:inline-block; width:17px; height:17px; margin-right:7px; vertical-align:-2px;
+                   background:url(bilder/logo-zeichen.svg) center/contain no-repeat; }
 
 /* FAQ */
 .faq details { border-bottom:1px solid var(--linie); }
@@ -186,10 +189,10 @@ footer .flinks a { min-height:44px; display:inline-flex; align-items:center; tex
 <a class="skip" href="#inhalt">Zum Inhalt springen</a>
 
 <nav aria-label="Hauptnavigation">
-  <a class="nav-logo" href="/">🧱 Prozesswand</a>
+  <a class="nav-logo" href="/"><img src="bilder/logo.svg" alt="Prozesswand" width="164" height="28"></a>
   <div class="nav-links">
     <a class="nav-an" href="prozesswand.html">Anmelden</a>
-    <a class="btn btn-voll" href="prozesswand.html?beispiel=1&amp;v=76">Beispiel ansehen</a>
+    <a class="btn btn-voll" href="prozesswand.html?beispiel=1&amp;v=77">Beispiel ansehen</a>
   </div>
 </nav>
 
@@ -199,7 +202,7 @@ footer .flinks a { min-height:44px; display:inline-flex; align-items:center; tex
      ohne Projektprofi zu sein: Schreib dein Ziel in eigenen Worten – die KI baut Phasen,
      Aufgaben und Entscheid-Tore. <b>Entscheiden tust du.</b></p>
   <div class="btnrow">
-    <a class="btn btn-hell" href="prozesswand.html?beispiel=1&amp;v=76">🧪 Beispielprojekt ansehen – ohne Anmeldung</a>
+    <a class="btn btn-hell" href="prozesswand.html?beispiel=1&amp;v=77">🧪 Beispielprojekt ansehen – ohne Anmeldung</a>
     <a class="btn btn-invert" href="prozesswand.html">Eigene Wand starten</a>
   </div>
   <p class="hero-note">Läuft im Browser · nichts zu installieren · Übungs-Modus speichert nichts ·
@@ -222,7 +225,7 @@ footer .flinks a { min-height:44px; display:inline-flex; align-items:center; tex
 <main id="inhalt">
 
   <p style="text-align:center;margin:22px 0 0">
-    <a class="btn btn-voll" href="prozesswand.html?beispiel=1&amp;v=76">🧪 Gleich selbst ausprobieren: Beispielprojekt öffnen – ohne Anmeldung</a>
+    <a class="btn btn-voll" href="prozesswand.html?beispiel=1&amp;v=77">🧪 Gleich selbst ausprobieren: Beispielprojekt öffnen – ohne Anmeldung</a>
   </p>
 
   <section aria-labelledby="h-problem">
@@ -286,7 +289,7 @@ footer .flinks a { min-height:44px; display:inline-flex; align-items:center; tex
         <p>Genau diese Wand kannst du jetzt öffnen und verändern: Karten verschieben,
         Aufgaben abhaken, das Dashboard erkunden. Ohne Anmeldung, ohne Spuren –
         beim Neuladen ist alles wieder frisch.</p>
-        <p><a class="btn btn-voll" href="prozesswand.html?beispiel=1&amp;v=76">🧪 Beispielprojekt öffnen</a></p>
+        <p><a class="btn btn-voll" href="prozesswand.html?beispiel=1&amp;v=77">🧪 Beispielprojekt öffnen</a></p>
       </div>
     </div>
   </section>
@@ -301,7 +304,7 @@ footer .flinks a { min-height:44px; display:inline-flex; align-items:center; tex
         <video src="videos/kurs1.mp4?v=0611c" controls preload="metadata" playsinline poster="bilder/kurs1-poster.jpg?v=0611c" aria-label="Video Teil 1: Der Überblick"></video>
         <b>Teil 1 · Der Überblick (1:46)</b>
         <span>Projekt aus dem KI-Chat, Interview, Wand und Wegweiser, Priorisieren, Projekt-Analyse, Rundgang, Foto einer Papierwand</span>
-        <a class="btn btn-rand" href="prozesswand.html?beispiel=1&amp;v=76">▶ Selbst ausprobieren: Beispielprojekt öffnen</a>
+        <a class="btn btn-rand" href="prozesswand.html?beispiel=1&amp;v=77">▶ Selbst ausprobieren: Beispielprojekt öffnen</a>
       </div>
       <div class="vliste">
         <details ontoggle="if(!this.open)this.querySelector('video').pause()"><summary>Teil 2 · Ein Projekt starten: das Interview <small>(1:06)</small></summary><video src="videos/kurs2.mp4?v=0611c" controls preload="none" playsinline aria-label="Video Teil 2: Ein Projekt starten – das Interview"></video></details>
@@ -343,7 +346,7 @@ footer .flinks a { min-height:44px; display:inline-flex; align-items:center; tex
     direkt (typisch wenige Rappen pro Anwendung). Die Preise unten sind geplant –
     deine Meinung dazu interessiert mich.</p>
     <div class="preise">
-      <div><b class="kopf">🧱 Prozesswand</b>Eine Wand: <b>gratis</b> – mit allen Kernfunktionen.<br>
+      <div><b class="kopf"><span class="zeichen" aria-hidden="true"></span>Prozesswand</b>Eine Wand: <b>gratis</b> – mit allen Kernfunktionen.<br>
       Mehrere Wände + Portfolio-Übersicht: <b>CHF 9/Monat</b> (oder CHF 90/Jahr).</div>
       <div><b class="kopf">📋 Umfrage-Modul</b>Umfragen bis 30 Antworten: <b>gratis</b>.<br>
       Grosse Umfragen + KI-Umfrage mit Nachfragen: <b>CHF 19 pro Umfrage</b>.</div>
@@ -394,7 +397,7 @@ footer .flinks a { min-height:44px; display:inline-flex; align-items:center; tex
     <p class="sub">Das Beispielprojekt läuft sofort im Browser – ohne Anmeldung,
     ohne Installation, ohne Spuren.</p>
     <div class="btnrow">
-      <a class="btn btn-hell" href="prozesswand.html?beispiel=1&amp;v=76">🧪 Beispielprojekt ansehen</a>
+      <a class="btn btn-hell" href="prozesswand.html?beispiel=1&amp;v=77">🧪 Beispielprojekt ansehen</a>
       <a class="btn btn-invert" href="prozesswand.html">Eigene Wand starten</a>
     </div>
   </section>
