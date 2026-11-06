@@ -202,16 +202,19 @@ footer .flinks a { min-height:44px; display:inline-flex; align-items:center; tex
   <p class="hero-note">Läuft im Browser · nichts zu installieren · Übungs-Modus speichert nichts ·
   für die KI-Funktionen brauchst du zurzeit einen eigenen KI-Schlüssel</p>
   <div class="hero-bild">
-    <video src="videos/werbevideo.mp4" controls preload="metadata" playsinline
-           poster="bilder/wand-beispiel.png" width="1280" height="720"
-           aria-label="Werbevideo: Die Prozesswand in einer Minute – vom Ziel zur fertigen Projektwand"></video>
+    <video src="videos/werbevideo.mp4?v=2611" autoplay muted loop playsinline controls preload="metadata"
+           poster="bilder/werbevideo-poster.jpg" width="1280" height="720"
+           aria-label="Werbevideo ohne Ton, 47 Sekunden: Foto einer Papierwand, Projekt aus dem KI-Chat, Interview, Priorisieren, Projekt-Analyse und Rundgang – dann in vier Schritten ans Ziel"></video>
   </div>
+  <script>/* Wer weniger Bewegung eingestellt hat, startet das Video selbst */
+    (function () { var v = document.querySelector('.hero-bild video');
+      if (v && window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) { v.removeAttribute('autoplay'); v.pause(); } })();</script>
 </header>
 
 <main id="inhalt">
 
   <p style="text-align:center;margin:22px 0 0">
-    <a class="btn btn-voll" href="prozesswand.html?beispiel=1&amp;v=75">🧪 Der Link aus dem Video: Beispielprojekt öffnen – ohne Anmeldung</a>
+    <a class="btn btn-voll" href="prozesswand.html?beispiel=1&amp;v=75">🧪 Gleich selbst ausprobieren: Beispielprojekt öffnen – ohne Anmeldung</a>
   </p>
 
   <section aria-labelledby="h-problem">
@@ -283,22 +286,19 @@ footer .flinks a { min-height:44px; display:inline-flex; align-items:center; tex
   <div class="trenner" role="presentation"><span></span><span></span><span></span><span></span></div>
 
   <section id="kurs" aria-labelledby="h-kurs">
-    <h2 id="h-kurs">Der Grundkurs in 7 kurzen Videos</h2>
-    <p class="sub">Zusammen rund 9 Minuten – mit Sprecherstimme und Untertiteln. Teil 1 reicht für den Start.</p>
+    <h2 id="h-kurs">Der Grundkurs in 4 kurzen Videos</h2>
+    <p class="sub">Zusammen rund 4½ Minuten. Teil 1 mit Sprecherstimme, die Vertiefungen mit Untertiteln. Teil 1 reicht für den Start.</p>
     <div class="kurs1">
       <div class="vgross">
-        <video src="videos/teil1.mp4" controls preload="metadata" aria-label="Video Teil 1: Die Grundlagen"></video>
-        <b>Teil 1 · Die Grundlagen (1:24)</b>
-        <span>Wand, Karten, Auftrag, Tore, Dashboard, Wörterbuch</span>
-        <a class="btn btn-rand" href="prozesswand.html?beispiel=1&amp;v=75">▶ Der Link aus dem Video: Beispielprojekt öffnen</a>
+        <video src="videos/kurs1.mp4?v=2611" controls preload="metadata" playsinline poster="bilder/kurs1-poster.jpg" aria-label="Video Teil 1: Der Überblick"></video>
+        <b>Teil 1 · Der Überblick (1:51)</b>
+        <span>Projekt aus dem KI-Chat, Interview, Wand und Wegweiser, Priorisieren, Projekt-Analyse, Rundgang, Foto einer Papierwand</span>
+        <a class="btn btn-rand" href="prozesswand.html?beispiel=1&amp;v=75">▶ Selbst ausprobieren: Beispielprojekt öffnen</a>
       </div>
       <div class="vliste">
-        <details ontoggle="if(!this.open)this.querySelector('video').pause()"><summary>Teil 2 · Neues Projekt mit KI <small>(1:12)</small></summary><video src="videos/teil2.mp4" controls preload="none" aria-label="Video Teil 2: Neues Projekt mit KI"></video></details>
-        <details ontoggle="if(!this.open)this.querySelector('video').pause()"><summary>Teil 3 · Das Dashboard <small>(1:04)</small></summary><video src="videos/teil3.mp4" controls preload="none" aria-label="Video Teil 3: Das Dashboard"></video></details>
-        <details ontoggle="if(!this.open)this.querySelector('video').pause()"><summary>Teil 4 · Dokumente &amp; Exporte <small>(0:51)</small></summary><video src="videos/teil4.mp4" controls preload="none" aria-label="Video Teil 4: Dokumente und Exporte"></video></details>
-        <details ontoggle="if(!this.open)this.querySelector('video').pause()"><summary>Teil 5 · Aufgaben an die KI <small>(1:03)</small></summary><video src="videos/teil5.mp4" controls preload="none" aria-label="Video Teil 5: Aufgaben an die KI"></video></details>
-        <details ontoggle="if(!this.open)this.querySelector('video').pause()"><summary>Teil 6 · Befragungen <small>(1:46)</small></summary><video src="videos/teil6.mp4" controls preload="none" aria-label="Video Teil 6: Befragungen"></video></details>
-        <details ontoggle="if(!this.open)this.querySelector('video').pause()"><summary>Teil 7 · Projekte aus dem Chat <small>(1:10)</small></summary><video src="videos/teil7.mp4" controls preload="none" aria-label="Video Teil 7: Projekte aus dem Chat"></video></details>
+        <details ontoggle="if(!this.open)this.querySelector('video').pause()"><summary>Teil 2 · Ein Projekt starten: das Interview <small>(1:00)</small></summary><video src="videos/kurs2.mp4?v=2611" controls preload="none" playsinline aria-label="Video Teil 2: Ein Projekt starten – das Interview"></video></details>
+        <details ontoggle="if(!this.open)this.querySelector('video').pause()"><summary>Teil 3 · Die Wand im Alltag: Übersicht und Priorisieren <small>(0:56)</small></summary><video src="videos/kurs3.mp4?v=2611" controls preload="none" playsinline aria-label="Video Teil 3: Die Wand im Alltag – Übersicht und Priorisieren"></video></details>
+        <details ontoggle="if(!this.open)this.querySelector('video').pause()"><summary>Teil 4 · Berichte und Dokumente <small>(0:48)</small></summary><video src="videos/kurs4.mp4?v=2611" controls preload="none" playsinline aria-label="Video Teil 4: Berichte und Dokumente"></video></details>
       </div>
     </div>
   </section>
