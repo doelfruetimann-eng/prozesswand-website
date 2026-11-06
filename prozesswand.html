@@ -301,7 +301,7 @@ body.iv-on #main { margin-left:460px; }
 body.einfach #guideBtn, body.einfach #wegBtn, body.einfach #glossarBtn, body.einfach #boardMenu,
 body.einfach #addPhase, body.einfach #addMs, body.einfach #connectBtn, body.einfach #viewSeg, body.einfach #fsBtn,
 body.einfach #checkBtn, body.einfach #docsBtn, body.einfach #exportBtn, body.einfach #kiWipe, body.einfach #keyBtn,
-body.einfach #smartBtn, body.einfach #prioBtn, body.einfach .phase-fit { display:none !important; }
+body.einfach #smartBtn, body.einfach #prioBtn, body.einfach .phase-fit { display:none !important; } /* V76: Priorisieren steht in der einfachen Ansicht unter «Was willst du erstellen?» */
 body.einfach header .sub { font-size:0; }
 body.einfach header .sub b { font-size:11px; }
 body.einfach .lane-label b { font-size:12.5px; }
@@ -646,7 +646,7 @@ body.rg-on #wegLeiste { display:none; }
 <script>
 "use strict";
 
-const APP_VERSION = 'V75';
+const APP_VERSION = 'V76';
 /* V49: einheitlicher Wegweiser nach jedem «An Claude kopieren» */
 function claudeHinweis() {
   sysMsg('📋 Kopiert! Jetzt: 1. Claude öffnen (claude.ai bzw. deine Prozesswand-Sitzung) → 2. ins Schreibfeld klicken → 3. Cmd+V (einfügen) → 4. Senden. Mehr braucht es nicht.', true);
@@ -5940,6 +5940,13 @@ function wwOptionen() {
     vorher: erledigt ? [] : ['Noch keine Aufgabe erledigt – der Bericht zeigt dann vor allem den Plan'], trotzdem: true, knopf: 'Erstellen' });
   L.push({ id: 'analyse', ic: '📈', titel: 'Projekt-Analyse mit Grafiken', satz: 'Ein Bericht zum Zeigen: Zeitplan, Fortschritt, Risiko-Matrix, Beteiligte, Systeme und nächste Schritte. Als PDF speicherbar.',
     vorher: [].concat(state.goal ? [] : ['Ziel unten in der Zielleiste eintragen'], ki ? [] : ['Für Texte und Schätzungen: Gratis-Konto (ohne geht es auch, dann bleiben sie [offen])']), trotzdem: true, knopf: 'Erstellen' });
+  /* V76 (Wunsch Dölf 06.11.2026): Priorisieren auch in der einfachen Ansicht – hier statt als
+     elfter Knopf (Messlatte max. 10 Knöpfe, Handy-Breite). Ergebnis: P1, P2 … auf den Karten
+     und ein Schnappschuss «📄 Priorisierung vom …» auf der Dokumentationsebene. */
+  const prioN = prioKarten().length, p1 = state.postits.find(c => c.rang === 1 && istArbeitsLane(laneKeyOfY(c.y)));
+  L.push({ id: 'prio', ic: '📊', titel: 'Priorisieren: Was ist am wichtigsten?', satz: 'Du bringst die Aufgaben in eine Reihenfolge – P1 kommt zuerst. Ohne KI, nur dein Urteil. Die Ränge stehen danach auf den Karten.',
+    vorher: prioN >= 2 ? [] : ['Mindestens zwei Aufgaben auf der Ebene «Was zu tun ist»'],
+    hinweis: p1 ? 'Zurzeit P1: ' + cleanTxt(p1.text).slice(0, 70) : '', knopf: 'Ordnen' });
   L.push({ id: 'rundgang', ic: '▶', titel: 'Rundgang durch das Projekt', satz: 'Die Wand stellt dein Projekt Phase für Phase vor und liest es vor. Gut für Sitzungen – oder den Bildschirm dabei aufnehmen, dann hast du ein Erklärvideo.',
     vorher: state.goal ? [] : ['Ziel unten in der Zielleiste eintragen'], trotzdem: true, knopf: 'Starten' });
   L.push({ id: 'termin', ic: '🗓', titel: 'Terminplan (Excel)', satz: 'Phasen und Entscheid-Tore auf einer Zeitachse.',
@@ -5952,7 +5959,7 @@ function wwOptionen() {
 }
 function openWasWillst() {
   if (previewState) return;
-  const IK = { fahrplan: 'coins', auftrag: 'doc', stand: 'chart', analyse: 'layout', rundgang: 'play', termin: 'cal', ki: 'spark', alle: 'folder', sicherung: 'save' };
+  const IK = { fahrplan: 'coins', auftrag: 'doc', stand: 'chart', prio: 'sliders', analyse: 'layout', rundgang: 'play', termin: 'cal', ki: 'spark', alle: 'folder', sicherung: 'save' };
   const h = wwOptionen().map(o => '<div class="ww-opt"><span class="ww-ic" style="--i:var(--ic-' + (IK[o.id] || 'doc') + ')" aria-hidden="true">' + o.ic + '</span><div class="ww-body"><b>' + esc(o.titel) + '</b><p>' + esc(o.satz) + '</p>'
     + (o.vorher.length
       ? '<div class="ww-vorher">&#9888; Vorher noch: ' + o.vorher.map(esc).join(' &middot; ') + (o.trotzdem ? ' &ndash; erstellen geht trotzdem.' : '') + '</div>'
@@ -5982,6 +5989,7 @@ function wwErstellen(id) {
   }
   if (id === 'analyse') { openAnalyse(); return; }
   if (id === 'rundgang') { rgStart(); return; }
+  if (id === 'prio') { openPrio(); return; }
   if (id === 'termin') { downloadXls('Terminplan - ' + name + '.xls', genTermin()); return; }
   if (id === 'abschluss') { downloadDoc('Abschlussbericht - ' + name + '.doc', genAbschluss()); return; }
   if (id === 'ki') { document.getElementById('swarmBtn').click(); return; }

@@ -75,7 +75,10 @@ a.btn-invert:hover { background:rgba(255,255,255,.16); }
 .hero h1 { margin:0 auto 14px; max-width:820px; font-size:clamp(32px,5.6vw,52px); line-height:1.12; letter-spacing:.2px; }
 .hero p { margin:0 auto 28px; max-width:660px; font-size:clamp(17px,2.3vw,20px); opacity:.95; }
 .btnrow { display:flex; gap:12px; justify-content:center; flex-wrap:wrap; }
-.hero-bild { max-width:1080px; margin:38px auto -1px; padding:0; }
+.hero-bild { max-width:1080px; margin:38px auto -1px; padding:0; position:relative; }
+.ton-an { position:absolute; right:14px; top:14px; z-index:2; display:inline-flex; align-items:center; gap:8px; min-height:44px; padding:10px 16px;
+          border:0; border-radius:999px; background:#fff; color:#651B32; font-weight:700; font-size:15px; font-family:inherit; cursor:pointer; box-shadow:0 4px 16px rgba(0,0,0,.3); }
+.ton-an:hover { background:#F3EBEE; }
 .hero-bild img, .hero-bild video { display:block; width:100%; height:auto; border-radius:14px 14px 0 0;
                  box-shadow:0 -6px 40px rgba(0,0,0,.35); background:#000; }
 .hero-note { font-size:14.5px; opacity:.8; margin:14px 0 0; }
@@ -186,7 +189,7 @@ footer .flinks a { min-height:44px; display:inline-flex; align-items:center; tex
   <a class="nav-logo" href="/">🧱 Prozesswand</a>
   <div class="nav-links">
     <a class="nav-an" href="prozesswand.html">Anmelden</a>
-    <a class="btn btn-voll" href="prozesswand.html?beispiel=1&amp;v=75">Beispiel ansehen</a>
+    <a class="btn btn-voll" href="prozesswand.html?beispiel=1&amp;v=76">Beispiel ansehen</a>
   </div>
 </nav>
 
@@ -196,25 +199,30 @@ footer .flinks a { min-height:44px; display:inline-flex; align-items:center; tex
      ohne Projektprofi zu sein: Schreib dein Ziel in eigenen Worten – die KI baut Phasen,
      Aufgaben und Entscheid-Tore. <b>Entscheiden tust du.</b></p>
   <div class="btnrow">
-    <a class="btn btn-hell" href="prozesswand.html?beispiel=1&amp;v=75">🧪 Beispielprojekt ansehen – ohne Anmeldung</a>
+    <a class="btn btn-hell" href="prozesswand.html?beispiel=1&amp;v=76">🧪 Beispielprojekt ansehen – ohne Anmeldung</a>
     <a class="btn btn-invert" href="prozesswand.html">Eigene Wand starten</a>
   </div>
   <p class="hero-note">Läuft im Browser · nichts zu installieren · Übungs-Modus speichert nichts ·
   für die KI-Funktionen brauchst du zurzeit einen eigenen KI-Schlüssel</p>
   <div class="hero-bild">
-    <video src="videos/werbevideo.mp4?v=2611" autoplay muted loop playsinline controls preload="metadata"
-           poster="bilder/werbevideo-poster.jpg" width="1280" height="720"
-           aria-label="Werbevideo ohne Ton, 47 Sekunden: Foto einer Papierwand, Projekt aus dem KI-Chat, Interview, Priorisieren, Projekt-Analyse und Rundgang – dann in vier Schritten ans Ziel"></video>
+    <video src="videos/werbevideo.mp4?v=0611b" autoplay muted loop playsinline controls preload="metadata"
+           poster="bilder/werbevideo-poster.jpg?v=0611b" width="1280" height="720"
+           aria-label="Werbevideo, 50 Sekunden, mit Sprecherin (startet ohne Ton): Foto einer Papierwand, Projekt aus dem KI-Chat, Interview, Priorisieren, Projekt-Analyse und Rundgang – dann in vier Schritten ans Ziel"></video>
+    <button class="ton-an" type="button" hidden>🔊 Mit Ton ansehen</button>
   </div>
-  <script>/* Wer weniger Bewegung eingestellt hat, startet das Video selbst */
-    (function () { var v = document.querySelector('.hero-bild video');
-      if (v && window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) { v.removeAttribute('autoplay'); v.pause(); } })();</script>
+  <script>/* Wer weniger Bewegung eingestellt hat, startet das Video selbst. «Mit Ton ansehen» startet es von vorn mit Ton. */
+    (function () { var v = document.querySelector('.hero-bild video'), t = document.querySelector('.ton-an');
+      if (!v) return;
+      if (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) { v.removeAttribute('autoplay'); v.pause(); }
+      if (t) { t.hidden = false;
+        t.onclick = function () { v.muted = false; v.loop = false; v.currentTime = 0; var p = v.play(); if (p && p.catch) p.catch(function () {}); t.hidden = true; };
+        v.addEventListener('volumechange', function () { if (!v.muted) t.hidden = true; }); } })();</script>
 </header>
 
 <main id="inhalt">
 
   <p style="text-align:center;margin:22px 0 0">
-    <a class="btn btn-voll" href="prozesswand.html?beispiel=1&amp;v=75">🧪 Gleich selbst ausprobieren: Beispielprojekt öffnen – ohne Anmeldung</a>
+    <a class="btn btn-voll" href="prozesswand.html?beispiel=1&amp;v=76">🧪 Gleich selbst ausprobieren: Beispielprojekt öffnen – ohne Anmeldung</a>
   </p>
 
   <section aria-labelledby="h-problem">
@@ -278,7 +286,7 @@ footer .flinks a { min-height:44px; display:inline-flex; align-items:center; tex
         <p>Genau diese Wand kannst du jetzt öffnen und verändern: Karten verschieben,
         Aufgaben abhaken, das Dashboard erkunden. Ohne Anmeldung, ohne Spuren –
         beim Neuladen ist alles wieder frisch.</p>
-        <p><a class="btn btn-voll" href="prozesswand.html?beispiel=1&amp;v=75">🧪 Beispielprojekt öffnen</a></p>
+        <p><a class="btn btn-voll" href="prozesswand.html?beispiel=1&amp;v=76">🧪 Beispielprojekt öffnen</a></p>
       </div>
     </div>
   </section>
@@ -287,18 +295,18 @@ footer .flinks a { min-height:44px; display:inline-flex; align-items:center; tex
 
   <section id="kurs" aria-labelledby="h-kurs">
     <h2 id="h-kurs">Der Grundkurs in 4 kurzen Videos</h2>
-    <p class="sub">Zusammen rund 4½ Minuten. Teil 1 mit Sprecherstimme, die Vertiefungen mit Untertiteln. Teil 1 reicht für den Start.</p>
+    <p class="sub">Zusammen knapp 5 Minuten – alle mit Sprecherin und Untertiteln. Teil 1 reicht für den Start.</p>
     <div class="kurs1">
       <div class="vgross">
-        <video src="videos/kurs1.mp4?v=2611" controls preload="metadata" playsinline poster="bilder/kurs1-poster.jpg" aria-label="Video Teil 1: Der Überblick"></video>
-        <b>Teil 1 · Der Überblick (1:51)</b>
+        <video src="videos/kurs1.mp4?v=0611b" controls preload="metadata" playsinline poster="bilder/kurs1-poster.jpg?v=0611b" aria-label="Video Teil 1: Der Überblick"></video>
+        <b>Teil 1 · Der Überblick (1:44)</b>
         <span>Projekt aus dem KI-Chat, Interview, Wand und Wegweiser, Priorisieren, Projekt-Analyse, Rundgang, Foto einer Papierwand</span>
-        <a class="btn btn-rand" href="prozesswand.html?beispiel=1&amp;v=75">▶ Selbst ausprobieren: Beispielprojekt öffnen</a>
+        <a class="btn btn-rand" href="prozesswand.html?beispiel=1&amp;v=76">▶ Selbst ausprobieren: Beispielprojekt öffnen</a>
       </div>
       <div class="vliste">
-        <details ontoggle="if(!this.open)this.querySelector('video').pause()"><summary>Teil 2 · Ein Projekt starten: das Interview <small>(1:00)</small></summary><video src="videos/kurs2.mp4?v=2611" controls preload="none" playsinline aria-label="Video Teil 2: Ein Projekt starten – das Interview"></video></details>
-        <details ontoggle="if(!this.open)this.querySelector('video').pause()"><summary>Teil 3 · Die Wand im Alltag: Übersicht und Priorisieren <small>(0:56)</small></summary><video src="videos/kurs3.mp4?v=2611" controls preload="none" playsinline aria-label="Video Teil 3: Die Wand im Alltag – Übersicht und Priorisieren"></video></details>
-        <details ontoggle="if(!this.open)this.querySelector('video').pause()"><summary>Teil 4 · Berichte und Dokumente <small>(0:48)</small></summary><video src="videos/kurs4.mp4?v=2611" controls preload="none" playsinline aria-label="Video Teil 4: Berichte und Dokumente"></video></details>
+        <details ontoggle="if(!this.open)this.querySelector('video').pause()"><summary>Teil 2 · Ein Projekt starten: das Interview <small>(1:06)</small></summary><video src="videos/kurs2.mp4?v=0611b" controls preload="none" playsinline aria-label="Video Teil 2: Ein Projekt starten – das Interview"></video></details>
+        <details ontoggle="if(!this.open)this.querySelector('video').pause()"><summary>Teil 3 · Die Wand im Alltag: Übersicht und Priorisieren <small>(1:01)</small></summary><video src="videos/kurs3.mp4?v=0611b" controls preload="none" playsinline aria-label="Video Teil 3: Die Wand im Alltag – Übersicht und Priorisieren"></video></details>
+        <details ontoggle="if(!this.open)this.querySelector('video').pause()"><summary>Teil 4 · Berichte und Dokumente <small>(0:53)</small></summary><video src="videos/kurs4.mp4?v=0611b" controls preload="none" playsinline aria-label="Video Teil 4: Berichte und Dokumente"></video></details>
       </div>
     </div>
   </section>
@@ -386,7 +394,7 @@ footer .flinks a { min-height:44px; display:inline-flex; align-items:center; tex
     <p class="sub">Das Beispielprojekt läuft sofort im Browser – ohne Anmeldung,
     ohne Installation, ohne Spuren.</p>
     <div class="btnrow">
-      <a class="btn btn-hell" href="prozesswand.html?beispiel=1&amp;v=75">🧪 Beispielprojekt ansehen</a>
+      <a class="btn btn-hell" href="prozesswand.html?beispiel=1&amp;v=76">🧪 Beispielprojekt ansehen</a>
       <a class="btn btn-invert" href="prozesswand.html">Eigene Wand starten</a>
     </div>
   </section>
