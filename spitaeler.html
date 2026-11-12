@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Prozessaufnahme für Spitäler &middot; Prozesswand</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 22 22'><rect width='22' height='22' rx='5' fill='%23651B32'/><rect x='5' y='5' width='12' height='12' rx='2' fill='none' stroke='%23F3EBEE' stroke-width='2'/></svg>">
+<style>
+  :root { --bx:#651B32; --rose:#F3EBEE; --line:#d9cdd2; --muted:#6f5f66; --text:#2b2228; --gelb:#FFF6D5; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:Inter,Calibri,'Segoe UI',system-ui,Arial,sans-serif; background:var(--rose); color:var(--text); }
+  header { background:var(--bx); color:#fff; padding:18px 16px; }
+  header .in, main { max-width:860px; margin:0 auto; }
+  header h1 { margin:0; font-size:22px; }
+  header p { margin:4px 0 0; font-size:14.5px; opacity:.9; }
+  main { padding:16px; }
+  .karte { background:#fff; border-radius:12px; box-shadow:0 2px 12px rgba(0,0,0,.10); padding:18px 20px; margin-bottom:16px; }
+  h2 { font-size:17px; margin:0 0 4px; color:var(--bx); }
+  h2 .nr { display:inline-block; width:26px; height:26px; line-height:26px; text-align:center; border-radius:50%; background:var(--bx); color:#fff; font-size:14px; margin-right:8px; }
+  p { font-size:14.5px; line-height:1.5; margin:6px 0 10px; }
+  .klein { font-size:13px; color:var(--muted); }
+  input[type=text], textarea { width:100%; font:inherit; font-size:14.5px; padding:10px 12px; border:1px solid var(--line); border-radius:8px; }
+  label { display:block; font-size:13px; font-weight:700; color:var(--bx); margin:12px 0 4px; }
+  .gruppe { font-size:12.5px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); margin:14px 0 6px; }
+  .liste { display:grid; grid-template-columns:repeat(auto-fill, minmax(250px, 1fr)); gap:8px; }
+  .proz { text-align:left; font:inherit; font-size:14px; background:#fff; border:2px solid var(--line); border-radius:9px; padding:9px 11px; cursor:pointer; min-height:44px; }
+  .proz b { display:block; }
+  .proz span { font-size:12.5px; color:var(--muted); }
+  .proz:hover { border-color:var(--bx); }
+  .proz.gewaehlt { border-color:var(--bx); background:var(--rose); }
+  .knopf { display:inline-block; font:inherit; font-size:15.5px; font-weight:700; background:var(--bx); color:#fff; border:0; border-radius:9px; padding:12px 22px; cursor:pointer; text-decoration:none; min-height:44px; }
+  .knopf:hover { background:#7d2a42; }
+  .knopf.neben { background:#fff; color:var(--bx); border:2px solid var(--bx); }
+  .knopf[aria-disabled=true] { background:#b9aab0; cursor:not-allowed; pointer-events:none; }
+  .wahl { background:var(--gelb); border-left:4px solid var(--bx); border-radius:0 8px 8px 0; padding:10px 14px; font-size:14.5px; margin:10px 0 0; }
+  .hinweis { background:var(--gelb); border-radius:8px; padding:10px 14px; font-size:13.5px; line-height:1.5; }
+  details { font-size:14px; }
+  summary { cursor:pointer; font-weight:700; color:var(--bx); padding:4px 0; }
+  #linkAus { word-break:break-all; font-size:12.5px; background:var(--rose); border-radius:8px; padding:10px 12px; margin-top:10px; display:none; }
+  footer { max-width:860px; margin:0 auto; padding:0 16px 30px; font-size:12.5px; color:var(--muted); }
+  footer a { color:var(--bx); }
+  @media (max-width:560px) { header h1 { font-size:19px; } .knopf { width:100%; text-align:center; margin-bottom:8px; } }
+</style>
+</head>
+<body>
+<header><div class="in">
+  <h1>Prozessaufnahme für Spitäler</h1>
+  <p id="unter">Vom Gespräch zum Prozess nach BPMN 2.0 – in drei Schritten.</p>
+</div></header>
+
+<main>
+  <div class="karte">
+    <h2><span class="nr">1</span>Prozess wählen</h2>
+    <p id="wahlText">Welchen Prozess nimmst du auf? Tippe Nummer und Name ein.</p>
+    <input type="text" id="suche" placeholder="Suchen oder eintippen, z. B. 3.7.1 Gebäudeinstandhaltung" autocomplete="off">
+    <div id="prozesse"></div>
+    <div class="wahl" id="wahl" style="display:none"></div>
+  </div>
+
+  <div class="karte">
+    <h2><span class="nr">2</span>Interview mit der KI führen</h2>
+    <p>Ein KI-Interviewer fragt dich rund 20 Minuten lang zum Ablauf: Auslöser, Schritte, Ausnahmen und Kontrollen. Du sprichst einfach, wie du es einer neuen Kollegin erklären würdest. Das Gespräch wird aufgezeichnet.</p>
+    <p class="klein">Bitte keine Namen und keine Angaben zu Patientinnen und Patienten nennen – Funktionen genügen. Das Gespräch beendest du selbst mit dem Auflege-Knopf.</p>
+    <a class="knopf" id="interviewBtn" target="_blank" rel="noopener" aria-disabled="true" href="#">Interview starten</a>
+    <p class="klein" id="interviewInfo" style="margin-top:10px"></p>
+  </div>
+
+  <div class="karte">
+    <h2><span class="nr">3</span>Aus dem Gespräch die Wand bauen</h2>
+    <p>Die Abschrift des Gesprächs wird zur Prozesswand nach BPMN 2.0: eine Bahn pro Rolle, mit Start, Aufgaben, Entscheiden und Ende. Was im Gespräch offen blieb, steht als Frage auf der Wand. Von dort speicherst du die BPMN-2.0-Datei.</p>
+    <a class="knopf" id="wandBtn" aria-disabled="true" href="#">Wand öffnen und Abschrift einfügen</a>
+    <p class="klein" style="margin-top:10px">Dafür braucht es ein Konto in der Prozesswand. Die Abschrift bekommst du von der Person, die das Interview eingerichtet hat.</p>
+  </div>
+
+  <div class="karte">
+    <details id="einrichten">
+      <summary>Eigene Prozessliste einrichten (für die Koordination)</summary>
+      <p>Hier entsteht ein Link, der deine Prozessliste und deinen KI-Interviewer enthält. Die Liste wird <b>nicht auf dieser Website gespeichert</b> – sie steckt nur im Link. Gib ihn nur an die Personen weiter, die Prozesse aufnehmen.</p>
+      <label for="eTitel">Titel (z. B. Organisation und Bereich)</label>
+      <input type="text" id="eTitel" maxlength="90" placeholder="z. B. Spital Musterstadt – Bereich Finanzen">
+      <label for="eAgent">Kennung des KI-Interviewers (ElevenLabs, beginnt mit agent_)</label>
+      <input type="text" id="eAgent" maxlength="60" placeholder="agent_…">
+      <label for="eListe">Prozesse – pro Zeile: Nummer; Name; Gruppe; zuständige Funktion</label>
+      <textarea id="eListe" rows="8" placeholder="3.2.4; Kreditorenmanagement; Finanzen; Leitung Rechnungswesen&#10;3.7.1; Gebäudeinstandhaltung; Immobilien; Leitung Immobilien und Betrieb"></textarea>
+      <p style="margin-top:12px"><button class="knopf" id="linkBtn" type="button">Link erzeugen</button>
+      <button class="knopf neben" id="kopieBtn" type="button" style="display:none">Link kopieren</button></p>
+      <div id="linkAus"></div>
+    </details>
+  </div>
+</main>
+
+<footer>
+  Ein Werkzeug der <a href="prozesswand.html" id="fussWand">Prozesswand</a>. Die Prozesswand dokumentiert und ordnet – verbindlich ist der Eintrag im Prozess-System der Organisation.
+</footer>
+
+<script>
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  var T = function (v, n) { return String(v == null ? '' : v).replace(/[<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, n); };
+  var b64uEnc = function (s) { return btoa(unescape(encodeURIComponent(s))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); };
+  var b64uDec = function (s) { return decodeURIComponent(escape(atob(String(s).replace(/-/g, '+').replace(/_/g, '/')))); };
+  /* Auf prozesswand.ch und immokision.ch heisst die Wand prozesswand.html, im Repo index.html */
+  var WAND = (location.protocol === 'file:' || /netlify\.app$/.test(location.hostname)) ? 'index.html' : 'prozesswand.html';
+  $('fussWand').href = WAND;
+
+  /* Einstellung aus dem Link lesen: ?l=<base64url von {t, a, p:[[nr, name, gruppe, funktion], …]}> */
+  var cfg = { t: '', a: '', p: [] };
+  try {
+    var l = new URLSearchParams(location.search).get('l');
+    if (l) {
+      var o = JSON.parse(b64uDec(l));
+      cfg.t = T(o.t, 90);
+      cfg.a = /^agent_[A-Za-z0-9]{6,50}$/.test(String(o.a || '')) ? String(o.a) : '';
+      cfg.p = (Array.isArray(o.p) ? o.p : []).slice(0, 200).map(function (z) {
+        z = Array.isArray(z) ? z : [];
+        return { nr: T(z[0], 12), name: T(z[1], 80), gruppe: T(z[2], 60), funktion: T(z[3], 80) };
+      }).filter(function (z) { return z.name; });
+    }
+  } catch (e) { cfg = { t: '', a: '', p: [] }; }
+
+  if (cfg.t) $('unter').textContent = cfg.t + ' – vom Gespräch zum Prozess nach BPMN 2.0.';
+  if (cfg.p.length) $('wahlText').textContent = 'Wähle deinen Prozess aus der Liste. Fehlt er, tippe Nummer und Name ins Feld.';
+
+  var gewaehlt = null;
+  function waehlen(p) {
+    gewaehlt = p;
+    var w = $('wahl');
+    if (!p) { w.style.display = 'none'; }
+    else {
+      w.style.display = '';
+      w.textContent = 'Gewählt: ' + (p.nr ? p.nr + ' ' : '') + p.name + (p.funktion ? ' · zuständig: ' + p.funktion : '');
+    }
+    var btn = $('wandBtn');
+    if (p) {
+      btn.href = WAND + '?prozess=' + b64uEnc(JSON.stringify({ nr: p.nr, name: p.name }));
+      btn.setAttribute('aria-disabled', 'false');
+    } else { btn.href = '#'; btn.setAttribute('aria-disabled', 'true'); }
+    var iv = $('interviewBtn'), info = $('interviewInfo');
+    if (!cfg.a) { iv.setAttribute('aria-disabled', 'true'); info.textContent = 'Für diese Seite ist noch kein KI-Interviewer hinterlegt. Die Koordination richtet ihn unten ein.'; }
+    else if (!p) { iv.setAttribute('aria-disabled', 'true'); info.textContent = 'Wähle zuerst oben deinen Prozess.'; }
+    else {
+      iv.href = 'https://elevenlabs.io/app/talk-to?agent_id=' + encodeURIComponent(cfg.a);
+      iv.setAttribute('aria-disabled', 'false');
+      info.textContent = 'Sage dem Interviewer zu Beginn: «' + (p.nr ? p.nr + ' ' : '') + p.name + '».';
+    }
+    zeichnen();
+  }
+  function zeichnen() {
+    var box = $('prozesse'), q = $('suche').value.trim().toLowerCase();
+    box.textContent = '';
+    var gruppen = [], nach = {};
+    cfg.p.forEach(function (p) {
+      if (q && (p.nr + ' ' + p.name + ' ' + p.gruppe + ' ' + p.funktion).toLowerCase().indexOf(q) < 0) return;
+      var g = p.gruppe || 'Prozesse';
+      if (!nach[g]) { nach[g] = []; gruppen.push(g); }
+      nach[g].push(p);
+    });
+    gruppen.forEach(function (g) {
+      var h = document.createElement('div'); h.className = 'gruppe'; h.textContent = g; box.appendChild(h);
+      var li = document.createElement('div'); li.className = 'liste';
+      nach[g].forEach(function (p) {
+        var b = document.createElement('button'); b.type = 'button';
+        b.className = 'proz' + (gewaehlt && gewaehlt.nr === p.nr && gewaehlt.name === p.name ? ' gewaehlt' : '');
+        var t = document.createElement('b'); t.textContent = (p.nr ? p.nr + ' ' : '') + p.name; b.appendChild(t);
+        if (p.funktion) { var s = document.createElement('span'); s.textContent = p.funktion; b.appendChild(s); }
+        b.onclick = function () { waehlen(p); };
+        li.appendChild(b);
+      });
+      box.appendChild(li);
+    });
+    /* Freie Eingabe: «3.7.1 Gebäudeinstandhaltung» */
+    var roh = $('suche').value.trim();
+    if (roh.length >= 4 && !gruppen.length) {
+      var m = roh.match(/^(\d+(?:\.\d+){0,3})\s+(.+)$/);
+      var eigen = { nr: T(m ? m[1] : '', 12), name: T(m ? m[2] : roh, 80), gruppe: '', funktion: '' };
+      var b2 = document.createElement('button'); b2.type = 'button'; b2.className = 'proz' + (gewaehlt && gewaehlt.name === eigen.name ? ' gewaehlt' : '');
+      b2.style.marginTop = '10px';
+      var t2 = document.createElement('b'); t2.textContent = '«' + roh.slice(0, 90) + '» aufnehmen'; b2.appendChild(t2);
+      b2.onclick = function () { waehlen(eigen); };
+      box.appendChild(b2);
+    }
+  }
+  $('suche').addEventListener('input', zeichnen);
+  waehlen(null);
+
+  /* Einrichten: Liste → Link */
+  if (cfg.t) $('eTitel').value = cfg.t;
+  if (cfg.a) $('eAgent').value = cfg.a;
+  if (cfg.p.length) $('eListe').value = cfg.p.map(function (p) { return [p.nr, p.name, p.gruppe, p.funktion].join('; '); }).join('\n');
+  if (!cfg.p.length && !cfg.a) $('einrichten').open = true;
+  var link = '';
+  $('linkBtn').onclick = function () {
+    var aus = $('linkAus'), ag = $('eAgent').value.trim();
+    var p = $('eListe').value.split(/\n/).map(function (z) { return z.split(';').map(function (x) { return T(x, 80); }); })
+      .filter(function (z) { return z.length >= 2 && z[1]; }).map(function (z) { return [z[0] || '', z[1], z[2] || '', z[3] || '']; });
+    aus.style.display = '';
+    if (ag && !/^agent_[A-Za-z0-9]{6,50}$/.test(ag)) { aus.textContent = 'Die Kennung des Interviewers stimmt nicht. Sie beginnt mit «agent_» und enthält nur Buchstaben und Zahlen.'; $('kopieBtn').style.display = 'none'; return; }
+    if (!p.length) { aus.textContent = 'Bitte mindestens einen Prozess eintragen: Nummer; Name; Gruppe; Funktion.'; $('kopieBtn').style.display = 'none'; return; }
+    link = location.origin + location.pathname + '?l=' + b64uEnc(JSON.stringify({ t: T($('eTitel').value, 90), a: ag, p: p }));
+    aus.textContent = p.length + (p.length === 1 ? ' Prozess' : ' Prozesse') + ' im Link: ' + link;
+    $('kopieBtn').style.display = '';
+  };
+  $('kopieBtn').onclick = function () {
+    var b = this;
+    if (navigator.clipboard) navigator.clipboard.writeText(link).then(function () { b.textContent = '✓ kopiert'; }, function () { b.textContent = 'Bitte von Hand kopieren'; });
+    else b.textContent = 'Bitte von Hand kopieren';
+  };
+})();
+</script>
+</body>
+</html>

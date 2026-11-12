@@ -536,6 +536,21 @@ body.rg-on #wallScroll { padding-bottom:210px; }
 body.rg-on #wegLeiste { display:none; }
 @media (max-width:600px) { #rg { bottom:10px; padding:12px 14px; } #rg #rgText { font-size:14px; } #rg .rg-knoepfe .rg-ton { margin-left:0; } }
 @media print { #rg, #rgFokus { display:none !important; } }
+/* ============================================================
+   V78 BPMN-WAND: Aufgabe = weisses Rechteck, Start = duenner Kreis,
+   Ende = dicker Kreis, Entscheid = Raute. Nur auf BPMN-Waenden.
+   ============================================================ */
+.postit.bp { background:#fff !important; border:1.5px solid #1b2430; border-radius:10px; box-shadow:none; opacity:1; min-height:52px; }
+.postit.bp.st-erledigt { opacity:1; }
+.postit.bp-start, .postit.bp-ende, .postit.bp-gateway { background:transparent !important; border:0; text-align:center; padding:50px 4px 0; min-height:0; font-size:11px; }
+.postit.bp .bpf { position:absolute; left:50%; top:9px; width:38px; height:38px; margin-left:-19px; box-sizing:border-box; background:#fff; }
+.postit.bp-start .bpf { border:2px solid #2e7d32; border-radius:50%; }
+.postit.bp-ende .bpf { border:5px solid #9a2b1b; border-radius:50%; }
+.postit.bp-gateway .bpf { border:2px solid #1b2430; transform:rotate(45deg); width:32px; height:32px; margin-left:-16px; top:12px; }
+.postit.bp-gateway .bpf::after { content:'\00d7'; position:absolute; inset:0; display:flex; align-items:center; justify-content:center; transform:rotate(-45deg); font:700 20px/1 Arial,sans-serif; color:#1b2430; font-style:normal; }
+.postit.bp-start .dot, .postit.bp-ende .dot, .postit.bp-gateway .dot { display:none; }
+.postit.bp-start, .postit.bp-ende, .postit.bp-gateway { text-shadow:0 0 3px #fff, 0 0 3px #fff, 0 0 4px #fff, 0 0 5px #fff; }
+#conns text.bplab { font:600 11px Inter,Calibri,Arial,sans-serif; fill:#1b2430; paint-order:stroke; stroke:#fff; stroke-width:3px; }
 </style>
 </head>
 <body>
@@ -646,7 +661,7 @@ body.rg-on #wegLeiste { display:none; }
 <script>
 "use strict";
 
-const APP_VERSION = 'V77';
+const APP_VERSION = 'V78';
 /* V49: einheitlicher Wegweiser nach jedem «An Claude kopieren» */
 function claudeHinweis() {
   sysMsg('📋 Kopiert! Jetzt: 1. Claude öffnen (claude.ai bzw. deine Prozesswand-Sitzung) → 2. ins Schreibfeld klicken → 3. Cmd+V (einfügen) → 4. Senden. Mehr braucht es nicht.', true);
@@ -696,7 +711,7 @@ function gateLaneIdx() { const i = laneKeys().indexOf('sache'); return i >= 0 ? 
 function defaultLaneKey() { const k = laneKeys(); return k.includes('handlung') ? 'handlung' : k[0]; }
 /* Ebenen, auf denen die eigentliche Arbeit liegt: OSTO = Handlungsebene,
    Agenten-Wand = jede Agenten-Ebene. */
-function arbeitsLanes() { return istAgentenWand() ? laneKeys() : ['handlung']; }
+function arbeitsLanes() { return istAgentenWand() ? laneKeys() : (istBpmnWand() ? laneKeys().filter(k => k !== 'notiz') : ['handlung']); }
 function istArbeitsLane(k) { return arbeitsLanes().indexOf(k) >= 0; }
 function arbeitsKartenPhase(i) { return arbeitsLanes().reduce((a, k) => a.concat(cardsInPhaseLane(i, k)), []); }
 
@@ -770,6 +785,259 @@ function findAgent(key, s) { s = s || activeState(); return (s && s.agenten || [
 /* Ebenen der Wand nach einer Aenderung an den Agenten neu setzen */
 function agentenLanesSetzen(s) { s = s || state; s.lanes = agentenZuLanes(s.agenten); }
 
+/* ====== V78: BPMN-WAND ======
+   Dieselbe Zeichen-Maschine, andere Ebenen: jede Ebene ist eine ROLLE (Bahn).
+   Karten sind Start, Aufgabe, Entscheid (Gateway) oder Ende; Verbindungen sind
+   der Ablauf mit Pfeil. Die unterste Ebene «notiz» sammelt offene Fragen und
+   Hinweise. Daraus entsteht ohne KI eine BPMN-2.0-Datei (genBpmn).
+   Alles additiv: OSTO- und Agenten-Wände verhalten sich unverändert. */
+function istBpmnWand(s) { s = s || activeState(); return !!(s && s.wandTyp === 'bpmn'); }
+function bpmnArt(p) { return p && (p.bpmn === 'start' || p.bpmn === 'gateway' || p.bpmn === 'ende') ? p.bpmn : 'aufgabe'; }
+function bpmnLaneKeyVon(p, s) {
+  s = s || activeState();
+  const L = (Array.isArray(s.lanes) && s.lanes.length) ? s.lanes : OSTO_LANES;
+  return L[clamp(Math.floor(p.y / LANE_H), 0, L.length - 1)].key;
+}
+function bpmnIstNotiz(p, s) { return bpmnLaneKeyVon(p, s) === 'notiz'; }
+const BPMN_FARBEN = ['#eef4fb', '#eef7ee', '#f6f1fa', '#fdf8e3', '#fbeff2', '#f1f2f4'];
+const BPMN_SPALTE = 200;
+/* Weg einer Verbindung in Wand-Koordinaten (ohne Kopf und Beschriftungsspalte).
+   Gilt für die Zeichnung UND für die BPMN-Datei – so sehen beide gleich aus. */
+function bpmnWeg(a, b, s) {
+  const ax = a.x + PI_W / 2, ay = a.y + 28, bx = b.x + PI_W / 2, by = b.y + 28;
+  const ra = bpmnArt(a) === 'aufgabe' ? PI_W / 2 : 21, rb = bpmnArt(b) === 'aufgabe' ? PI_W / 2 : 21;
+  const gleicheBahn = Math.abs(by - ay) < 20;
+  if (b.x < a.x + 40) { // zurück oder senkrecht: unten herum
+    const yl = Math.max(Math.floor(a.y / LANE_H), Math.floor(b.y / LANE_H)) * LANE_H + LANE_H - 7;
+    return { pts: [[ax, ay + 30], [ax, yl], [bx, yl], [bx, by + 32]], lx: ax + 6, ly: yl - 5 };
+  }
+  if (gleicheBahn) {
+    const dazwischen = s.postits.some(p => p !== a && p !== b && Math.abs(p.y - a.y) < 40 && p.x > a.x + 20 && p.x < b.x - 20);
+    if (dazwischen) { // über eine andere Karte hinweg: am Rand der Bahn entlang (1. unten, 2. oben)
+      const mit = s.connections.filter(k => k.from === a.id).map(k => s.postits.find(p => p.id === k.to))
+        .filter(z => z && Math.abs(z.y - a.y) < 40 && z.x > a.x + 40 && s.postits.some(p => p !== a && p !== z && Math.abs(p.y - a.y) < 40 && p.x > a.x + 20 && p.x < z.x - 20))
+        .sort((p, q) => q.x - p.x);
+      const lt = Math.floor(a.y / LANE_H) * LANE_H;
+      if (mit.indexOf(b) === 1) return { pts: [[ax, ay - (bpmnArt(a) === 'aufgabe' ? 30 : 21)], [ax, lt + 3], [bx, lt + 3], [bx, b.y + (bpmnArt(b) === 'aufgabe' ? -2 : 7)]], lx: ax + 7, ly: lt + 15 };
+      const yl = lt + LANE_H - 7;
+      return { pts: [[ax, ay + (bpmnArt(a) === 'aufgabe' ? 30 : 21)], [ax, yl], [bx, yl], [bx, by + (bpmnArt(b) === 'aufgabe' ? 36 : 21)]], lx: ax + 7, ly: yl - 5 };
+    }
+    return { pts: [[ax + ra, ay], [bx - rb - 2, by]], lx: ax + ra + 6, ly: ay - 6 };
+  }
+  if (bpmnArt(a) === 'gateway') { // Entscheid: senkrecht hinaus, dann waagrecht zum Ziel
+    const y1 = ay + (by > ay ? 21 : -21);
+    return { pts: [[ax, y1], [ax, by], [bx - rb - 2, by]], lx: ax + 7, ly: by - 6 };
+  }
+  /* andere Bahn: waagrecht in der eigenen Bahn bis kurz vor das Ziel, dann senkrecht –
+     ausser dort steht eine Karte im Weg, dann gleich nach dem Start abbiegen */
+  const x1 = ax + ra, x2 = bx - rb - 2;
+  const imWeg = (y, von, bis) => s.postits.some(p => p !== a && p !== b && Math.abs(p.y - y) < 40 && p.x + PI_W > von && p.x < bis);
+  const xm = !imWeg(a.y, x1, x2 - 4) ? x2 - 18 : (!imWeg(b.y, x1 + 4, x2) ? x1 + 18 : x2 - 18);
+  return { pts: [[x1, ay], [xm, ay], [xm, by], [x2, by]], lx: x1 + 6, ly: ay - 6 };
+}
+/* Baut aus einer Prozess-Beschreibung (von der KI oder aus einem Chat) eine BPMN-Wand.
+   Rein rechnerisch, ohne KI: gleiche Eingabe = gleiche Wand. Nichts wird erfunden –
+   was fehlt, steht als ❓-Karte auf der Ebene «Offene Fragen». */
+function bpmnWandBauen(erg, beleg) {
+  const T = (v, n) => String(v == null ? '' : v).replace(/\s+/g, ' ').trim().slice(0, n || 200);
+  const abschnitte = (Array.isArray(erg.abschnitte) ? erg.abschnitte : []).filter(a => a && typeof a === 'object');
+  if (!abschnitte.length) throw new Error('Die Beschreibung enthält keine Abschnitte.');
+  const rollen = [];
+  const rolleVon = r => { r = T(r, 60) || 'Rolle [offen]'; if (rollen.indexOf(r) < 0) rollen.push(r); return r; };
+  (Array.isArray(erg.rollen) ? erg.rollen : []).forEach(rolleVon);
+  abschnitte.forEach(a => (Array.isArray(a.elemente) ? a.elemente : []).forEach(e => { if (e && typeof e === 'object') rolleVon(e.rolle); }));
+  if (rollen.length > 9) throw new Error('Mehr als 9 Rollen – bitte den Prozess aufteilen.');
+  const lanesNeu = rollen.map((r, i) => ({ key: 'r' + (i + 1), title: r, desc: 'Rolle', color: BPMN_FARBEN[i % BPMN_FARBEN.length], einfach: 'Wer es macht: ' + r }));
+  lanesNeu.push({ key: 'notiz', title: 'Offene Fragen und Hinweise', desc: 'Noch zu klären', color: '#fdf3bf', einfach: 'Was noch geklärt werden muss' });
+  const notizIdx = lanesNeu.length - 1;
+  const phases = [], postits = [], connections = [], idNeu = {}, nach = [];
+  let links = 0, nr = 0;
+  const offen = (Array.isArray(erg.offen) ? erg.offen : []).filter(o => o && T(o.frage || o.text));
+  const hinweise = (Array.isArray(erg.hinweise) ? erg.hinweise : []).filter(o => o && T(o.text));
+  abschnitte.forEach((a, ai) => {
+    const name = T(a.name, 60) || ('Abschnitt ' + (ai + 1));
+    const els = (Array.isArray(a.elemente) ? a.elemente : []).filter(e => e && typeof e === 'object' && T(e.text));
+    const spalte = {}, belegt = {};
+    let maxSp = -1;
+    els.forEach(e => {
+      const eid = T(e.id, 40) || ('e' + (++nr));
+      const rIdx = rollen.indexOf(rolleVon(e.rolle));
+      let sp = 0;
+      els.forEach(v => { // Vorgänger im selben Abschnitt, die schon gesetzt sind
+        const vid = T(v.id, 40);
+        if (vid && spalte[vid] !== undefined && (Array.isArray(v.nach) ? v.nach : []).some(n => T(n && (n.zu || n), 40) === eid)) sp = Math.max(sp, spalte[vid] + 1);
+      });
+      while (belegt[rIdx + '/' + sp]) sp++;
+      belegt[rIdx + '/' + sp] = true; spalte[eid] = sp; maxSp = Math.max(maxSp, sp);
+      const art = ['start', 'gateway', 'ende'].indexOf(e.art) >= 0 ? e.art : 'aufgabe';
+      const id = uid('b'); idNeu[eid] = id;
+      const womit = T(e.womit, 120), ergebnis = T(e.ergebnis, 160);
+      const c = { id: id, x: links + 14 + sp * BPMN_SPALTE, y: rIdx * LANE_H + 8, text: T(e.text, 80), color: '#ffffff',
+        bpmn: art, status: 'erledigt', checked: true, beleg: beleg || '[unbelegt]' };
+      if (art === 'aufgabe') c.auftrag = 'Wer: ' + rollen[rIdx] + '. Womit: ' + (womit || '[offen]') + '. Ergebnis: ' + (ergebnis || '[offen]') + '.';
+      postits.push(c);
+      (Array.isArray(e.nach) ? e.nach : []).forEach(n => { const zu = T(n && (n.zu || n), 40); if (zu) nach.push({ von: eid, zu: zu, wenn: T(n && n.wenn, 40) }); });
+    });
+    const meineFragen = offen.filter(o => (T(o.abschnitt, 60) || T(abschnitte[0].name, 60)) === name || (!abschnitte.some(x => T(x.name, 60) === T(o.abschnitt, 60)) && ai === 0));
+    const meineHinweise = hinweise.filter(o => T(o.abschnitt, 60) === name || (!abschnitte.some(x => T(x.name, 60) === T(o.abschnitt, 60)) && ai === 0));
+    const notizen = meineFragen.map(o => ({ text: '❓ ' + T(o.frage || o.text, 88), frage: true }))
+      .concat(meineHinweise.map(o => ({ text: '💡 ' + T(o.text, 88), frage: false })));
+    const w = Math.max(240, 14 + Math.max(maxSp + 1, notizen.length) * BPMN_SPALTE + 6);
+    notizen.forEach((n, k) => {
+      const c = { id: uid('b'), x: links + 14 + k * BPMN_SPALTE, y: notizIdx * LANE_H + 8, text: n.text, color: n.frage ? '#f6d4d4' : '#fdf3bf', checked: true };
+      if (n.frage) { c.status = 'offen'; c.typ = 'input'; } else { c.status = 'erledigt'; c.beleg = beleg || '[unbelegt]'; }
+      postits.push(c);
+    });
+    phases.push({ id: uid('ph'), name: name, w: w, ziel: T(a.ziel, 160), input: '', output: '', wer: '', was: '', wann: '', wie: '' });
+    links += w;
+  });
+  nach.forEach(n => { if (idNeu[n.von] && idNeu[n.zu] && idNeu[n.von] !== idNeu[n.zu]) { const k = { id: uid('c'), from: idNeu[n.von], to: idNeu[n.zu] }; if (n.wenn) k.label = n.wenn; connections.push(k); } });
+  return { wandTyp: 'bpmn', lanes: lanesNeu, agenten: [], phases: phases, postits: postits, connections: connections, milestones: [],
+    ssot: beleg || '', prozessName: T(erg.prozess, 120) };
+}
+/* BPMN-2.0-Datei aus der Wand – ohne KI. Öffnet sich in Camunda Modeler, bpmn.io, Signavio, ADONIS. */
+function genBpmn() {
+  const s = state, x = v => esc(String(v == null ? '' : v).replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, ''));
+  const L = lanes().filter(l => l.key !== 'notiz');
+  const NID = id => 'N_' + String(id).replace(/[^A-Za-z0-9_]/g, '_');
+  const knoten = s.postits.filter(p => !bpmnIstNotiz(p, s));
+  const notizen = s.postits.filter(p => bpmnIstNotiz(p, s));
+  const ids = new Set(knoten.map(p => p.id));
+  const fl = s.connections.filter(k => ids.has(k.from) && ids.has(k.to));
+  const TAG = { start: 'startEvent', ende: 'endEvent', gateway: 'exclusiveGateway', aufgabe: 'task' };
+  const name = boardName();
+  const OX = 30, W = canvasW(s) + OX, H = L.length * LANE_H;
+  let m = '', d = '';
+  m += '    <bpmn:laneSet id="LaneSet_1">\n';
+  L.forEach((l, i) => {
+    m += '      <bpmn:lane id="Lane_' + (i + 1) + '" name="' + x(laneTitle(l)) + '">\n';
+    knoten.filter(p => bpmnLaneKeyVon(p, s) === l.key).forEach(p => { m += '        <bpmn:flowNodeRef>' + NID(p.id) + '</bpmn:flowNodeRef>\n'; });
+    m += '      </bpmn:lane>\n';
+    d += '      <bpmndi:BPMNShape id="Lane_' + (i + 1) + '_di" bpmnElement="Lane_' + (i + 1) + '" isHorizontal="true"><dc:Bounds x="' + OX + '" y="' + (i * LANE_H) + '" width="' + (W - OX) + '" height="' + LANE_H + '"/></bpmndi:BPMNShape>\n';
+  });
+  m += '    </bpmn:laneSet>\n';
+  knoten.forEach(p => {
+    const art = bpmnArt(p), t = TAG[art], id = NID(p.id);
+    const txt = cleanTxt(p.text || '');
+    m += '    <bpmn:' + t + ' id="' + id + '" name="' + x(txt) + '">\n';
+    const doku = [p.auftrag, p.beleg && p.beleg !== UNBELEGT ? 'Beleg: ' + p.beleg : ''].filter(Boolean).join(' ');
+    if (doku) m += '      <bpmn:documentation>' + x(doku) + '</bpmn:documentation>\n';
+    fl.filter(k => k.to === p.id).forEach(k => { m += '      <bpmn:incoming>F_' + NID(k.id) + '</bpmn:incoming>\n'; });
+    fl.filter(k => k.from === p.id).forEach(k => { m += '      <bpmn:outgoing>F_' + NID(k.id) + '</bpmn:outgoing>\n'; });
+    m += '    </bpmn:' + t + '>\n';
+    const cx = OX + p.x + PI_W / 2, cy = p.y + 28;
+    const b = art === 'aufgabe' ? [OX + p.x, p.y - 2, PI_W, 60] : art === 'gateway' ? [cx - 21, cy - 21, 42, 42] : [cx - 18, cy - 18, 36, 36];
+    d += '      <bpmndi:BPMNShape id="' + id + '_di" bpmnElement="' + id + '"' + (art === 'gateway' ? ' isMarkerVisible="true"' : '') + '><dc:Bounds x="' + b[0] + '" y="' + b[1] + '" width="' + b[2] + '" height="' + b[3] + '"/>'
+      + (art === 'aufgabe' ? '' : '<bpmndi:BPMNLabel><dc:Bounds x="' + (cx - 70) + '" y="' + (cy + 24) + '" width="140" height="28"/></bpmndi:BPMNLabel>') + '</bpmndi:BPMNShape>\n';
+  });
+  fl.forEach(k => {
+    const a = s.postits.find(p => p.id === k.from), b = s.postits.find(p => p.id === k.to), w = bpmnWeg(a, b, s), id = 'F_' + NID(k.id);
+    m += '    <bpmn:sequenceFlow id="' + id + '" sourceRef="' + NID(a.id) + '" targetRef="' + NID(b.id) + '"' + (k.label ? ' name="' + x(k.label) + '"' : '') + '/>\n';
+    d += '      <bpmndi:BPMNEdge id="' + id + '_di" bpmnElement="' + id + '">' + w.pts.map(q => '<di:waypoint x="' + Math.round(OX + q[0]) + '" y="' + Math.round(q[1]) + '"/>').join('')
+      + (k.label ? '<bpmndi:BPMNLabel><dc:Bounds x="' + Math.round(OX + w.lx) + '" y="' + Math.round(w.ly - 12) + '" width="80" height="14"/></bpmndi:BPMNLabel>' : '') + '</bpmndi:BPMNEdge>\n';
+  });
+  notizen.forEach((p, i) => {
+    const id = 'A_' + NID(p.id);
+    m += '    <bpmn:textAnnotation id="' + id + '"><bpmn:text>' + x(cleanTxt(p.text || '') + ((p.status || 'offen') === 'erledigt' ? '' : ' [offen]')) + '</bpmn:text></bpmn:textAnnotation>\n';
+    d += '      <bpmndi:BPMNShape id="' + id + '_di" bpmnElement="' + id + '"><dc:Bounds x="' + (OX + p.x) + '" y="' + (H + 24 + (p.y % LANE_H)) + '" width="' + PI_W + '" height="62"/></bpmndi:BPMNShape>\n';
+  });
+  const ssot = (s.ssot || '').trim();
+  return '<?xml version="1.0" encoding="UTF-8"?>\n'
+    + '<!-- Prozesswand ' + APP_VERSION + ' · ' + x(heute()) + (ssot ? ' · Bei Widerspruch gilt: ' + x(ssot).replace(/--/g, '–') : '') + ' -->\n'
+    + '<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" id="Definitions_1" targetNamespace="https://prozesswand.ch/bpmn" exporter="Prozesswand" exporterVersion="' + APP_VERSION + '">\n'
+    + '  <bpmn:collaboration id="Collaboration_1">\n    <bpmn:participant id="Participant_1" name="' + x(name) + '" processRef="Process_1"/>\n  </bpmn:collaboration>\n'
+    + '  <bpmn:process id="Process_1" name="' + x(name) + '" isExecutable="false">\n'
+    + (ssot || s.goal ? '    <bpmn:documentation>' + x([s.goal, ssot ? 'Bei Widerspruch gilt: ' + ssot : ''].filter(Boolean).join(' · ')) + '</bpmn:documentation>\n' : '')
+    + m + '  </bpmn:process>\n'
+    + '  <bpmndi:BPMNDiagram id="Diagram_1">\n    <bpmndi:BPMNPlane id="Plane_1" bpmnElement="Collaboration_1">\n'
+    + '      <bpmndi:BPMNShape id="Participant_1_di" bpmnElement="Participant_1" isHorizontal="true"><dc:Bounds x="0" y="0" width="' + W + '" height="' + H + '"/></bpmndi:BPMNShape>\n'
+    + d + '    </bpmndi:BPMNPlane>\n  </bpmndi:BPMNDiagram>\n</bpmn:definitions>\n';
+}
+function downloadBpmn() {
+  if (!istBpmnWand(state)) { sysMsg('Eine BPMN-Datei gibt es nur von einer BPMN-Wand (Dokumente → «Prozess aus Interview»).', true); return; }
+  const fn = boardName().replace(/[\\/:*?"<>|]+/g, ' ').trim().slice(0, 80) + '.bpmn';
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([genBpmn()], { type: 'application/xml' })); a.download = fn; a.click(); URL.revokeObjectURL(a.href);
+  downloadGemeldet(fn);
+  const offen = offeneFragen().length;
+  if (offen) sysMsg('Hinweis: ' + offen + (offen === 1 ? ' offene Frage steht' : ' offene Fragen stehen') + ' als Anmerkung mit [offen] in der Datei.', true);
+}
+/* Auftrag an die KI: aus der Abschrift eines Interviews wird eine Prozess-Beschreibung.
+   Dasselbe Format liest auch der Import – so geht es mit dem Abo ohne API-Kosten. */
+const BPMN_FORMAT = '{"prozess":"Nummer und Name","rollen":["Rolle A","Rolle B"],'
+  + '"abschnitte":[{"name":"Abschnitt","elemente":[{"id":"e1","art":"start|aufgabe|gateway|ende","rolle":"Rolle A","text":"höchstens 80 Zeichen","womit":"System, Formular, Telefon oder leer","ergebnis":"was danach vorhanden ist oder leer","nach":[{"zu":"e2","wenn":"nur bei Entscheid: ja, nein oder kurze Bedingung"}]}]}],'
+  + '"offen":[{"frage":"offene Frage","abschnitt":"Name des Abschnitts"}],"hinweise":[{"text":"wichtige Nebenbemerkung","abschnitt":"Name des Abschnitts"}]}';
+const BPMN_SYS = 'Du strukturierst die Abschrift eines Interviews zu einem Arbeitsprozess nach BPMN 2.0. '
+  + 'Antworte NUR mit einem JSON-Objekt in genau diesem Format: ' + BPMN_FORMAT + '\n'
+  + 'Regeln:\n'
+  + '1. Evidenz: Übernimm nur, was die befragte Person gesagt oder bestätigt hat. Erfinde nichts. Was unklar, abgebrochen oder nicht beantwortet ist, kommt als Frage nach "offen".\n'
+  + '2. Rollen sind Funktionen, nie Namen von Personen. Kommt ein Name vor, nimm die Funktion.\n'
+  + '3. Genau ein Element mit art "start" (der Auslöser) und mindestens eines mit art "ende" (das Ergebnis).\n'
+  + '4. Eine "aufgabe" ist eine Tätigkeit einer Rolle: Verb und Objekt, höchstens 80 Zeichen. Ein neuer Schritt beginnt, wenn Rolle oder Hilfsmittel wechselt.\n'
+  + '5. Ein "gateway" steht dort, wo der Ablauf sich verzweigt. Sein Text ist die Frage (z. B. «Vor Ort lösbar?»), jede Verbindung danach trägt "wenn".\n'
+  + '6. 3 bis 6 Abschnitte in der Reihenfolge des Ablaufs, je 1 bis 5 Elemente. Jedes Element ausser dem Ende hat mindestens einen Eintrag in "nach".\n'
+  + '7. Schweizer Schreibweise (ss statt ß). Keine Angaben zu Patientinnen und Patienten.';
+function bpmnAuftragText(name, abschrift) {
+  return BPMN_SYS + '\n\nProzess: ' + (name || '[offen]') + '\n\nAbschrift des Interviews:\n' + abschrift;
+}
+/* Vorschau einer BPMN-Wand zeigen (aus KI-Antwort oder Import) */
+function bpmnVorschau(erg, beleg, name) {
+  const st = normalizeState(bpmnWandBauen(erg, beleg));
+  st.goal = state.goal; st.kiLog = state.kiLog; st.kiConvo = state.kiConvo; st.solo = state.solo;
+  const nm = String(name || erg.prozess || 'Prozess').replace(/\s+/g, ' ').trim().slice(0, 60);
+  previewState = st; previewMeta = { import: true, bpmn: true, name: nm, ziel: nm };
+  document.getElementById('previewBar').style.display = 'flex';
+  render();
+  const fr = st.postits.filter(c => /^\s*❓/u.test(c.text)).length;
+  sysMsg('🧩 Vorschau «' + nm + '» nach BPMN 2.0: ' + (st.lanes.length - 1) + ' Rollen, ' + st.postits.filter(c => c.bpmn).length + ' Schritte, ' + fr + ' offene Fragen. Oben «Als neue Wand» wählen – oder verwerfen.');
+  return st;
+}
+function prozessAusLink() {
+  try {
+    const p = new URLSearchParams(location.search).get('prozess'); if (!p) return null;
+    const o = JSON.parse(decodeURIComponent(escape(atob(p.replace(/-/g, '+').replace(/_/g, '/')))));
+    const t = (v, n) => String(v == null ? '' : v).replace(/[<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, n);
+    return { nr: t(o.nr, 12), name: t(o.name, 80) };
+  } catch (e) { return null; }
+}
+function openAbschriftImport(vor) {
+  if (previewState) { sysMsg('Zuerst die offene Vorschau übernehmen oder verwerfen.', true); return; }
+  const vn = vor ? ((vor.nr ? vor.nr + ' ' : '') + (vor.name || '')).trim() : '';
+  openModal('<h3>Prozess aus einem Interview (BPMN 2.0)</h3>'
+    + '<p style="font-size:13px;margin:2px 0 8px">Füge die <b>Abschrift des Interviews</b> ein. Daraus entsteht eine Wand mit einer Bahn pro Rolle, mit Start, Aufgaben, Entscheiden und Ende. Was im Gespräch offen blieb, steht danach als Frage auf der Wand – erfunden wird nichts.</p>'
+    + '<label for="abName">Prozess (Nummer und Name)</label><input type="text" id="abName" maxlength="90" value="' + esc(vn) + '" placeholder="z. B. 3.7.1 Gebäudeinstandhaltung">'
+    + '<label for="abText" style="margin-top:8px">Abschrift</label><textarea id="abText" rows="9" placeholder="Interviewer: …&#10;Antwort: …"></textarea>'
+    + '<div style="margin-top:6px"><label class="foto-wahl" for="abDatei" style="min-height:40px">Datei wählen (.txt oder .md)</label>'
+    + '<input type="file" id="abDatei" accept=".md,.txt,text/markdown,text/plain" style="position:absolute;left:-9999px"></div>'
+    + '<p style="font-size:12px;color:var(--muted);margin:8px 0 0">Die Abschrift geht für die Auswertung an den KI-Dienst (Anthropic). Mail-Adressen und Telefonnummern werden vorher entfernt. Bitte keine Angaben zu Patientinnen und Patienten einfügen.</p>'
+    + '<div id="abInfo" style="font-size:12.5px;color:var(--muted);margin-top:8px"></div>'
+    + '<div class="btnrow"><button class="go" id="abLos">Wand bauen</button><button id="abAbo" title="Kopiert den fertigen Auftrag. In Claude oder ChatGPT einfügen, die Antwort als Datei speichern und über «Import (JSON)» einlesen – ohne KI-Kosten in der Wand.">Auftrag kopieren (ohne KI in der Wand)</button><button id="mCancel">Abbrechen</button></div>', true);
+  document.getElementById('mCancel').onclick = closeModal;
+  const ta = document.getElementById('abText'), info = document.getElementById('abInfo'), nm = document.getElementById('abName');
+  document.getElementById('abDatei').onchange = e => {
+    const f = e.target.files[0]; if (!f) return;
+    if (f.size > 500000) { info.textContent = 'Die Datei ist zu gross (höchstens 500 KB).'; return; }
+    const r = new FileReader(); r.onload = () => { ta.value = String(r.result || ''); info.textContent = '✓ «' + f.name + '» geladen.'; }; r.readAsText(f);
+  };
+  const sauber = () => orgaSauber(ta.value.trim()).slice(0, 60000);
+  document.getElementById('abAbo').onclick = async function () {
+    if (ta.value.trim().length < 80) { info.textContent = 'Bitte zuerst die Abschrift einfügen.'; return; }
+    const t = bpmnAuftragText(nm.value.trim(), sauber());
+    try { await navigator.clipboard.writeText(t); this.textContent = '✓ kopiert'; info.textContent = 'In Claude oder ChatGPT einfügen. Die Antwort als Datei «prozess.json» speichern und über Dokumente → «Import (JSON)» einlesen.'; }
+    catch (e) { ta.value = t; ta.select(); this.textContent = 'Im Feld markiert – jetzt kopieren'; }
+  };
+  document.getElementById('abLos').onclick = async function () {
+    if (ta.value.trim().length < 80) { info.textContent = 'Die Abschrift ist zu kurz. Bitte das ganze Gespräch einfügen.'; return; }
+    if (!kiBereit()) { closeModal(); openKeyModal(() => openAbschriftImport(vor)); return; }
+    const name = nm.value.trim(), text = sauber();
+    this.disabled = true; info.textContent = 'Die KI liest das Gespräch … das dauert bis zu einer Minute.';
+    try {
+      const erg = extractJSON(await callClaude(BPMN_SYS, 'Prozess: ' + (name || '[offen]') + '\n\nAbschrift des Interviews:\n' + text, CHAT_MODEL, 6000));
+      closeModal();
+      bpmnVorschau(erg, 'Interview, ausgewertet am ' + heute(), name || erg.prozess);
+    } catch (e) { this.disabled = false; info.textContent = 'Das hat nicht geklappt: ' + e.message; }
+  };
+}
+
 const LABEL_W = 150, HEADER_H = 60, LANE_H = 104, PHASE_W = 300, PI_W = 172;
 const STORE = 'osto-prozesswand-v3';
 
@@ -827,7 +1095,7 @@ function normalizeState(d) {
     viewMode: ['lean', 'mittel', 'voll'].includes(d.viewMode) ? d.viewMode : 'voll',
     befragungen: Array.isArray(d.befragungen) ? d.befragungen : [],
     /* V62 Agenten-Wand: ohne diese Felder verhaelt sich die Wand wie bisher */
-    wandTyp: d.wandTyp === 'agenten' ? 'agenten' : 'osto',
+    wandTyp: d.wandTyp === 'agenten' ? 'agenten' : (d.wandTyp === 'bpmn' ? 'bpmn' : 'osto'),
     lanes: Array.isArray(d.lanes) ? d.lanes : [],
     agenten: Array.isArray(d.agenten) ? d.agenten : [],
     /* V67: Organisation und Rollen – ein Ort, den alle Agenten kennen */
@@ -856,9 +1124,12 @@ function normalizeState(d) {
     if (p.status != null && !['offen', 'arbeit', 'erledigt'].includes(p.status)) p.status = 'offen';
     if (p.rang != null) p.rang = ZAHL(p.rang, undefined);
     if (p.erledigtAm != null) p.erledigtAm = DATUM(p.erledigtAm);
+    if (p.bpmn != null && ['start', 'aufgabe', 'gateway', 'ende'].indexOf(p.bpmn) < 0) delete p.bpmn; /* V78 */
     return p; });
   s.connections = s.connections.filter(OBJ)
-    .map(c => ({ id: neu(c.id, 'c'), from: idMap[c.from] || c.from, to: idMap[c.to] || c.to }))
+    .map(c => { const o = { id: neu(c.id, 'c'), from: idMap[c.from] || c.from, to: idMap[c.to] || c.to };
+      if (typeof c.label === 'string' && c.label.trim()) o.label = c.label.replace(/\s+/g, ' ').trim().slice(0, 40); /* V78 */
+      return o; })
     .filter(c => ID(c.from) && ID(c.to));
   s.milestones = s.milestones.filter(OBJ).map(m => { m.id = neu(m.id, 'm'); m.x = ZAHL(m.x, 0);
     m.label = m.label == null ? '' : String(m.label); m.due = DATUM(m.due); if (m.due === undefined) delete m.due; return m; });
@@ -1000,6 +1271,7 @@ function render() {
     h += '<div class="ms-flag" data-mid="' + esc(m.id) + '" style="left:' + x + 'px;top:' + flagTop + 'px' + (late ? ';background:#a02020' : '') + '" title="Entscheid-Punkt (Tor): ' + esc(m.label) + (m.due ? ' – Zieldatum ' + esc(fmtDue(m.due)) : '') + ' – hier schaust du die Ergebnisse an und sagst Ja (weiter) oder Nein (stopp)">&#9670; ' + esc(short) + dueTxt + '</div>';
   });
 
+  const bpW = istBpmnWand(s); /* V78 */
   s.postits.forEach(p => {
     if (!visIds.has(p.id)) return;
     const st = p.status || 'offen';
@@ -1017,7 +1289,8 @@ function render() {
       ? '<span class="todoTag" title="Unbelegt: Es ist nicht festgehalten, woher die Annahme hinter dieser Karte stammt. Doppelklick &rarr; Feld &laquo;Beleg&raquo; ausf&uuml;llen." style="color:#b3391f;font-weight:700">&#9679; unbelegt</span>'
       : '';
     const prio = mode === 'lean' && istArbeitsLane(laneKeyOfY(p.y)) && depsOk(p);
-    h += '<div class="postit st-' + st + (prio ? ' prio' : '') + (connectSrc === p.id ? ' sel' : '') + '" data-pid="' + esc(p.id) + '" style="left:' + (LABEL_W + p.x) + 'px;top:' + (HEADER_H + p.y) + 'px;background:' + (p.color || PALETTE[0]) + '"><span class="dot ' + st + '"></span>' + esc(p.text) + (prio ? '<span class="prioTag">&#10148; als N&auml;chstes</span>' : '') + tds + typTag + persTag + owTag + rgTag + beTag + '</div>';
+    const bpK = bpW && !bpmnIstNotiz(p, s) ? ' bp bp-' + bpmnArt(p) : '';
+    h += '<div class="postit st-' + st + bpK + (prio ? ' prio' : '') + (connectSrc === p.id ? ' sel' : '') + '" data-pid="' + esc(p.id) + '" style="left:' + (LABEL_W + p.x) + 'px;top:' + (HEADER_H + p.y) + 'px;background:' + (p.color || PALETTE[0]) + '"><span class="dot ' + st + '"></span>' + (bpK && bpmnArt(p) !== 'aufgabe' ? '<i class="bpf"></i>' : '') + esc(p.text) + (prio ? '<span class="prioTag">&#10148; als N&auml;chstes</span>' : '') + tds + typTag + persTag + owTag + rgTag + beTag + '</div>';
   });
 
   h += '<svg id="conns" width="' + (LABEL_W + W) + '" height="' + (HEADER_H + H) + '"><defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#1f5fae"/></marker></defs>';
@@ -1027,8 +1300,13 @@ function render() {
     const ax = LABEL_W + a.x + PI_W/2, ay = HEADER_H + a.y + 28;
     const bx = LABEL_W + b.x + PI_W/2, by = HEADER_H + b.y + 28;
     const mx = (ax + bx) / 2;
-    const d = 'M' + ax + ',' + ay + ' C' + mx + ',' + ay + ' ' + mx + ',' + by + ' ' + bx + ',' + by;
-    h += '<path class="cas" d="' + d + '"/><path class="vis" d="' + d + '"/><path class="hit" data-cid="' + esc(c.id) + '" d="' + d + '"/>';
+    let d = 'M' + ax + ',' + ay + ' C' + mx + ',' + ay + ' ' + mx + ',' + by + ' ' + bx + ',' + by, lab = '';
+    if (bpW && !bpmnIstNotiz(a, s) && !bpmnIstNotiz(b, s)) { /* V78: rechtwinkliger Ablauf mit Pfeil und Beschriftung */
+      const w = bpmnWeg(a, b, s);
+      d = w.pts.map((q, i) => (i ? 'L' : 'M') + (LABEL_W + q[0]) + ',' + (HEADER_H + q[1])).join(' ');
+      if (c.label) lab = '<text class="bplab" x="' + (LABEL_W + w.lx) + '" y="' + (HEADER_H + w.ly) + '">' + esc(c.label) + '</text>';
+    }
+    h += '<path class="cas" d="' + d + '"/><path class="vis" d="' + d + '"/><path class="hit" data-cid="' + esc(c.id) + '" d="' + d + '"/>' + lab;
   });
   h += '</svg>';
 
@@ -1259,6 +1537,8 @@ function openPostitModal(id) {
     + '<label>Beleg <span style="font-weight:400;text-transform:none">&ndash; woher weisst du, dass das n&ouml;tig ist?</span></label>'
     + '<input type="text" id="mBeleg" placeholder="URL, Dateiname oder gemessener Wert &ndash; sonst [unbelegt]" value="' + esc(card.beleg || '') + '">'
     + '<div style="font-size:10.5px;color:var(--muted);margin-top:3px">Ohne Beleg kann diese Karte kein Entscheid-Tor ausl&ouml;sen &ndash; eine Vermutung darf den Ablauf nicht anhalten.</div>'
+    + (istBpmnWand() && !bpmnIstNotiz(card) ? '<label>Art des Schritts (BPMN)</label><select id="mBpmn" style="width:100%;font:inherit;font-size:12.5px;padding:6px 8px;border:1px solid var(--line);border-radius:6px">'
+      + [['aufgabe', 'Aufgabe – eine Tätigkeit'], ['start', 'Start – der Auslöser'], ['gateway', 'Entscheid – der Ablauf verzweigt sich'], ['ende', 'Ende – das Ergebnis']].map(o => '<option value="' + o[0] + '"' + (bpmnArt(card) === o[0] ? ' selected' : '') + '>' + o[1] + '</option>').join('') + '</select>' : '')
     + '<label>Farbe</label><div class="swatches">' + sw + '</div>'
     + '<div style="display:flex;gap:8px;margin-top:10px">'
     + '<div style="flex:1"><label>Task-Typ</label><select id="mTyp" style="width:100%;font:inherit;font-size:12.5px;padding:6px 8px;border:1px solid var(--line);border-radius:6px">'
@@ -1418,6 +1698,7 @@ function openPostitModal(id) {
     card.text = neuText;
     const auEl = document.getElementById('mAuftrag');
     if (auEl) { const v = auEl.value.trim(); if (v) card.auftrag = v; else delete card.auftrag; }
+    const bpEl = document.getElementById('mBpmn'); if (bpEl) card.bpmn = bpEl.value; /* V78 */
     const beEl = document.getElementById('mBeleg');
     if (beEl) { const v = beEl.value.trim(); if (v) card.beleg = v; else delete card.beleg; }
     const sel = modalBox.querySelector('.swatch.sel'); if (sel) card.color = sel.dataset.c;
@@ -2700,6 +2981,8 @@ document.getElementById('importFile').addEventListener('change', e => {
       /* akzeptiert: Roh-Export der Wand, {state:…} oder eine ganze Sammlung {boards:[…]} */
       const src = raw && raw.state ? raw.state
         : (raw && Array.isArray(raw.boards) && raw.boards.length ? ((raw.boards.find(b => b.id === raw.activeId) || raw.boards[0]).state || {}) : raw);
+      /* V78: Prozess-Beschreibung (rollen + abschnitte) = BPMN-Wand */
+      if (src && Array.isArray(src.abschnitte) && !Array.isArray(src.phases)) { bpmnVorschau(src, 'Datei ' + f.name.replace(/[<>]/g, '').slice(0, 60), src.prozess || f.name.replace(/\.json$/i, '')); return; }
       const st = normalizeState(src || {});
       if (!st.phases.length && !st.postits.length) throw new Error('keine Phasen oder Post-its in der Datei gefunden');
       /* C2: Die Zielleiste bleibt manuell – Import ersetzt nur die Struktur. Chat-Verlauf bleibt ebenfalls. */
@@ -3066,6 +3349,7 @@ document.getElementById('swarmBtn').onclick = () => {
   /* V72: ohne Konto zuerst das Gratis-Konto erklaeren – nicht erst ein Fachformular ausfuellen lassen */
   if (istEinfach() && !kiBereit()) { openKeyModal(() => document.getElementById('swarmBtn').click()); return; }
   if (istAgentenWand()) { openAgentenSchwarmModal(); return; }
+  if (istBpmnWand()) { openAbschriftImport(); return; } /* V78: eine BPMN-Wand entsteht aus einem Interview */
   openModal('<h3>&#129302; Projekt strukturieren (KI)</h3>'
     + '<p style="font-size:12px;color:var(--muted);margin:0">Sechs Agenten (Architekt &rarr; Planer &rarr; Kritiker &rarr; Verbinder &rarr; Lean &rarr; Optimierer) bauen einen Entwurf nach deiner Methodik. Du siehst zuerst eine Vorschau.</p>'
     + '<label>Gesamtziel</label><textarea id="swZiel" rows="3">' + esc(state.goal || '') + '</textarea>'
@@ -5166,6 +5450,8 @@ document.getElementById('docsBtn').onclick = () => {
     + '</select><button class="go" id="dCC">Auftrag (.md)</button><button class="go" id="dTasks">Tasks (.zip)</button><button class="go" id="dTasksGh" title="Aufgaben direkt ins konfigurierte GitHub-Repo legen (ohne ZIP-Umweg)">Tasks &rarr; GitHub</button><button id="dGhCfg" title="Repo und Schl&uuml;ssel f&uuml;r die direkte &Uuml;bertragung einstellen">&#9881; GitHub</button></div>'
     + '<label style="margin-top:12px">Projekt einlesen</label>'
     + '<div class="btnrow" style="margin-top:4px"><button class="go" id="dChat" title="Projekt-Brief aus ChatGPT, Claude oder Copilot einfügen – die Wand fragt nur noch, was fehlt">&#128172; Projekt aus einem Chat</button><button class="go" id="dFoto" title="Foto einer Moderationswand aus Papier: die KI liest Zettel, Phasen und Tore &ndash; mit Vorschau">&#128247; Foto einer Papierwand</button><button class="go" id="dImport" title="Fertige Strukturdatei (JSON) aus dem Chat einlesen &ndash; mit Vorschau; die Zielleiste bleibt unber&uuml;hrt">Import (JSON)</button>'
+    + '<button class="go" id="dAbschrift" title="Abschrift eines Interviews einf&uuml;gen &ndash; daraus entsteht eine Wand nach BPMN 2.0: eine Bahn pro Rolle, Start, Aufgaben, Entscheide, Ende">&#127908; Prozess aus Interview (BPMN)</button>'
+    + (istBpmnWand(state) ? '<button class="go" id="dBpmn" title="Die Wand als BPMN-2.0-Datei speichern &ndash; &ouml;ffnet sich in Camunda Modeler, bpmn.io, Signavio und ADONIS; ohne KI">BPMN 2.0 (.bpmn)</button>' : '')
     + '<button class="go" id="dRepoWand" title="Claude analysiert ein ganzes Repo und schickt die fertige Strukturdatei &ndash; im Abo, keine API-Kosten">&rarr; Wand aus einem Repo (Claude)</button></div>'
     + '<div style="font-size:10.5px;color:var(--muted);margin-top:3px">&laquo;Wand aus einem Repo&raquo; kopiert dir den fertigen Auftrag f&uuml;r Claude. Dort einf&uuml;gen &rarr; du bekommst die Strukturdatei zur&uuml;ck &rarr; hier mit &laquo;Import&raquo; einlesen (mit Vorschau).</div>'
     + '<label style="margin-top:12px">Umfrage auswerten <span style="font-weight:400;text-transform:none">(liest die Antworten aus Supabase &ndash; nur du kannst das)</span></label>'
@@ -5285,6 +5571,8 @@ document.getElementById('docsBtn').onclick = () => {
   };
   document.getElementById('dGhCfg').onclick = () => openGhModal();
   document.getElementById('dImport').onclick = () => { closeModal(); document.getElementById('importFile').click(); };
+  document.getElementById('dAbschrift').onclick = () => { closeModal(); openAbschriftImport(); };
+  if (document.getElementById('dBpmn')) document.getElementById('dBpmn').onclick = () => { closeModal(); downloadBpmn(); };
   document.getElementById('dFoto').onclick = () => { closeModal(); openFotoImport(); };
   document.getElementById('dChat').onclick = () => { closeModal(); openChatImport(); };
   document.getElementById('dAnalyse').onclick = () => { closeModal(); openAnalyse(); };
@@ -5929,6 +6217,7 @@ function wwOptionen() {
   const erledigt = state.postits.filter(c => istArbeitsLane(laneKeyOfY(c.y)) && (c.status || 'offen') === 'erledigt').length;
   const ki = kiBereit();
   const L = [];
+  if (istBpmnWand(state)) L.push({ id: 'bpmn', ic: '🧩', titel: 'BPMN-2.0-Datei', satz: 'Der Prozess als Datei für Camunda Modeler, bpmn.io, Signavio oder ADONIS – ohne KI.', vorher: fr ? [fr + (fr === 1 ? ' offene Frage beantworten' : ' offene Fragen beantworten')] : [], knopf: 'Speichern' });
   if (state.fahrplan) L.push({ id: 'fahrplan', ic: '💰', titel: 'Sparpotenzial und Entscheidungsvorlage', satz: 'Rechner in Franken pro Jahr und die Vorlage für Geschäftsleitung, IT und Fachbereich (Word).', vorher: [], knopf: 'Öffnen' });
   L.push({ id: 'auftrag', ic: '📄', titel: 'Projektauftrag (Word)', satz: 'Für die Entscheider: Ausgangslage, Ziel, Phasen, Tore mit Kriterien, Aufgaben und ein Block zum Unterschreiben.',
     vorher: [].concat(state.goal ? [] : ['Ziel unten in der Zielleiste eintragen'],
@@ -5976,6 +6265,7 @@ function wwErstellen(id) {
   closeModal();
   const name = boardName();
   if (id === 'fahrplan') { openFahrplan(); return; }
+  if (id === 'bpmn') { downloadBpmn(); return; }
   if (id === 'auftrag') {
     if (kiBereit()) { kiBericht('auftrag'); return; }
     downloadDoc('Projektauftrag - ' + name + '.doc', genAuftrag(''));
@@ -7060,6 +7350,7 @@ const LUPE_SECTIONS_OSTO = [
   { lane:'anspruch', title:'Anspruchsgruppen', add:'Gruppe' }
 ];
 function lupeSections() {
+  if (istBpmnWand()) return lanes().map(l => ({ lane: l.key, title: l.title, add: l.key === 'notiz' ? 'Frage' : 'Schritt' }));
   if (!istAgentenWand()) return LUPE_SECTIONS_OSTO;
   return lanes().map(l => ({ lane: l.key, title: l.title, add: 'Auftrag' }));
 }
@@ -7312,6 +7603,7 @@ async function startApp(user) {
   authGate.style.display = 'none';
   await loadFromCloud();
   if (new URLSearchParams(location.search).has('agenten')) { agentenWandOeffnen(); return; }
+  if (new URLSearchParams(location.search).has('prozess')) { openAbschriftImport(prozessAusLink()); return; } /* V78: von spitaeler.html */
   if (new URLSearchParams(location.search).has('interview')) { openInterview(); return; }
   if (new URLSearchParams(location.search).has('rundgang')) { setTimeout(rgStart, 400); return; }
   if (mitgenommeneWand()) return;
