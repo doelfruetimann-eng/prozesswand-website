@@ -67,21 +67,28 @@
   </div>
 
   <div class="karte">
-    <h2><span class="nr">3</span>Aus dem Gespräch die Wand bauen</h2>
-    <p>Die Abschrift des Gesprächs wird zur Prozesswand nach BPMN 2.0: eine Bahn pro Rolle, mit Start, Aufgaben, Entscheiden und Ende. Was im Gespräch offen blieb, steht als Frage auf der Wand. Von dort speicherst du die BPMN-2.0-Datei.</p>
-    <a class="knopf" id="wandBtn" aria-disabled="true" href="#">Wand öffnen und Abschrift einfügen</a>
-    <p class="klein" style="margin-top:10px">Dafür braucht es ein Konto in der Prozesswand. Die Abschrift bekommst du von der Person, die das Interview eingerichtet hat.</p>
+    <h2><span class="nr">3</span>Fertig – du erhältst den Entwurf zur Kontrolle</h2>
+    <p>Mit dem Gespräch ist deine Arbeit getan. Es wird <b>von selbst gespeichert</b>: Du musst nichts hochladen und nichts verschicken.</p>
+    <p>Die Koordination baut aus dem Gespräch den Prozess nach BPMN 2.0 – eine Bahn pro Rolle, mit Start, Aufgaben, Entscheiden und Ende. Du bekommst den Entwurf zugeschickt und sagst, ob der Ablauf stimmt oder was angepasst werden muss.</p>
+    <p class="klein" id="kontakt"></p>
   </div>
 
   <div class="karte">
     <details id="einrichten">
-      <summary>Eigene Prozessliste einrichten (für die Koordination)</summary>
+      <summary>Für die Koordination: Wand bauen und Prozessliste einrichten</summary>
+      <h2 style="margin-top:14px">Aus einem Gespräch die Wand bauen</h2>
+      <p>Die Gespräche liegen im ElevenLabs-Konto, zu dem der KI-Interviewer gehört (dort beim Interviewer unter «Conversations»). Wähle oben den Prozess, kopiere die Abschrift und füge sie in der Prozesswand ein. Was im Gespräch offen blieb, steht danach als Frage auf der Wand. Von dort speicherst du die BPMN-2.0-Datei.</p>
+      <a class="knopf" id="wandBtn" aria-disabled="true" href="#">Wand öffnen und Abschrift einfügen</a>
+      <p class="klein" style="margin-top:10px">Dafür braucht es ein Konto in der Prozesswand.</p>
+      <h2 style="margin-top:22px">Eigene Prozessliste einrichten</h2>
       <p>Hier entsteht ein Link, der deine Prozessliste und deinen KI-Interviewer enthält. Die Liste wird <b>nicht auf dieser Website gespeichert</b> – sie steckt nur im Link. Gib ihn nur an die Personen weiter, die Prozesse aufnehmen.</p>
       <label for="eTitel">Titel (z. B. Organisation und Bereich)</label>
       <input type="text" id="eTitel" maxlength="90" placeholder="z. B. Spital Musterstadt – Bereich Finanzen">
+      <label for="eKontakt">Koordination – an wen sich die Befragten wenden</label>
+      <input type="text" id="eKontakt" maxlength="90" placeholder="z. B. Vorname Name und Vorname Name">
       <label for="eAgent">Kennung des KI-Interviewers (ElevenLabs, beginnt mit agent_)</label>
       <input type="text" id="eAgent" maxlength="60" placeholder="agent_…">
-      <label for="eListe">Prozesse – pro Zeile: Nummer; Name; Gruppe; zuständige Funktion</label>
+      <label for="eListe">Prozesse – pro Zeile: Nummer; Name; Gruppe; zuständige Person oder Funktion</label>
       <textarea id="eListe" rows="8" placeholder="3.2.4; Kreditorenmanagement; Finanzen; Leitung Rechnungswesen&#10;3.7.1; Gebäudeinstandhaltung; Immobilien; Leitung Immobilien und Betrieb"></textarea>
       <p style="margin-top:12px"><button class="knopf" id="linkBtn" type="button">Link erzeugen</button>
       <button class="knopf neben" id="kopieBtn" type="button" style="display:none">Link kopieren</button></p>
@@ -106,21 +113,23 @@
   $('fussWand').href = WAND;
 
   /* Einstellung aus dem Link lesen: ?l=<base64url von {t, a, p:[[nr, name, gruppe, funktion], …]}> */
-  var cfg = { t: '', a: '', p: [] };
+  var cfg = { t: '', a: '', k: '', p: [] };
   try {
     var l = new URLSearchParams(location.search).get('l');
     if (l) {
       var o = JSON.parse(b64uDec(l));
       cfg.t = T(o.t, 90);
+      cfg.k = T(o.k, 90);
       cfg.a = /^agent_[A-Za-z0-9]{6,50}$/.test(String(o.a || '')) ? String(o.a) : '';
       cfg.p = (Array.isArray(o.p) ? o.p : []).slice(0, 200).map(function (z) {
         z = Array.isArray(z) ? z : [];
         return { nr: T(z[0], 12), name: T(z[1], 80), gruppe: T(z[2], 60), funktion: T(z[3], 80) };
       }).filter(function (z) { return z.name; });
     }
-  } catch (e) { cfg = { t: '', a: '', p: [] }; }
+  } catch (e) { cfg = { t: '', a: '', k: '', p: [] }; }
 
   if (cfg.t) $('unter').textContent = cfg.t + ' – vom Gespräch zum Prozess nach BPMN 2.0.';
+  $('kontakt').textContent = cfg.k ? 'Fragen dazu beantwortet die Koordination: ' + cfg.k + '.' : '';
   if (cfg.p.length) $('wahlText').textContent = 'Wähle deinen Prozess aus der Liste. Fehlt er, tippe Nummer und Name ins Feld.';
 
   var gewaehlt = null;
@@ -188,6 +197,7 @@
   /* Einrichten: Liste → Link */
   if (cfg.t) $('eTitel').value = cfg.t;
   if (cfg.a) $('eAgent').value = cfg.a;
+  if (cfg.k) $('eKontakt').value = cfg.k;
   if (cfg.p.length) $('eListe').value = cfg.p.map(function (p) { return [p.nr, p.name, p.gruppe, p.funktion].join('; '); }).join('\n');
   if (!cfg.p.length && !cfg.a) $('einrichten').open = true;
   var link = '';
@@ -198,7 +208,7 @@
     aus.style.display = '';
     if (ag && !/^agent_[A-Za-z0-9]{6,50}$/.test(ag)) { aus.textContent = 'Die Kennung des Interviewers stimmt nicht. Sie beginnt mit «agent_» und enthält nur Buchstaben und Zahlen.'; $('kopieBtn').style.display = 'none'; return; }
     if (!p.length) { aus.textContent = 'Bitte mindestens einen Prozess eintragen: Nummer; Name; Gruppe; Funktion.'; $('kopieBtn').style.display = 'none'; return; }
-    link = location.origin + location.pathname + '?l=' + b64uEnc(JSON.stringify({ t: T($('eTitel').value, 90), a: ag, p: p }));
+    link = location.origin + location.pathname + '?l=' + b64uEnc(JSON.stringify({ t: T($('eTitel').value, 90), a: ag, k: T($('eKontakt').value, 90), p: p }));
     aus.textContent = p.length + (p.length === 1 ? ' Prozess' : ' Prozesse') + ' im Link: ' + link;
     $('kopieBtn').style.display = '';
   };
