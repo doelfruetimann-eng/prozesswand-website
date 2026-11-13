@@ -536,6 +536,11 @@ body.rg-on #wallScroll { padding-bottom:210px; }
 body.rg-on #wegLeiste { display:none; }
 @media (max-width:600px) { #rg { bottom:10px; padding:12px 14px; } #rg #rgText { font-size:14px; } #rg .rg-knoepfe .rg-ton { margin-left:0; } }
 @media print { #rg, #rgFokus { display:none !important; } }
+#aufnBar { position:fixed; left:50%; transform:translateX(-50%); bottom:14px; z-index:70; display:flex; gap:10px; align-items:center; flex-wrap:wrap; justify-content:center; background:#fff; border:1px solid var(--line, #d9cdd2); border-radius:12px; box-shadow:0 6px 24px rgba(0,0,0,.16); padding:8px 10px; max-width:calc(100vw - 24px); }
+#aufnBar button { font:inherit; font-size:14px; font-weight:600; border-radius:9px; padding:9px 14px; cursor:pointer; border:1px solid var(--line, #d9cdd2); background:#fff; min-height:42px; }
+#aufnBar button.go { background:#651B32; color:#fff; border-color:#651B32; }
+#aufnBar #aufnInfo { font-size:13px; color:#6f5f66; max-width:340px; }
+@media print { #aufnBar { display:none !important; } }
 /* ============================================================
    V78 BPMN-WAND: Aufgabe = weisses Rechteck, Start = duenner Kreis,
    Ende = dicker Kreis, Entscheid = Raute. Nur auf BPMN-Waenden.
@@ -661,7 +666,7 @@ body.rg-on #wegLeiste { display:none; }
 <script>
 "use strict";
 
-const APP_VERSION = 'V79';
+const APP_VERSION = 'V80';
 /* V49: einheitlicher Wegweiser nach jedem «An Claude kopieren» */
 function claudeHinweis() {
   sysMsg('📋 Kopiert! Jetzt: 1. Claude öffnen (claude.ai bzw. deine Prozesswand-Sitzung) → 2. ins Schreibfeld klicken → 3. Cmd+V (einfügen) → 4. Senden. Mehr braucht es nicht.', true);
@@ -995,14 +1000,42 @@ function bpmnVorschau(erg, beleg, name) {
    nichts wird gespeichert). Die Beschreibung liegt im Browser-Speicher desselben Geräts. */
 function aufnahmeOeffnen() {
   let a = null; try { a = JSON.parse(localStorage.getItem('pw-aufnahme')); } catch (e) {}
-  if (!a || !a.erg || !Array.isArray(a.erg.abschnitte)) return false;
+  if (!a) return false;
+  const hatWand = a.wand && typeof a.wand === 'object' && a.wand.wandTyp === 'bpmn' && Array.isArray(a.wand.postits);
+  if (!hatWand && !(a.erg && Array.isArray(a.erg.abschnitte))) return false;
   try {
-    bpmnVorschau(a.erg, 'Interview, ausgewertet am ' + heute(), a.name || a.erg.prozess);
-    document.getElementById('pvNeu').click();
+    const name = String(a.name || (a.erg && a.erg.prozess) || 'Prozess').replace(/\s+/g, ' ').trim().slice(0, 60);
+    if (hatWand) { newBoardFrom(name, normalizeState(a.wand), true); }
+    else { bpmnVorschau(a.erg, 'Interview, ausgewertet am ' + heute(), name); document.getElementById('pvNeu').click(); }
     state.goal = ''; goalInput.value = ''; autoResizeGoal(); kiLog.innerHTML = ''; render();
-    sysMsg('🧩 Dein Prozess nach BPMN 2.0. Stimmt der Ablauf? Karten lassen sich anklicken und ändern, offene Fragen beantwortest du über «Beantworten». Zum Speichern: oben rechts «Was willst du erstellen?» → «BPMN-2.0-Datei». Hier wird nichts dauerhaft gespeichert – die Koordination hat deinen Prozess bereits erhalten.');
+    const kannSpeichern = /^[A-Za-z0-9_-]{16,64}$/.test(String(a.s || ''));
+    if (kannSpeichern) aufnahmeLeiste(a, name);
+    sysMsg('🧩 Dein Prozess nach BPMN 2.0. Stimmt etwas nicht? Karte anklicken und Text ändern, offene Fragen über «Beantworten» klären. '
+      + (kannSpeichern ? 'Danach unten «Änderungen speichern» drücken.' : 'Hier wird nichts gespeichert.')
+      + ' Die BPMN-2.0-Datei gibt es oben rechts unter «Was willst du erstellen?».');
     return true;
   } catch (e) { return false; }
+}
+/* V80: Leiste unten im Aufnahme-Modus – Änderungen gehen als neue Fassung an die Koordination */
+function aufnahmeLeiste(a, name) {
+  let bar = document.getElementById('aufnBar');
+  if (!bar) { bar = document.createElement('div'); bar.id = 'aufnBar'; document.body.appendChild(bar); }
+  bar.innerHTML = '<button type="button" id="aufnZurueck">&larr; Zur Prozessliste</button><span id="aufnInfo"></span><button type="button" class="go" id="aufnSpeichern">Änderungen speichern</button>';
+  document.getElementById('aufnZurueck').onclick = () => { if (history.length > 1) history.back(); else location.href = 'spitaeler.html'; };
+  const info = document.getElementById('aufnInfo');
+  document.getElementById('aufnSpeichern').onclick = async function () {
+    this.disabled = true; info.textContent = 'Wird gespeichert …';
+    const w = { wandTyp: 'bpmn', lanes: state.lanes, phases: state.phases, postits: state.postits, connections: state.connections, milestones: state.milestones, ssot: state.ssot };
+    try {
+      const r = await fetch(SUPABASE_URL + '/functions/v1/prozess-aufnahme', { method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ aktion: 'speichern', sammlung: a.s, nr: String(a.nr || ''), name: String(a.nurName || name), wand: w }) });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.error || ('Fehler ' + r.status));
+      try { a.wand = w; localStorage.setItem('pw-aufnahme', JSON.stringify(a)); } catch (e) {}
+      info.textContent = '✓ Gespeichert um ' + new Date().toLocaleTimeString('de-CH', { hour: '2-digit', minute: '2-digit' }) + ' – die Koordination sieht die neue Fassung.';
+    } catch (e) { info.textContent = 'Nicht gespeichert: ' + e.message; }
+    this.disabled = false;
+  };
 }
 function prozessAusLink() {
   try {
