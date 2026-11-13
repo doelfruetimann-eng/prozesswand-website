@@ -661,7 +661,7 @@ body.rg-on #wegLeiste { display:none; }
 <script>
 "use strict";
 
-const APP_VERSION = 'V78';
+const APP_VERSION = 'V79';
 /* V49: einheitlicher Wegweiser nach jedem «An Claude kopieren» */
 function claudeHinweis() {
   sysMsg('📋 Kopiert! Jetzt: 1. Claude öffnen (claude.ai bzw. deine Prozesswand-Sitzung) → 2. ins Schreibfeld klicken → 3. Cmd+V (einfügen) → 4. Senden. Mehr braucht es nicht.', true);
@@ -990,6 +990,19 @@ function bpmnVorschau(erg, beleg, name) {
   const fr = st.postits.filter(c => /^\s*❓/u.test(c.text)).length;
   sysMsg('🧩 Vorschau «' + nm + '» nach BPMN 2.0: ' + (st.lanes.length - 1) + ' Rollen, ' + st.postits.filter(c => c.bpmn).length + ' Schritte, ' + fr + ' offene Fragen. Oben «Als neue Wand» wählen – oder verwerfen.');
   return st;
+}
+/* V79: Ein auf spitaeler.html aufgenommener Prozess wird ohne Konto gezeigt (Übungs-Modus:
+   nichts wird gespeichert). Die Beschreibung liegt im Browser-Speicher desselben Geräts. */
+function aufnahmeOeffnen() {
+  let a = null; try { a = JSON.parse(localStorage.getItem('pw-aufnahme')); } catch (e) {}
+  if (!a || !a.erg || !Array.isArray(a.erg.abschnitte)) return false;
+  try {
+    bpmnVorschau(a.erg, 'Interview, ausgewertet am ' + heute(), a.name || a.erg.prozess);
+    document.getElementById('pvNeu').click();
+    state.goal = ''; goalInput.value = ''; autoResizeGoal(); kiLog.innerHTML = ''; render();
+    sysMsg('🧩 Dein Prozess nach BPMN 2.0. Stimmt der Ablauf? Karten lassen sich anklicken und ändern, offene Fragen beantwortest du über «Beantworten». Zum Speichern: oben rechts «Was willst du erstellen?» → «BPMN-2.0-Datei». Hier wird nichts dauerhaft gespeichert – die Koordination hat deinen Prozess bereits erhalten.');
+    return true;
+  } catch (e) { return false; }
 }
 function prozessAusLink() {
   try {
@@ -7618,6 +7631,7 @@ async function initAuth() {
     authGate.style.display = 'none'; // V60: hart ausblenden – nie ein Anmelde-Fenster in der Übung
     document.getElementById('userTag').textContent = 'Übungs-Modus (wird nicht gespeichert)';
     loadCollection(null);
+    if (new URLSearchParams(location.search).has('aufnahme') && aufnahmeOeffnen()) return; /* V79: von spitaeler.html */
     ladeBeispiel();
     document.getElementById('pvNeu').click();
     const zielMon = new Date(); zielMon.setMonth(zielMon.getMonth() + 8);

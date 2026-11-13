@@ -32,11 +32,22 @@
   .knopf { display:inline-block; font:inherit; font-size:15.5px; font-weight:700; background:var(--bx); color:#fff; border:0; border-radius:9px; padding:12px 22px; cursor:pointer; text-decoration:none; min-height:44px; }
   .knopf:hover { background:#7d2a42; }
   .knopf.neben { background:#fff; color:var(--bx); border:2px solid var(--bx); }
+  a[aria-disabled=true]:not(.knopf) { color:var(--muted); pointer-events:none; }
   .knopf[aria-disabled=true] { background:#b9aab0; cursor:not-allowed; pointer-events:none; }
   .wahl { background:var(--gelb); border-left:4px solid var(--bx); border-radius:0 8px 8px 0; padding:10px 14px; font-size:14.5px; margin:10px 0 0; }
   .hinweis { background:var(--gelb); border-radius:8px; padding:10px 14px; font-size:13.5px; line-height:1.5; }
   details { font-size:14px; }
   summary { cursor:pointer; font-weight:700; color:var(--bx); padding:4px 0; }
+  #gText { max-height:260px; overflow-y:auto; margin-top:10px; display:none; border:1px solid var(--line); border-radius:8px; padding:8px 10px; font-size:14px; line-height:1.45; }
+  #gText div { margin:4px 0; } #gText .ki { color:var(--muted); } #gText .du b, #gText .ki b { font-size:12px; text-transform:uppercase; letter-spacing:.04em; margin-right:6px; }
+  button.knopf:disabled { background:#b9aab0; cursor:not-allowed; }
+  .zeile { display:flex; gap:10px; align-items:center; justify-content:space-between; border-top:1px solid var(--line); padding:9px 0; font-size:14.5px; }
+  .zeile .st { font-size:12.5px; font-weight:700; border-radius:20px; padding:3px 10px; white-space:nowrap; }
+  .zeile .st.ok { background:#e3f1e3; color:#2e6b2e; } .zeile .st.offen { background:var(--rose); color:var(--muted); }
+  .zeile .wer { display:block; font-size:12.5px; color:var(--muted); }
+  .zeile .rechts { display:flex; gap:8px; align-items:center; flex-shrink:0; }
+  .proz .ok { display:block; color:#2e6b2e; font-weight:700; font-size:12.5px; }
+  .zeile button { font:inherit; font-size:13.5px; font-weight:700; color:var(--bx); background:#fff; border:2px solid var(--bx); border-radius:8px; padding:6px 12px; cursor:pointer; min-height:40px; }
   #linkAus { word-break:break-all; font-size:12.5px; background:var(--rose); border-radius:8px; padding:10px 12px; margin-top:10px; display:none; }
   footer { max-width:860px; margin:0 auto; padding:0 16px 30px; font-size:12.5px; color:var(--muted); }
   footer a { color:var(--bx); }
@@ -62,15 +73,31 @@
     <h2><span class="nr">2</span>Interview mit der KI führen</h2>
     <p>Ein KI-Interviewer fragt dich rund 20 Minuten lang zum Ablauf: Auslöser, Schritte, Ausnahmen und Kontrollen. Du sprichst einfach, wie du es einer neuen Kollegin erklären würdest. Das Gespräch wird aufgezeichnet.</p>
     <p class="klein">Bitte keine Namen und keine Angaben zu Patientinnen und Patienten nennen – Funktionen genügen. Das Gespräch beendest du selbst mit dem Auflege-Knopf.</p>
-    <a class="knopf" id="interviewBtn" target="_blank" rel="noopener" aria-disabled="true" href="#">Interview starten</a>
+    <div id="gBox">
+      <button class="knopf" id="gStart" type="button" disabled>Gespräch starten</button>
+      <button class="knopf neben" id="gStop" type="button" style="display:none">Unterbrechen</button>
+      <button class="knopf" id="gFertig" type="button" style="display:none">Interview abschliessen</button>
+      <button class="knopf neben" id="gNeu" type="button" style="display:none">Von vorne beginnen</button>
+    </div>
     <p class="klein" id="interviewInfo" style="margin-top:10px"></p>
+    <div id="gText" aria-live="polite"></div>
+    <p class="klein" style="margin-top:10px">Geht es auf diesem Gerät nicht? <a id="interviewBtn" target="_blank" rel="noopener" aria-disabled="true" href="#">Gespräch in einem eigenen Fenster führen</a> (dann ohne Mitschrift auf dieser Seite).</p>
   </div>
 
   <div class="karte">
-    <h2><span class="nr">3</span>Fertig – du erhältst den Entwurf zur Kontrolle</h2>
-    <p>Mit dem Gespräch ist deine Arbeit getan. Es wird <b>von selbst gespeichert</b>: Du musst nichts hochladen und nichts verschicken.</p>
-    <p>Die Koordination baut aus dem Gespräch den Prozess nach BPMN 2.0 – eine Bahn pro Rolle, mit Start, Aufgaben, Entscheiden und Ende. Du bekommst den Entwurf zugeschickt und sagst, ob der Ablauf stimmt oder was angepasst werden muss.</p>
+    <h2><span class="nr">3</span>Prozess ansehen und speichern</h2>
+    <p>Wenn du das Interview abschliesst, entsteht daraus dein Prozess nach BPMN 2.0 – eine Bahn pro Rolle, mit Start, Aufgaben, Entscheiden und Ende. Du siehst ihn sofort, kannst ihn als BPMN-2.0-Datei speichern, und die Koordination erhält ihn von selbst.</p>
+    <div id="ergebnis" class="wahl" style="display:none"></div>
+    <p style="margin-top:12px"><a class="knopf" id="ansehenBtn" href="#" aria-disabled="true">Prozess ansehen und speichern</a></p>
     <p class="klein" id="kontakt"></p>
+  </div>
+
+  <div class="karte" id="uebersichtKarte" style="display:none">
+    <h2>Stand der Prozesse</h2>
+    <p id="standZahl" style="font-weight:700"></p>
+    <div id="standBalken" style="height:10px;border-radius:5px;background:var(--rose);overflow:hidden;margin:4px 0 8px"><div style="height:100%;width:0;background:var(--bx)"></div></div>
+    <p class="klein">Wer den Link hat, sieht diese Liste und kann aufgenommene Prozesse ansehen.</p>
+    <div id="uebersicht"></div>
   </div>
 
   <div class="karte">
@@ -96,6 +123,7 @@
     </details>
   </div>
 </main>
+<script src="https://unpkg.com/@elevenlabs/client@1.36.0/dist/lib.iife.js" defer></script>
 
 <footer>
   Ein Werkzeug der <a href="prozesswand.html" id="fussWand">Prozesswand</a>. Die Prozesswand dokumentiert und ordnet – verbindlich ist der Eintrag im Prozess-System der Organisation.
@@ -113,20 +141,21 @@
   $('fussWand').href = WAND;
 
   /* Einstellung aus dem Link lesen: ?l=<base64url von {t, a, p:[[nr, name, gruppe, funktion], …]}> */
-  var cfg = { t: '', a: '', k: '', p: [] };
+  var cfg = { t: '', a: '', k: '', s: '', p: [] };
   try {
     var l = new URLSearchParams(location.search).get('l');
     if (l) {
       var o = JSON.parse(b64uDec(l));
       cfg.t = T(o.t, 90);
       cfg.k = T(o.k, 90);
+      cfg.s = /^[A-Za-z0-9_-]{16,64}$/.test(String(o.s || '')) ? String(o.s) : '';
       cfg.a = /^agent_[A-Za-z0-9]{6,50}$/.test(String(o.a || '')) ? String(o.a) : '';
       cfg.p = (Array.isArray(o.p) ? o.p : []).slice(0, 200).map(function (z) {
         z = Array.isArray(z) ? z : [];
         return { nr: T(z[0], 12), name: T(z[1], 80), gruppe: T(z[2], 60), funktion: T(z[3], 80) };
       }).filter(function (z) { return z.name; });
     }
-  } catch (e) { cfg = { t: '', a: '', k: '', p: [] }; }
+  } catch (e) { cfg = { t: '', a: '', k: '', s: '', p: [] }; }
 
   if (cfg.t) $('unter').textContent = cfg.t + ' – vom Gespräch zum Prozess nach BPMN 2.0.';
   $('kontakt').textContent = cfg.k ? 'Fragen dazu beantwortet die Koordination: ' + cfg.k + '.' : '';
@@ -146,14 +175,10 @@
       btn.href = WAND + '?prozess=' + b64uEnc(JSON.stringify({ nr: p.nr, name: p.name }));
       btn.setAttribute('aria-disabled', 'false');
     } else { btn.href = '#'; btn.setAttribute('aria-disabled', 'true'); }
-    var iv = $('interviewBtn'), info = $('interviewInfo');
-    if (!cfg.a) { iv.setAttribute('aria-disabled', 'true'); info.textContent = 'Für diese Seite ist noch kein KI-Interviewer hinterlegt. Die Koordination richtet ihn unten ein.'; }
-    else if (!p) { iv.setAttribute('aria-disabled', 'true'); info.textContent = 'Wähle zuerst oben deinen Prozess.'; }
-    else {
-      iv.href = 'https://elevenlabs.io/app/talk-to?agent_id=' + encodeURIComponent(cfg.a);
-      iv.setAttribute('aria-disabled', 'false');
-      info.textContent = 'Sage dem Interviewer zu Beginn: «' + (p.nr ? p.nr + ' ' : '') + p.name + '».';
-    }
+    var iv = $('interviewBtn');
+    if (!cfg.a || !p) { iv.setAttribute('aria-disabled', 'true'); iv.removeAttribute('href'); }
+    else { iv.href = 'https://elevenlabs.io/app/talk-to?agent_id=' + encodeURIComponent(cfg.a); iv.setAttribute('aria-disabled', 'false'); }
+    gespraechZeigen();
     zeichnen();
   }
   function zeichnen() {
@@ -174,6 +199,7 @@
         b.className = 'proz' + (gewaehlt && gewaehlt.nr === p.nr && gewaehlt.name === p.name ? ' gewaehlt' : '');
         var t = document.createElement('b'); t.textContent = (p.nr ? p.nr + ' ' : '') + p.name; b.appendChild(t);
         if (p.funktion) { var s = document.createElement('span'); s.textContent = p.funktion; b.appendChild(s); }
+        if (typeof erledigt !== 'undefined' && erledigt[pKey(p.nr, p.name)]) { var ok = document.createElement('span'); ok.className = 'ok'; ok.textContent = '✓ aufgenommen'; b.appendChild(ok); }
         b.onclick = function () { waehlen(p); };
         li.appendChild(b);
       });
@@ -191,6 +217,132 @@
       box.appendChild(b2);
     }
   }
+
+  /* ---------- V79: Gespräch auf der Seite, Mitschrift, Fortsetzen, Abschliessen ---------- */
+  var DIENST = 'https://bvbjxofdcugpfsccwlzv.supabase.co/functions/v1/prozess-aufnahme';
+  var conv = null, laeuft = false;
+  function schluessel() { return gewaehlt ? 'pa-' + (cfg.s || 'ohne') + '-' + (gewaehlt.nr || gewaehlt.name) : ''; }
+  function laden() { try { return JSON.parse(localStorage.getItem(schluessel())) || { zeilen: [] }; } catch (e) { return { zeilen: [] }; } }
+  function sichern(d) { try { localStorage.setItem(schluessel(), JSON.stringify(d)); } catch (e) {} }
+  function abschriftText(d) { return d.zeilen.map(function (z) { return (z.q === 'du' ? 'Antwort: ' : 'Interviewer: ') + z.t; }).join('\n'); }
+  function info(t) { $('interviewInfo').textContent = t; }
+  function gespraechZeigen() {
+    var d = gewaehlt ? laden() : { zeilen: [] }, n = d.zeilen.length, box = $('gText');
+    box.textContent = ''; box.style.display = n ? 'block' : 'none';
+    d.zeilen.forEach(function (z) { var e = document.createElement('div'); e.className = z.q; var b = document.createElement('b'); b.textContent = z.q === 'du' ? 'Du' : 'KI'; e.appendChild(b); e.appendChild(document.createTextNode(z.t)); box.appendChild(e); });
+    box.scrollTop = box.scrollHeight;
+    var bereit = !!(gewaehlt && cfg.a && cfg.s);
+    $('gStart').disabled = !bereit || laeuft;
+    $('gStart').textContent = n ? 'Gespräch fortsetzen' : 'Gespräch starten';
+    $('gStart').style.display = (laeuft || d.fertig) ? 'none' : '';
+    $('gStop').style.display = laeuft ? '' : 'none';
+    $('gFertig').style.display = (n >= 4 && !d.fertig) ? '' : 'none';
+    $('gNeu').style.display = (n && !laeuft) ? '' : 'none';
+    $('gNeu').textContent = d.fertig ? 'Neues Interview zu diesem Prozess' : 'Von vorne beginnen';
+    var an = $('ansehenBtn'), erg = $('ergebnis');
+    if (d.fertig) { an.setAttribute('aria-disabled', 'false'); erg.style.display = ''; erg.textContent = 'Dein Prozess ist aufgenommen und bei der Koordination angekommen.'; }
+    else { an.setAttribute('aria-disabled', 'true'); erg.style.display = 'none'; }
+    if (!laeuft) {
+      if (!cfg.a || !cfg.s) info('Für diese Seite ist noch kein KI-Interviewer hinterlegt. Die Koordination richtet ihn unten ein.');
+      else if (!gewaehlt) info('Wähle zuerst oben deinen Prozess.');
+      else if (d.fertig) info('Das Interview ist abgeschlossen.');
+      else if (n) info('Das Gespräch wurde unterbrochen. Mit «Gespräch fortsetzen» geht es dort weiter, wo ihr wart. Die Mitschrift bleibt auf diesem Gerät gespeichert.');
+      else info('Erlaube das Mikrofon, wenn der Browser fragt. Die Mitschrift erscheint hier.');
+    }
+  }
+  function zeile(q, t) {
+    t = T(t, 4000); if (!t) return;
+    var d = laden(), l = d.zeilen[d.zeilen.length - 1];
+    if (l && l.q === q && l.t === t) return;
+    d.zeilen.push({ q: q, t: t }); if (d.zeilen.length > 600) d.zeilen.shift();
+    sichern(d); gespraechZeigen();
+  }
+  $('gStart').onclick = function () {
+    var lib = window.ElevenLabsClient;
+    if (!lib || !lib.Conversation) { info('Das Gespräch lässt sich auf diesem Gerät nicht in die Seite laden. Nutze den Link «in einem eigenen Fenster» weiter unten.'); return; }
+    var d = laden(), fort = d.zeilen.length > 0, name = (gewaehlt.nr ? gewaehlt.nr + ' ' : '') + gewaehlt.name;
+    laeuft = true; gespraechZeigen(); info('Verbindung wird aufgebaut …');
+    lib.Conversation.startSession({
+      agentId: cfg.a, connectionType: 'webrtc',
+      onConnect: function () { info('Das Gespräch läuft. Sprich einfach – «Unterbrechen» hält es an, «Interview abschliessen» beendet es.'); },
+      onDisconnect: function () { conv = null; laeuft = false; gespraechZeigen(); },
+      onError: function () { info('Die Verbindung ist abgebrochen. Mit «Gespräch fortsetzen» geht es weiter.'); },
+      onMessage: function (m) { if (m && m.message) zeile(m.source === 'user' ? 'du' : 'ki', m.message); }
+    }).then(function (c) {
+      conv = c;
+      var hinweis = 'Hinweis der Seite: Der aufzunehmende Prozess ist «' + name + '». Frage nicht mehr nach dem Namen des Prozesses.';
+      if (fort) hinweis += ' Dies ist die FORTSETZUNG eines unterbrochenen Gesprächs. Das Einverständnis liegt bereits vor – frage nicht nochmals danach. Wiederhole keine beantworteten Fragen und fahre dort weiter, wo das Gespräch abbrach. Bisheriges Gespräch:\n' + abschriftText(d).slice(-12000);
+      try { c.sendContextualUpdate(hinweis); } catch (e) {}
+    }).catch(function () { conv = null; laeuft = false; gespraechZeigen(); info('Das Gespräch konnte nicht starten. Ist das Mikrofon erlaubt? Sonst nutze den Link «in einem eigenen Fenster».'); });
+  };
+  function beenden() { var c = conv; conv = null; laeuft = false; if (c) { try { return c.endSession(); } catch (e) {} } return Promise.resolve(); }
+  $('gStop').onclick = function () { beenden(); gespraechZeigen(); };
+  $('gNeu').onclick = function () { if (!confirm('Die Mitschrift auf diesem Gerät löschen und von vorne beginnen?')) return; try { localStorage.removeItem(schluessel()); } catch (e) {} gespraechZeigen(); };
+  function dienst(koerper) {
+    koerper.sammlung = cfg.s;
+    return fetch(DIENST, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(koerper) })
+      .then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j && j.error ? j.error : 'Fehler ' + r.status); return j; }); });
+  }
+  function zurWand(erg, name) {
+    try { localStorage.setItem('pw-aufnahme', JSON.stringify({ erg: erg, name: name, zeit: Date.now() })); } catch (e) {}
+    location.href = WAND + '?beispiel=1&aufnahme=1';
+  }
+  $('gFertig').onclick = function () {
+    var knopf = this, d = laden(), name = (gewaehlt.nr ? gewaehlt.nr + ' ' : '') + gewaehlt.name;
+    knopf.disabled = true;
+    Promise.resolve(beenden()).then(function () {
+      info('Dein Prozess wird aus dem Gespräch gebaut … das dauert bis zu einer Minute. Bitte die Seite offen lassen.');
+      return dienst({ aktion: 'auswerten', nr: gewaehlt.nr, name: gewaehlt.name, abschrift: abschriftText(laden()) });
+    }).then(function (j) {
+      d = laden(); d.fertig = true; d.id = j.id; d.erg = j.ergebnis; sichern(d);
+      knopf.disabled = false; gespraechZeigen(); uebersichtLaden();
+      info('Fertig. Unten bei Schritt 3 kannst du deinen Prozess ansehen und speichern.');
+    }).catch(function (e) { knopf.disabled = false; gespraechZeigen(); info(String(e.message || e) + ' Die Mitschrift bleibt auf diesem Gerät gespeichert.'); });
+  };
+  $('ansehenBtn').onclick = function (ev) {
+    ev.preventDefault(); var d = gewaehlt ? laden() : {};
+    if (d.erg) zurWand(d.erg, (gewaehlt.nr ? gewaehlt.nr + ' ' : '') + gewaehlt.name);
+  };
+  var erledigt = {}; /* Prozess-Nr. oder Name → neueste Aufnahme */
+  function pKey(nr, name) { return nr ? 'n:' + nr : 'm:' + String(name || '').toLowerCase(); }
+  function ansehen(id, b) {
+    b.disabled = true;
+    dienst({ aktion: 'hole', id: id }).then(function (x) { zurWand(x.ergebnis, (x.prozess_nr ? x.prozess_nr + ' ' : '') + x.prozess_name); })
+      .catch(function () { b.disabled = false; b.textContent = 'Nicht erreichbar'; });
+  }
+  function standZeichnen() {
+    var box = $('uebersicht'); box.textContent = '';
+    var zeilen = cfg.p.map(function (p) { return { nr: p.nr, name: p.name, wer: p.funktion, a: erledigt[pKey(p.nr, p.name)] }; });
+    var bekannt = {}; cfg.p.forEach(function (p) { bekannt[pKey(p.nr, p.name)] = 1; });
+    Object.keys(erledigt).forEach(function (k) { if (!bekannt[k]) { var z = erledigt[k]; zeilen.push({ nr: z.prozess_nr, name: z.prozess_name, wer: '', a: z }); } });
+    var n = zeilen.filter(function (z) { return z.a; }).length;
+    $('uebersichtKarte').style.display = zeilen.length ? '' : 'none';
+    $('standZahl').textContent = n + ' von ' + zeilen.length + (zeilen.length === 1 ? ' Prozess' : ' Prozessen') + ' aufgenommen';
+    $('standBalken').firstChild.style.width = (zeilen.length ? Math.round(100 * n / zeilen.length) : 0) + '%';
+    zeilen.forEach(function (z) {
+      var r = document.createElement('div'); r.className = 'zeile';
+      var s = document.createElement('span'); var b0 = document.createElement('b'); b0.textContent = (z.nr ? z.nr + ' ' : '') + z.name; s.appendChild(b0);
+      if (z.wer) { var w = document.createElement('span'); w.className = 'wer'; w.textContent = z.wer; s.appendChild(w); }
+      var re = document.createElement('span'); re.className = 'rechts';
+      var st = document.createElement('span'); st.className = 'st ' + (z.a ? 'ok' : 'offen');
+      st.textContent = z.a ? '✓ ' + String(z.a.erstellt || '').slice(0, 10).split('-').reverse().join('.') : 'offen';
+      re.appendChild(st);
+      if (z.a) { var b = document.createElement('button'); b.type = 'button'; b.textContent = 'Ansehen'; b.onclick = function () { ansehen(z.a.id, b); }; re.appendChild(b); }
+      r.appendChild(s); r.appendChild(re); box.appendChild(r);
+    });
+    zeichnen();
+  }
+  function uebersichtLaden() {
+    standZeichnen();
+    if (!cfg.s) return;
+    dienst({ aktion: 'liste' }).then(function (j) {
+      erledigt = {};
+      ((j && j.liste) || []).forEach(function (z) { var k = pKey(z.prozess_nr, z.prozess_name); if (!erledigt[k]) erledigt[k] = z; }); /* Liste ist neueste zuerst */
+      standZeichnen();
+    }).catch(function () {});
+  }
+  uebersichtLaden();
+
   $('suche').addEventListener('input', zeichnen);
   waehlen(null);
 
@@ -201,6 +353,7 @@
   if (cfg.p.length) $('eListe').value = cfg.p.map(function (p) { return [p.nr, p.name, p.gruppe, p.funktion].join('; '); }).join('\n');
   if (!cfg.p.length && !cfg.a) $('einrichten').open = true;
   var link = '';
+  function zufall() { var a = new Uint8Array(18); crypto.getRandomValues(a); return Array.prototype.map.call(a, function (b) { return 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789'[b % 56]; }).join(''); }
   $('linkBtn').onclick = function () {
     var aus = $('linkAus'), ag = $('eAgent').value.trim();
     var p = $('eListe').value.split(/\n/).map(function (z) { return z.split(';').map(function (x) { return T(x, 80); }); })
@@ -208,7 +361,7 @@
     aus.style.display = '';
     if (ag && !/^agent_[A-Za-z0-9]{6,50}$/.test(ag)) { aus.textContent = 'Die Kennung des Interviewers stimmt nicht. Sie beginnt mit «agent_» und enthält nur Buchstaben und Zahlen.'; $('kopieBtn').style.display = 'none'; return; }
     if (!p.length) { aus.textContent = 'Bitte mindestens einen Prozess eintragen: Nummer; Name; Gruppe; Funktion.'; $('kopieBtn').style.display = 'none'; return; }
-    link = location.origin + location.pathname + '?l=' + b64uEnc(JSON.stringify({ t: T($('eTitel').value, 90), a: ag, k: T($('eKontakt').value, 90), p: p }));
+    link = location.origin + location.pathname + '?l=' + b64uEnc(JSON.stringify({ t: T($('eTitel').value, 90), a: ag, k: T($('eKontakt').value, 90), s: cfg.s || zufall(), p: p }));
     aus.textContent = p.length + (p.length === 1 ? ' Prozess' : ' Prozesse') + ' im Link: ' + link;
     $('kopieBtn').style.display = '';
   };
