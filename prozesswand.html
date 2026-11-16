@@ -666,7 +666,7 @@ body.rg-on #wegLeiste { display:none; }
 <script>
 "use strict";
 
-const APP_VERSION = 'V86';
+const APP_VERSION = 'V87';
 /* V49: einheitlicher Wegweiser nach jedem «An Claude kopieren» */
 function claudeHinweis() {
   sysMsg('📋 Kopiert! Jetzt: 1. Claude öffnen (claude.ai bzw. deine Prozesswand-Sitzung) → 2. ins Schreibfeld klicken → 3. Cmd+V (einfügen) → 4. Senden. Mehr braucht es nicht.', true);
@@ -880,7 +880,7 @@ function bpmnWandBauen(erg, beleg) {
       const c = { id: id, x: links + 14 + sp * BPMN_SPALTE, y: rIdx * LANE_H + 8, text: T(e.text, 80), color: '#ffffff',
         bpmn: art, status: 'erledigt', checked: true, beleg: beleg || '[unbelegt]' };
       if (art === 'aufgabe') c.auftrag = 'Wer: ' + rollen[rIdx] + '. Womit: ' + (womit || '[offen]') + '. Ergebnis: ' + (ergebnis || '[offen]') + '.';
-      if (art === 'aufgabe') { const ab = { eingabe: T(e.eingabe, 160), womit: womit, ergebnis: ergebnis, mitwirkend: T(e.mitwirkend, 80) }; Object.keys(ab).forEach(k => { if (!ab[k]) delete ab[k]; }); if (Object.keys(ab).length) c.ablauf = ab; }
+      if (art === 'aufgabe' || art === 'gateway') { const ab = { eingabe: T(e.eingabe, 160), womit: womit, ergebnis: ergebnis, mitwirkend: T(e.mitwirkend, 80), frist: T(e.frist, 80) }; Object.keys(ab).forEach(k => { if (!ab[k]) delete ab[k]; }); if (Object.keys(ab).length) c.ablauf = ab; }
       postits.push(c);
       (Array.isArray(e.nach) ? e.nach : []).forEach(n => { const zu = T(n && (n.zu || n), 40); if (zu) nach.push({ von: eid, zu: zu, wenn: T(n && n.wenn, 40) }); });
     });
@@ -926,7 +926,7 @@ function genBpmn() {
     const art = bpmnArt(p), t = TAG[art], id = NID(p.id);
     const txt = cleanTxt(p.text || '');
     m += '    <bpmn:' + t + ' id="' + id + '" name="' + x(txt) + '">\n';
-    const doku = [p.auftrag, p.beleg && p.beleg !== UNBELEGT ? 'Beleg: ' + p.beleg : ''].filter(Boolean).join(' ');
+    const doku = [p.auftrag, p.ablauf && p.ablauf.frist ? 'Frist: ' + p.ablauf.frist + '.' : '', p.beleg && p.beleg !== UNBELEGT ? 'Beleg: ' + p.beleg : ''].filter(Boolean).join(' ');
     if (doku) m += '      <bpmn:documentation>' + x(doku) + '</bpmn:documentation>\n';
     fl.filter(k => k.to === p.id).forEach(k => { m += '      <bpmn:incoming>F_' + NID(k.id) + '</bpmn:incoming>\n'; });
     fl.filter(k => k.from === p.id).forEach(k => { m += '      <bpmn:outgoing>F_' + NID(k.id) + '</bpmn:outgoing>\n'; });
@@ -1062,7 +1062,7 @@ function genVsdx() {
     const daten = [];
     if (p.auftrag) daten.push(['Auftrag', 'Auftrag', p.auftrag]);
     if (p.beleg && p.beleg !== UNBELEGT) daten.push(['Beleg', 'Beleg', p.beleg]);
-    if (art === 'aufgabe') shapeId[p.id] = form({ cx: cx, cy: cy, w: PI_W / PX, h: 60 / PX, rund: 0.08, lw: 1, pt: 8, text: (vNr[p.id] ? vNr[p.id] + ' ' : '') + t, daten: daten, name: 'Aufgabe' });
+    if (art === 'aufgabe') shapeId[p.id] = form({ cx: cx, cy: cy, w: PI_W / PX, h: 60 / PX, rund: 0.08, lw: 1, pt: 8, text: (vNr[p.id] ? vNr[p.id] + ' ' : '') + t + (p.ablauf && p.ablauf.frist ? '\n(' + p.ablauf.frist + ')' : ''), daten: daten, name: 'Aufgabe' });
     else if (art === 'gateway') shapeId[p.id] = form({ cx: cx, cy: cy, w: 42 / PX, h: 42 / PX, lw: 1, geo: GEO.raute, textUnten: true, pt: 7.5, text: t, daten: daten, name: 'Entscheid' });
     else shapeId[p.id] = form({ cx: cx, cy: cy, w: 36 / PX, h: 36 / PX, lw: art === 'ende' ? 3 : 1, geo: GEO.kreis, textUnten: true, pt: 7.5, text: t, daten: daten, name: art === 'ende' ? 'Ende' : 'Start' });
   });
@@ -1238,7 +1238,8 @@ function genProzessseite() {
   start.forEach(p => { tab += zeile('', '<b>Vorgänger / Auslöser</b><br>' + esc(cleanTxt(p.text || '')), sb.eingaben.length ? esc(sb.eingaben.join('; ')) : OFFEN, sb.schnittstellen.length ? 'Schnittstellen: ' + esc(sb.schnittstellen.join('; ')) : '', esc(rolleVon(p)), ''); });
   schritte.forEach(p => {
     const a = A(p), ein = [a.eingabe ? 'Eingabe: ' + a.eingabe : '', a.ergebnis ? 'Ergebnis: ' + a.ergebnis : ''].filter(Boolean);
-    const txt = p.bpmn === 'gateway' ? '<b>Entscheid:</b> ' + esc(cleanTxt(p.text || '')) + '<br>' + esc(ziele(p.id).join('; ')) : esc(cleanTxt(p.text || ''));
+    const txt = (p.bpmn === 'gateway' ? '<b>Entscheid:</b> ' + esc(cleanTxt(p.text || '')) + '<br>' + esc(ziele(p.id).join('; ')) : esc(cleanTxt(p.text || '')))
+      + (a.frist ? '<br><i>Frist: ' + esc(a.frist) + '</i>' : '');
     tab += zeile(nr[p.id], txt, ein.length ? esc(ein.join(' · ')).replace(' · ', '<br>') : (p.bpmn === 'gateway' ? '' : OFFEN), a.womit ? esc(a.womit) : (p.bpmn === 'gateway' ? '' : OFFEN), esc(rolleVon(p)), a.mitwirkend ? esc(a.mitwirkend) : '');
   });
   ende.forEach(p => { tab += zeile('', '<b>Folgeschritt / Ende</b><br>' + esc(cleanTxt(p.text || '')), sb.ergebnisse.length ? esc(sb.ergebnisse.join('; ')) : OFFEN, '', esc(rolleVon(p)), ''); });
@@ -1307,7 +1308,7 @@ function downloadProzessseite() {
 /* Auftrag an die KI: aus der Abschrift eines Interviews wird eine Prozess-Beschreibung.
    Dasselbe Format liest auch der Import – so geht es mit dem Abo ohne API-Kosten. */
 const BPMN_FORMAT = '{"prozess":"Nummer und Name","rollen":["Rolle A","Rolle B"],'
-  + '"abschnitte":[{"name":"Abschnitt","elemente":[{"id":"e1","art":"start|aufgabe|gateway|ende","rolle":"Rolle A","text":"höchstens 80 Zeichen","eingabe":"was für diesen Schritt vorliegen muss oder leer","womit":"System, Formular, Dokument oder leer","ergebnis":"was danach vorhanden ist oder leer","mitwirkend":"weitere beteiligte Rolle oder leer","nach":[{"zu":"e2","wenn":"nur bei Entscheid: ja, nein oder kurze Bedingung"}]}]}],'
+  + '"abschnitte":[{"name":"Abschnitt","elemente":[{"id":"e1","art":"start|aufgabe|gateway|ende","rolle":"Rolle A","text":"höchstens 80 Zeichen","eingabe":"was für diesen Schritt vorliegen muss oder leer","womit":"System, Formular, Dokument oder leer","ergebnis":"was danach vorhanden ist oder leer","mitwirkend":"weitere beteiligte Rolle oder leer","frist":"Zeitvorgabe des Schritts oder leer","nach":[{"zu":"e2","wenn":"nur bei Entscheid: ja, nein oder kurze Bedingung"}]}]}],'
   + '"offen":[{"frage":"offene Frage","abschnitt":"Name des Abschnitts"}],"hinweise":[{"text":"wichtige Nebenbemerkung","abschnitt":"Name des Abschnitts"}],"steckbrief":{"ziele":[],"geltung":[],"eingaben":[],"ausgaben":[],"ergebnisse":[],"schnittstellen":[],"dokumente":[],"kennzahlen":[],"reife":[],"risiken":[],"grundlagen":[]}}';
 const BPMN_SYS = 'Du strukturierst die Abschrift eines Interviews zu einem Arbeitsprozess nach BPMN 2.0. '
   + 'Antworte NUR mit einem JSON-Objekt in genau diesem Format: ' + BPMN_FORMAT + '\n'
@@ -1319,7 +1320,8 @@ const BPMN_SYS = 'Du strukturierst die Abschrift eines Interviews zu einem Arbei
   + '5. Ein "gateway" steht dort, wo der Ablauf sich verzweigt. Sein Text ist die Frage (z. B. «Vor Ort lösbar?»), jede Verbindung danach trägt "wenn".\n'
   + '6. 3 bis 6 Abschnitte in der Reihenfolge des Ablaufs, je 1 bis 5 Elemente. Jedes Element ausser dem Ende hat mindestens einen Eintrag in "nach".\n'
   + '7. Schweizer Schreibweise (ss statt ß). Keine Angaben zu Patientinnen und Patienten.\n'
-  + '8. "steckbrief" sammelt die Pflichtangaben einer Prozessseite: ziele (wozu), geltung (wo der Prozess gilt), eingaben (was zum Start vorliegen muss), ausgaben (was weitergeht), ergebnisse (was am Ende vorliegt), schnittstellen (Prozesse davor und danach), dokumente (Weisungen, Reglemente, Checklisten, Formulare), kennzahlen (Messgrössen), reife (wie gut es heute läuft, wo es hakt), risiken, grundlagen (Gesetze, Normen, Vorgaben). Je Feld kurze Einträge (höchstens 160 Zeichen). Nur Gesagtes; was nicht vorkam, bleibt eine leere Liste – nie raten.';
+  + '8. "steckbrief" sammelt die Pflichtangaben einer Prozessseite: ziele (wozu), geltung (wo der Prozess gilt), eingaben (was zum Start vorliegen muss), ausgaben (was weitergeht), ergebnisse (was am Ende vorliegt), schnittstellen (Prozesse davor und danach), dokumente (Weisungen, Reglemente, Checklisten, Formulare), kennzahlen (Messgrössen), reife (wie gut es heute läuft, wo es hakt), risiken, grundlagen (Gesetze, Normen, Vorgaben). Je Feld kurze Einträge (höchstens 160 Zeichen). Nur Gesagtes; was nicht vorkam, bleibt eine leere Liste – nie raten.\n'
+  + '9. "frist" ist die Zeitvorgabe eines Schritts, so wie sie genannt wurde, kurz und relativ zu einem Bezugspunkt (z. B. «T0 − 9 Tage» bei einem festen Termin T0, «innert 2 Arbeitstagen nach Eingang», «bis 20. des Monats»). Keine Frist genannt = leer lassen, nie schätzen.';
 function bpmnAuftragText(name, abschrift) {
   return BPMN_SYS + '\n\nProzess: ' + (name || '[offen]') + '\n\nAbschrift des Interviews:\n' + abschrift;
 }
@@ -1542,7 +1544,7 @@ function normalizeState(d) {
     if (p.rang != null) p.rang = ZAHL(p.rang, undefined);
     if (p.erledigtAm != null) p.erledigtAm = DATUM(p.erledigtAm);
     if (p.bpmn != null && ['start', 'aufgabe', 'gateway', 'ende'].indexOf(p.bpmn) < 0) delete p.bpmn; /* V78 */
-    if (p.ablauf != null) { const ab = {}; if (OBJ(p.ablauf)) ['eingabe', 'womit', 'ergebnis', 'mitwirkend'].forEach(k => { if (p.ablauf[k] != null && String(p.ablauf[k]).trim()) ab[k] = String(p.ablauf[k]).replace(/\s+/g, ' ').trim().slice(0, 200); }); if (Object.keys(ab).length) p.ablauf = ab; else delete p.ablauf; } /* V82 */
+    if (p.ablauf != null) { const ab = {}; if (OBJ(p.ablauf)) ['eingabe', 'womit', 'ergebnis', 'mitwirkend', 'frist'].forEach(k => { if (p.ablauf[k] != null && String(p.ablauf[k]).trim()) ab[k] = String(p.ablauf[k]).replace(/\s+/g, ' ').trim().slice(0, 200); }); if (Object.keys(ab).length) p.ablauf = ab; else delete p.ablauf; } /* V82 */
     return p; });
   s.connections = s.connections.filter(OBJ)
     .map(c => { const o = { id: neu(c.id, 'c'), from: idMap[c.from] || c.from, to: idMap[c.to] || c.to };
@@ -1956,7 +1958,10 @@ function openPostitModal(id) {
     + '<input type="text" id="mBeleg" placeholder="URL, Dateiname oder gemessener Wert &ndash; sonst [unbelegt]" value="' + esc(card.beleg || '') + '">'
     + '<div style="font-size:10.5px;color:var(--muted);margin-top:3px">Ohne Beleg kann diese Karte kein Entscheid-Tor ausl&ouml;sen &ndash; eine Vermutung darf den Ablauf nicht anhalten.</div>'
     + (istBpmnWand() && !bpmnIstNotiz(card) ? '<label>Art des Schritts (BPMN)</label><select id="mBpmn" style="width:100%;font:inherit;font-size:12.5px;padding:6px 8px;border:1px solid var(--line);border-radius:6px">'
-      + [['aufgabe', 'Aufgabe – eine Tätigkeit'], ['start', 'Start – der Auslöser'], ['gateway', 'Entscheid – der Ablauf verzweigt sich'], ['ende', 'Ende – das Ergebnis']].map(o => '<option value="' + o[0] + '"' + (bpmnArt(card) === o[0] ? ' selected' : '') + '>' + o[1] + '</option>').join('') + '</select>' : '')
+      + [['aufgabe', 'Aufgabe – eine Tätigkeit'], ['start', 'Start – der Auslöser'], ['gateway', 'Entscheid – der Ablauf verzweigt sich'], ['ende', 'Ende – das Ergebnis']].map(o => '<option value="' + o[0] + '"' + (bpmnArt(card) === o[0] ? ' selected' : '') + '>' + o[1] + '</option>').join('') + '</select>'
+      /* V87: Angaben zum Schritt – erscheinen in Prozessseite, BPMN- und Visio-Datei */
+      + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 10px">' + [['eingabe', 'Eingabe – was vorliegen muss'], ['womit', 'Hilfsmittel – womit'], ['ergebnis', 'Ergebnis – was danach vorliegt'], ['mitwirkend', 'Mitwirkend'], ['frist', 'Frist – bis wann (z. B. T0 − 9 Tage)']]
+        .map(f => '<div><label>' + f[1] + '</label><input type="text" data-ablauf="' + f[0] + '" maxlength="160" value="' + esc((card.ablauf && card.ablauf[f[0]]) || '') + '"></div>').join('') + '</div>' : '')
     + '<label>Farbe</label><div class="swatches">' + sw + '</div>'
     + '<div style="display:flex;gap:8px;margin-top:10px">'
     + '<div style="flex:1"><label>Task-Typ</label><select id="mTyp" style="width:100%;font:inherit;font-size:12.5px;padding:6px 8px;border:1px solid var(--line);border-radius:6px">'
@@ -2117,6 +2122,8 @@ function openPostitModal(id) {
     const auEl = document.getElementById('mAuftrag');
     if (auEl) { const v = auEl.value.trim(); if (v) card.auftrag = v; else delete card.auftrag; }
     const bpEl = document.getElementById('mBpmn'); if (bpEl) card.bpmn = bpEl.value; /* V78 */
+    const abEls = modalBox.querySelectorAll('[data-ablauf]'); /* V87 */
+    if (abEls.length) { const ab = {}; abEls.forEach(e => { const v = e.value.replace(/\s+/g, ' ').trim().slice(0, 160); if (v) ab[e.dataset.ablauf] = v; }); if (Object.keys(ab).length) card.ablauf = ab; else delete card.ablauf; }
     const beEl = document.getElementById('mBeleg');
     if (beEl) { const v = beEl.value.trim(); if (v) card.beleg = v; else delete card.beleg; }
     const sel = modalBox.querySelector('.swatch.sel'); if (sel) card.color = sel.dataset.c;

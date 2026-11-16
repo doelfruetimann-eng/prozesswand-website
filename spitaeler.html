@@ -357,7 +357,7 @@
       var K = x.wand.postits.slice().sort(function (a, b) { return (+a.x || 0) - (+b.x || 0); });
       var txt = {}; K.forEach(function (c) { txt[c.id] = T(c.text, 120); });
       var z = ['Rollen: ' + L.filter(function (l) { return l.key !== 'notiz'; }).map(function (l) { return l.title; }).join(', ')];
-      K.forEach(function (c) { if (c.bpmn) z.push('- ' + (ART[c.bpmn] || 'Aufgabe') + ' [' + rolle(c) + ']: ' + txt[c.id]); });
+      K.forEach(function (c) { if (c.bpmn) z.push('- ' + (ART[c.bpmn] || 'Aufgabe') + ' [' + rolle(c) + ']: ' + txt[c.id] + (c.ablauf && c.ablauf.frist ? ' (Frist: ' + T(c.ablauf.frist, 80) + ')' : '')); });
       (x.wand.connections || []).forEach(function (k) { if (txt[k.from] && txt[k.to]) z.push('  Ablauf: ' + txt[k.from] + ' → ' + txt[k.to] + (k.label ? ' (' + T(k.label, 40) + ')' : '')); });
       K.forEach(function (c) { if (!c.bpmn && /❓/.test(c.text || '') && c.status !== 'erledigt') z.push('- Offene Frage: ' + txt[c.id].replace(/^❓\s*/, '')); });
       var sb = x.wand.steckbrief && typeof x.wand.steckbrief === 'object' ? x.wand.steckbrief : {};
