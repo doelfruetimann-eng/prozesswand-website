@@ -666,7 +666,7 @@ body.rg-on #wegLeiste { display:none; }
 <script>
 "use strict";
 
-const APP_VERSION = 'V88';
+const APP_VERSION = 'V89';
 /* V49: einheitlicher Wegweiser nach jedem «An Claude kopieren» */
 function claudeHinweis() {
   sysMsg('📋 Kopiert! Jetzt: 1. Claude öffnen (claude.ai bzw. deine Prozesswand-Sitzung) → 2. ins Schreibfeld klicken → 3. Cmd+V (einfügen) → 4. Senden. Mehr braucht es nicht.', true);
@@ -1198,7 +1198,9 @@ function bpmnReihenfolge(s) {
 function prozessInfoSauber(o) {
   const T = (v, n) => String(v == null ? '' : v).replace(/[\u0000-\u001f<>]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, n);
   o = o && typeof o === 'object' && !Array.isArray(o) ? o : {};
-  const r = { nr: /^\d+(\.\d+){0,3}$/.test(T(o.nr, 12)) ? T(o.nr, 12) : '', name: T(o.name, 80), gruppe: T(o.gruppe, 60), verantwortlich: T(o.verantwortlich, 100), eigner: T(o.eigner, 100) };
+  const r = { nr: /^\d+(\.\d+){0,3}$/.test(T(o.nr, 12)) ? T(o.nr, 12) : '', name: T(o.name, 80), gruppe: T(o.gruppe, 60), verantwortlich: T(o.verantwortlich, 100), eigner: T(o.eigner, 100), ober: T(o.ober, 100) };
+  /* V89: Teilprozess (z. B. 3.2.4.1) – übergeordneter Prozess «3.2.4 Name»; muss zur Nummer passen */
+  if (!r.nr || r.nr.split('.').length < 3 || r.ober.split(' ')[0] !== r.nr.replace(/\.\d+$/, '')) r.ober = '';
   return r;
 }
 function prozessInfo(s) {
@@ -1216,6 +1218,7 @@ function ablagePfad(s) {
   if (HAUPTPROZESSE[String(pi.nr).charAt(0)]) t.push(HAUPTPROZESSE[String(pi.nr).charAt(0)]);
   const zwei = (pi.nr.match(/^\d+\.\d+/) || [''])[0];
   if (zwei) t.push(pi.gruppe && pi.gruppe.indexOf(zwei) === 0 ? pi.gruppe : zwei + (pi.gruppe ? ' ' + pi.gruppe : ''));
+  if (pi.ober) t.push(pi.ober);
   t.push(seitenTitel(s));
   return t;
 }
@@ -1256,6 +1259,7 @@ function genProzessseite() {
     + '<tr><td>Seitenbezeichnung</td><td><b>' + esc(titel) + '</b></td></tr>'
     + '<tr><td>Freigabestatus</td><td>Entwurf</td></tr>'
     + '<tr><td>Seitentyp</td><td>Strukturseite (VORLAGE Prozesse SSH360)</td></tr>'
+    + (pi.ober ? '<tr><td>Übergeordnete Seite</td><td>' + esc(pi.ober) + ' (Prozessübersicht)</td></tr>' : '')
     + '<tr><td>Geltungsbereich</td><td>' + liste(sb.geltung) + '</td></tr>'
     + '<tr><td>Letzter Autor</td><td>' + leer + '</td></tr>'
     + '<tr><td>Verantwortlich (Prozessverantwortung)</td><td>' + (pi.verantwortlich ? esc(pi.verantwortlich) : leer) + '</td></tr>'
@@ -1372,7 +1376,7 @@ function aufnahmeOeffnen() {
     const name = String(a.name || (a.erg && a.erg.prozess) || 'Prozess').replace(/\s+/g, ' ').trim().slice(0, 60);
     if (hatWand) { newBoardFrom(name, normalizeState(a.wand), true); }
     else { bpmnVorschau(a.erg, 'Interview, ausgewertet am ' + heute(), name); document.getElementById('pvNeu').click(); }
-    const piAlt = prozessInfoSauber(state.prozessInfo), piNeu = prozessInfoSauber({ nr: a.nr, name: a.nurName, gruppe: a.gruppe, verantwortlich: a.funktion, eigner: a.eigner });
+    const piAlt = prozessInfoSauber(state.prozessInfo), piNeu = prozessInfoSauber({ nr: a.nr, name: a.nurName, gruppe: a.gruppe, verantwortlich: a.funktion, eigner: a.eigner, ober: a.ober });
     Object.keys(piNeu).forEach(k => { if (!piNeu[k]) piNeu[k] = piAlt[k]; }); state.prozessInfo = piNeu;
     state.goal = ''; goalInput.value = ''; autoResizeGoal(); kiLog.innerHTML = ''; save(); render();
     const kannSpeichern = /^[A-Za-z0-9_-]{16,64}$/.test(String(a.s || '')) || /^[A-Za-z0-9_-]{16,64}$/.test(String(a.z || '')); /* V83: auch mit persönlichem Zugang */

@@ -46,6 +46,10 @@
   .zeile .st.ok { background:#e3f1e3; color:#2e6b2e; } .zeile .st.offen { background:var(--rose); color:var(--muted); }
   .zeile .wer { display:block; font-size:12.5px; color:var(--muted); }
   .zeile .rechts { display:flex; gap:6px; align-items:center; flex-wrap:wrap; justify-content:flex-end; }
+  .proz.teil { margin-left:22px; border-style:dashed; }
+  .zeile.teil > span:first-child { padding-left:18px; }
+  #tpBox { margin-top:10px; font-size:14px; }
+  #tpBox input { margin:6px 0; }
   .proz .ok { display:block; color:#2e6b2e; font-weight:700; font-size:12.5px; }
   #uebKnoepfe button, .zeile button { font:inherit; font-size:13.5px; font-weight:700; color:var(--bx); background:#fff; border:2px solid var(--bx); border-radius:8px; padding:6px 12px; cursor:pointer; min-height:40px; }
   #linkAus { word-break:break-all; font-size:12.5px; background:var(--rose); border-radius:8px; padding:10px 12px; margin-top:10px; display:none; }
@@ -76,6 +80,16 @@
     <input type="text" id="suche" placeholder="Suchen oder eintippen, z. B. 3.7.1 Gebäudeinstandhaltung" autocomplete="off">
     <div id="prozesse"></div>
     <div class="wahl" id="wahl" style="display:none"></div>
+    <div id="tpBox" style="display:none">
+      <details id="tpDetails">
+        <summary>Besteht dieser Prozess aus mehreren Teilen? Teilprozess anlegen</summary>
+        <p class="klein" style="margin:6px 0 0">Jeder Teil wird einzeln aufgenommen und bekommt eine eigene Nummer, z. B. <span id="tpBeispiel">3.2.4.1</span>. So entstehen dieselben Ebenen wie in Prozesse4SSH.</p>
+        <label for="tpName">Name des Teilprozesses</label>
+        <input type="text" id="tpName" maxlength="80" placeholder="z. B. Rechnung erfassen und prüfen">
+        <button class="knopf" id="tpBtn" type="button">Teilprozess anlegen</button>
+        <p class="klein" id="tpInfo"></p>
+      </details>
+    </div>
   </div>
 
   <div class="karte">
@@ -179,6 +193,26 @@
       }).filter(function (z) { return z.name; });
     }
   } catch (e) { cfg = { t: '', a: '', k: '', s: '', z: '', w: '', p: [] }; }
+  /* V89: Teilprozesse – ein Prozess der Landkarte (z. B. 3.2.4) zerfällt in Teilprozesse 3.2.4.1, 3.2.4.2 …
+     Ein Teilprozess ist jeder Eintrag, dessen Nummer ohne die letzte Stelle in der Liste steht. Neu angelegte
+     Teilprozesse merkt sich dieses Gerät; aufgenommene kommen zusätzlich vom Dienst (andere Geräte). */
+  var oberNr = function (nr) { var m = String(nr || '').match(/^(\d+(?:\.\d+){1,2})\.\d+$/); return m ? m[1] : ''; };
+  function oberVon(p) { var o = oberNr(p && p.nr); return o ? cfg.p.filter(function (q) { return q.nr === o; })[0] || null : null; }
+  function kinderVon(p) { return p && p.nr ? cfg.p.filter(function (q) { return oberNr(q.nr) === p.nr; }) : []; }
+  var tpSchluessel = 'pa-tp-' + (cfg.s || cfg.z || 'ohne');
+  function teilEinfuegen(t) {
+    if (!t || !t.nr || !t.name || cfg.p.some(function (q) { return q.nr === t.nr; })) return false;
+    var o = oberVon(t); if (!o) return false;
+    t.gruppe = t.gruppe || o.gruppe; t.funktion = t.funktion || o.funktion; t.eigner = t.eigner || o.eigner;
+    var letzte = cfg.p.indexOf(o), n = +t.nr.split('.').pop();
+    cfg.p.forEach(function (q, i) { if (oberNr(q.nr) === o.nr && +q.nr.split('.').pop() < n) letzte = i; });
+    cfg.p.splice(letzte + 1, 0, t); return true;
+  }
+  function teileMerken() {
+    var eigene = cfg.p.filter(function (q) { return q.lokal; }).map(function (q) { return [q.nr, q.name]; });
+    try { localStorage.setItem(tpSchluessel, JSON.stringify(eigene)); } catch (e) {}
+  }
+  try { (JSON.parse(localStorage.getItem(tpSchluessel)) || []).forEach(function (z) { teilEinfuegen({ nr: T(z[0], 12), name: T(z[1], 80), gruppe: '', funktion: '', eigner: '', lokal: true }); }); } catch (e) {}
   var persoenlich = !!cfg.z, zugangOk = !!(cfg.s || cfg.z);
   if (persoenlich) {
     $('einrichtenKarte').style.display = 'none';
@@ -197,8 +231,12 @@
     if (!p) { w.style.display = 'none'; }
     else {
       w.style.display = '';
-      w.textContent = 'Gewählt: ' + (p.nr ? p.nr + ' ' : '') + p.name + (p.funktion ? ' · zuständig: ' + p.funktion : '');
+      var ob = oberVon(p);
+      w.textContent = 'Gewählt: ' + (p.nr ? p.nr + ' ' : '') + p.name + (ob ? ' · Teilprozess von ' + ob.nr + ' ' + ob.name : '') + (p.funktion ? ' · zuständig: ' + p.funktion : '');
     }
+    var kannTeil = !!(p && /^\d+(\.\d+){1,2}$/.test(p.nr || '') && !oberVon(p)); /* kein Teilprozess eines Teilprozesses */
+    $('tpBox').style.display = kannTeil ? '' : 'none'; $('tpInfo').textContent = ''; $('tpName').value = '';
+    if (kannTeil) $('tpBeispiel').textContent = p.nr + '.' + naechsteNr(p);
     var btn = $('wandBtn');
     if (p) {
       btn.href = WAND + '?prozess=' + b64uEnc(JSON.stringify({ nr: p.nr, name: p.name }));
@@ -225,7 +263,7 @@
       var li = document.createElement('div'); li.className = 'liste';
       nach[g].forEach(function (p) {
         var b = document.createElement('button'); b.type = 'button';
-        b.className = 'proz' + (gewaehlt && gewaehlt.nr === p.nr && gewaehlt.name === p.name ? ' gewaehlt' : '');
+        b.className = 'proz' + (oberVon(p) ? ' teil' : '') + (gewaehlt && gewaehlt.nr === p.nr && gewaehlt.name === p.name ? ' gewaehlt' : '');
         var t = document.createElement('b'); t.textContent = (p.nr ? p.nr + ' ' : '') + p.name; b.appendChild(t);
         if (p.funktion) { var s = document.createElement('span'); s.textContent = p.funktion; b.appendChild(s); }
         if (typeof erledigt !== 'undefined' && erledigt[pKey(p.nr, p.name)]) { var ok = document.createElement('span'); ok.className = 'ok'; ok.textContent = '✓ aufgenommen'; b.appendChild(ok); }
@@ -246,6 +284,18 @@
       box.appendChild(b2);
     }
   }
+
+  function naechsteNr(p) { var m = 0; kinderVon(p).forEach(function (q) { m = Math.max(m, +q.nr.split('.').pop() || 0); });
+    Object.keys(typeof erledigt === 'undefined' ? {} : erledigt).forEach(function (k) { var z = erledigt[k]; if (oberNr(z.prozess_nr) === p.nr) m = Math.max(m, +String(z.prozess_nr).split('.').pop() || 0); });
+    return m + 1; }
+  $('tpBtn').onclick = function () {
+    var o = gewaehlt, name = T($('tpName').value, 80);
+    if (!o || !/^\d+(\.\d+){1,2}$/.test(o.nr || '') || oberVon(o)) return;
+    if (name.length < 3) { $('tpInfo').textContent = 'Bitte zuerst den Namen des Teilprozesses eintippen.'; $('tpName').focus(); return; }
+    var t = { nr: o.nr + '.' + naechsteNr(o), name: name, gruppe: '', funktion: '', eigner: '', lokal: true };
+    teilEinfuegen(t); teileMerken(); $('suche').value = ''; standZeichnen(); uebKnoepfe(); waehlen(t);
+    $('wahl').textContent += ' – neu angelegt. Jetzt das Interview zu diesem Teil führen.';
+  };
 
   /* ---------- V79: Gespräch auf der Seite, Mitschrift, Fortsetzen, Abschliessen ---------- */
   var DIENST = 'https://bvbjxofdcugpfsccwlzv.supabase.co/functions/v1/prozess-aufnahme';
@@ -304,6 +354,8 @@
       var hinweis = aend
         ? 'Hinweis der Seite: ÄNDERUNGSGESPRÄCH zum Prozess «' + name + '». Der Ablauf ist schon aufgenommen. Frage nicht nach dem Namen des Prozesses und nimm ihn nicht neu auf. Bisher aufgenommener Ablauf:\n' + aend.basis.slice(0, 12000)
         : 'Hinweis der Seite: Der aufzunehmende Prozess ist «' + name + '». Frage nicht mehr nach dem Namen des Prozesses.';
+      var ob = oberVon(gewaehlt);
+      if (ob) hinweis += ' Es ist ein TEILPROZESS von «' + ob.nr + ' ' + ob.name + '». Nimm nur diesen Teil auf: vom Auslöser bis zum Ergebnis dieses Teils. Was davor oder danach in anderen Teilprozessen geschieht, ist eine Schnittstelle (nur kurz nennen, nicht aufnehmen).';
       if (fort) hinweis += ' Dies ist die FORTSETZUNG eines unterbrochenen Gesprächs. Das Einverständnis liegt bereits vor – frage nicht nochmals danach. Wiederhole keine beantworteten Fragen und fahre dort weiter, wo das Gespräch abbrach. Bisheriges Gespräch:\n' + abschriftText(d).slice(-12000);
       try { c.sendContextualUpdate(hinweis); } catch (e) {}
     }).catch(function () { conv = null; laeuft = false; gespraechZeigen(); info('Das Gespräch konnte nicht starten. Ist das Mikrofon erlaubt? Sonst nutze den Link «in einem eigenen Fenster».'); });
@@ -321,7 +373,7 @@
   }
   function zurWand(erg, name, wand, nr, nurName) {
     var q = cfg.p.filter(function (x) { return pKey(x.nr, x.name) === pKey(nr, nurName); })[0] || {}; /* V85: Gruppe, Verantwortung, Prozesseigner für die Prozessseite */
-    try { localStorage.setItem('pw-aufnahme', JSON.stringify({ erg: erg, wand: wand || null, name: name, nr: nr || '', nurName: nurName || '', gruppe: q.gruppe || '', funktion: q.funktion || '', eigner: q.eigner || '', s: cfg.s, z: cfg.z, zeit: Date.now() })); } catch (e) {}
+    try { localStorage.setItem('pw-aufnahme', JSON.stringify({ erg: erg, wand: wand || null, name: name, nr: nr || '', nurName: nurName || '', gruppe: q.gruppe || '', funktion: q.funktion || '', eigner: q.eigner || '', ober: (function (o) { return o ? o.nr + ' ' + o.name : ''; })(oberVon(q)), s: cfg.s, z: cfg.z, zeit: Date.now() })); } catch (e) {}
     location.href = WAND + '?beispiel=1&aufnahme=1';
   }
   $('gFertig').onclick = function () {
@@ -385,7 +437,7 @@
     $('standZahl').textContent = n + ' von ' + zeilen.length + (zeilen.length === 1 ? ' Prozess' : ' Prozessen') + ' aufgenommen';
     $('standBalken').firstChild.style.width = (zeilen.length ? Math.round(100 * n / zeilen.length) : 0) + '%';
     zeilen.forEach(function (z) {
-      var r = document.createElement('div'); r.className = 'zeile';
+      var r = document.createElement('div'); r.className = 'zeile' + (oberVon(z) ? ' teil' : '');
       var s = document.createElement('span'); var b0 = document.createElement('b'); b0.textContent = (z.nr ? z.nr + ' ' : '') + z.name; s.appendChild(b0);
       if (z.wer) { var w = document.createElement('span'); w.className = 'wer'; w.textContent = z.wer; s.appendChild(w); }
       var re = document.createElement('span'); re.className = 'rechts';
@@ -406,7 +458,8 @@
     dienst({ aktion: 'liste' }).then(function (j) {
       erledigt = {};
       ((j && j.liste) || []).forEach(function (z) { var k = pKey(z.prozess_nr, z.prozess_name); if (!erledigt[k]) erledigt[k] = z; }); /* Liste ist neueste zuerst */
-      standZeichnen();
+      var neu = false; Object.keys(erledigt).forEach(function (k) { var z = erledigt[k]; if (teilEinfuegen({ nr: T(z.prozess_nr, 12), name: T(z.prozess_name, 80), gruppe: '', funktion: '', eigner: '' })) neu = true; });
+      standZeichnen(); if (neu) uebKnoepfe();
     }).catch(function () {});
   }
   /* V86: Prozessübersicht pro Bereich (Word) – wie eine Seite «Prozessübersicht» in Prozesse4SSH:
@@ -430,11 +483,12 @@
     });
     return o;
   }
-  function uebersichtDoc(gruppe, teile, daten) {
+  function uebersichtDoc(gruppe, teile, daten, pfad) {
     var OFFEN = '<span style="color:#666;font-style:italic">[offen]</span>';
     var nr = (gruppe.match(/^\d+(?:\.\d+)?/) || [''])[0], farbe = ({ 1: '#C8323C', 2: '#2F4FA0', 3: '#8BB43A' })[nr.charAt(0)] || '#651B32';
     var HP = { 1: '1. Managementprozesse', 2: '2. Kernprozesse inkl. Medizinischem Support', 3: '3. Unterstützungsprozesse' }[nr.charAt(0)] || '';
     var eigner = teile.map(function (p) { return p.eigner; }).filter(Boolean)[0] || '';
+    var stand = function (p) { var a = erledigt[pKey(p.nr, p.name)], k = kinderVon(p); if (a) return 'aufgenommen ' + h(String(a.erstellt || '').slice(0, 10).split('-').reverse().join('.')); if (k.length) return k.filter(function (q) { return erledigt[pKey(q.nr, q.name)]; }).length + ' von ' + k.length + ' Teilprozessen aufgenommen'; return 'offen'; };
     var sammeln = function (k) { var a = []; teile.forEach(function (p) { var d = daten[pKey(p.nr, p.name)]; if (!d) return; d[k].forEach(function (t) { a.push(t + ' (' + p.nr + ')'); }); }); return a; };
     var liste = function (a) { return a.length ? '<ul style="margin:2pt 0 2pt 14pt;padding:0">' + a.map(function (t) { return '<li>' + h(t) + '</li>'; }).join('') + '</ul>' : OFFEN; };
     var zelle = function (k) {
@@ -453,23 +507,23 @@
       + '<tr><td>Freigegeben durch / Freigabedatum</td><td>' + OFFEN + '</td></tr><tr><td>Version</td><td>' + OFFEN + '</td></tr></table>'
       + '<h2>Prozessübersicht</h2><table><tr>' + teile.map(function (p) { return '<td style="background:' + farbe + ';color:#fff;font-weight:bold;text-align:center;border:1pt solid #fff">' + h(p.nr + ' ' + p.name) + '</td>'; }).join('') + '</tr></table>'
       + '<table><tr><th style="width:12%">Nr.</th><th>Teilprozess</th><th style="width:30%">Prozessverantwortung</th><th style="width:18%">Stand</th></tr>'
-      + teile.map(function (p) { var a = erledigt[pKey(p.nr, p.name)]; return '<tr><td>' + h(p.nr) + '</td><td>' + h(p.name) + '</td><td>' + (p.funktion ? h(p.funktion) : OFFEN) + '</td><td>' + (a ? 'aufgenommen ' + h(String(a.erstellt || '').slice(0, 10).split('-').reverse().join('.')) : 'offen') + '</td></tr>'; }).join('')
+      + teile.map(function (p) { return '<tr><td>' + h(p.nr) + '</td><td>' + h(p.name) + '</td><td>' + (p.funktion ? h(p.funktion) : OFFEN) + '</td><td>' + stand(p) + '</td></tr>'; }).join('')
       + '</table><p style="color:#666">' + aufgenommen + ' von ' + teile.length + ' Teilprozessen aufgenommen. Jede Zeile wird in Prozesse4SSH zum Link auf die Prozessbeschreibung.</p>'
       + '<h2>Prozessattribute</h2><table><tr><th style="width:26%">Prozessattribute</th><th>Beschreibung</th><th style="width:20%">Rollen und Verantwortlichkeiten</th></tr>'
       + ATTR.map(function (a) { return '<tr><td><b>' + a[1] + '</b></td><td>' + zelle(a[0]) + '</td><td><i>' + a[2] + '</i></td></tr>'; }).join('') + '</table>'
       + '<p style="color:#666;font-style:italic">Zusammengetragen aus den Interviews der Teilprozesse (Nummer in Klammern). Das Ziel der Prozessübersicht legt der Prozesseigner fest.</p>'
-      + '<h2>Ablage in Prozesse4SSH</h2><table class="k"><tr><td>Ort in der Prozesslandkarte</td><td>' + h(['Prozesslandkarte', HP, gruppe].filter(Boolean).join(' → ')) + '</td></tr>'
+      + '<h2>Ablage in Prozesse4SSH</h2><table class="k"><tr><td>Ort in der Prozesslandkarte</td><td>' + h(['Prozesslandkarte', HP].concat(pfad || [], [gruppe]).filter(Boolean).join(' → ')) + '</td></tr>'
       + '<tr><td>Untergeordnete Seiten</td><td>' + h(teile.map(function (p) { return p.nr + ' ' + p.name; }).join(', ')) + '</td></tr></table>';
     return '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word"><head><meta charset="utf-8"><title>' + h(gruppe) + '</title><style>' + css + '</style></head><body>' + b + '</body></html>';
   }
-  function uebersichtLaden2(gruppe, knopf) {
-    var teile = cfg.p.filter(function (p) { return (p.gruppe || 'Prozesse') === gruppe; });
+  function uebersichtLaden2(gruppe, knopf, teile, pfad) {
+    teile = teile || cfg.p.filter(function (p) { return (p.gruppe || 'Prozesse') === gruppe && !oberVon(p); }); /* Teilprozesse stehen in der Übersicht ihres Prozesses */
     var daten = {}, offen = teile.filter(function (p) { return erledigt[pKey(p.nr, p.name)]; });
     knopf.disabled = true; var alt = knopf.textContent; knopf.textContent = 'Wird erstellt …';
     offen.reduce(function (kette, p) {
       return kette.then(function () { return dienst({ aktion: 'hole', id: erledigt[pKey(p.nr, p.name)].id }).then(function (x) { daten[pKey(p.nr, p.name)] = steckVon(x); }).catch(function () {}); });
     }, Promise.resolve()).then(function () {
-      var html = uebersichtDoc(gruppe, teile, daten), a = document.createElement('a');
+      var html = uebersichtDoc(gruppe, teile, daten, pfad), a = document.createElement('a');
       a.href = URL.createObjectURL(new Blob(['﻿' + html], { type: 'application/msword' }));
       a.download = gruppe.replace(/[\\/:*?"<>|]+/g, ' ').trim() + '.doc'; document.body.appendChild(a); a.click(); a.remove();
       knopf.disabled = false; knopf.textContent = '✓ ' + alt.replace(/^✓ /, '');
@@ -482,6 +536,11 @@
     var gruppen = []; cfg.p.forEach(function (p) { var g = p.gruppe || 'Prozesse'; if (gruppen.indexOf(g) < 0) gruppen.push(g); });
     $('uebBereich').style.display = gruppen.length ? '' : 'none';
     gruppen.forEach(function (g) { var b = document.createElement('button'); b.type = 'button'; b.textContent = g; b.onclick = function () { uebersichtLaden2(g, b); }; box.appendChild(b); });
+    cfg.p.forEach(function (p) {
+      var k = kinderVon(p); if (!k.length) return;
+      var t = p.nr + ' ' + p.name, b = document.createElement('button'); b.type = 'button'; b.textContent = t; b.title = 'Prozessübersicht mit ' + k.length + ' Teilprozessen';
+      b.onclick = function () { uebersichtLaden2(t, b, kinderVon(p), [p.gruppe]); }; box.appendChild(b);
+    });
   }
   uebersichtLaden();
   uebKnoepfe();
