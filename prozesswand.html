@@ -666,7 +666,7 @@ body.rg-on #wegLeiste { display:none; }
 <script>
 "use strict";
 
-const APP_VERSION = 'V80';
+const APP_VERSION = 'V85';
 /* V49: einheitlicher Wegweiser nach jedem «An Claude kopieren» */
 function claudeHinweis() {
   sysMsg('📋 Kopiert! Jetzt: 1. Claude öffnen (claude.ai bzw. deine Prozesswand-Sitzung) → 2. ins Schreibfeld klicken → 3. Cmd+V (einfügen) → 4. Senden. Mehr braucht es nicht.', true);
@@ -880,6 +880,7 @@ function bpmnWandBauen(erg, beleg) {
       const c = { id: id, x: links + 14 + sp * BPMN_SPALTE, y: rIdx * LANE_H + 8, text: T(e.text, 80), color: '#ffffff',
         bpmn: art, status: 'erledigt', checked: true, beleg: beleg || '[unbelegt]' };
       if (art === 'aufgabe') c.auftrag = 'Wer: ' + rollen[rIdx] + '. Womit: ' + (womit || '[offen]') + '. Ergebnis: ' + (ergebnis || '[offen]') + '.';
+      if (art === 'aufgabe') { const ab = { eingabe: T(e.eingabe, 160), womit: womit, ergebnis: ergebnis, mitwirkend: T(e.mitwirkend, 80) }; Object.keys(ab).forEach(k => { if (!ab[k]) delete ab[k]; }); if (Object.keys(ab).length) c.ablauf = ab; }
       postits.push(c);
       (Array.isArray(e.nach) ? e.nach : []).forEach(n => { const zu = T(n && (n.zu || n), 40); if (zu) nach.push({ von: eid, zu: zu, wenn: T(n && n.wenn, 40) }); });
     });
@@ -898,7 +899,7 @@ function bpmnWandBauen(erg, beleg) {
   });
   nach.forEach(n => { if (idNeu[n.von] && idNeu[n.zu] && idNeu[n.von] !== idNeu[n.zu]) { const k = { id: uid('c'), from: idNeu[n.von], to: idNeu[n.zu] }; if (n.wenn) k.label = n.wenn; connections.push(k); } });
   return { wandTyp: 'bpmn', lanes: lanesNeu, agenten: [], phases: phases, postits: postits, connections: connections, milestones: [],
-    ssot: beleg || '', prozessName: T(erg.prozess, 120) };
+    ssot: beleg || '', prozessName: T(erg.prozess, 120), steckbrief: steckbriefSauber(erg.steckbrief) };
 }
 /* BPMN-2.0-Datei aus der Wand – ohne KI. Öffnet sich in Camunda Modeler, bpmn.io, Signavio, ADONIS. */
 function genBpmn() {
@@ -960,17 +961,354 @@ function genBpmn() {
 }
 function downloadBpmn() {
   if (!istBpmnWand(state)) { sysMsg('Eine BPMN-Datei gibt es nur von einer BPMN-Wand (Dokumente → «Prozess aus Interview»).', true); return; }
-  const fn = boardName().replace(/[\\/:*?"<>|]+/g, ' ').trim().slice(0, 80) + '.bpmn';
+  const fn = seitenTitel().replace(/[\\/:*?"<>|]+/g, ' ').trim().slice(0, 80) + '.bpmn';
   const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([genBpmn()], { type: 'application/xml' })); a.download = fn; a.click(); URL.revokeObjectURL(a.href);
   downloadGemeldet(fn);
   const offen = offeneFragen().length;
   if (offen) sysMsg('Hinweis: ' + offen + (offen === 1 ? ' offene Frage steht' : ' offene Fragen stehen') + ' als Anmerkung mit [offen] in der Datei.', true);
 }
+/* V81: Visio-Datei (.vsdx) aus der BPMN-Wand – ohne KI (Export-Regel), mit dem eigenen
+   Mini-ZIP-Schreiber. Gleiche Lage wie Zeichnung und BPMN-Datei (bpmnWeg). Formen ohne
+   Schablone: Aufgabe = abgerundetes Rechteck, Start/Ende = Kreis, Entscheid = Raute mit X.
+   Linien sind gezeichnet, aber nicht an die Formen geklebt (ehrliche Grenze). */
+function genVsdx() {
+  const s = state;
+  const x = v => esc(String(v == null ? '' : v).replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, ''));
+  const n = v => (Math.round(v * 10000) / 10000).toString();
+  const PX = 96, HX = 1.9, TOP = 1.2, L = lanes();
+  const breite = canvasW(s) / PX, hoehe = L.length * LANE_H / PX;
+  const PW = HX + breite + 0.3, PH = TOP + hoehe + 0.3, Y0 = PH - TOP;
+  const X = px => HX + px / PX, Y = py => Y0 - py / PX;
+  let sid = 0, shapes = '';
+  const zelle = (k, v, f, u) => '<Cell N="' + k + '" V="' + v + '"' + (f ? ' F="' + f + '"' : '') + (u ? ' U="' + u + '"' : '') + '/>';
+  const R = (t, i, c) => '<Row T="' + t + '" IX="' + i + '">' + c + '</Row>';
+  const geo = (rows, ohneFuellung, i) => '<Section N="Geometry" IX="' + (i || 0) + '">' + zelle('NoFill', ohneFuellung ? 1 : 0) + zelle('NoLine', 0) + zelle('NoShow', 0) + rows + '</Section>';
+  /* Formen als Funktion von Breite/Hoehe: Wert (V) fuer Leser ohne Formeln + Formel (F) fuer Visio */
+  const XYf = (w, h) => (fx, fy) => zelle('X', n(w * fx), 'Width*' + n(fx)) + zelle('Y', n(h * fy), 'Height*' + n(fy));
+  const GEO = {
+    rechteck: (w, h) => { const XY = XYf(w, h);
+      return geo(R('MoveTo', 1, XY(0, 0)) + R('LineTo', 2, XY(1, 0)) + R('LineTo', 3, XY(1, 1)) + R('LineTo', 4, XY(0, 1)) + R('LineTo', 5, XY(0, 0))); },
+    kreis: (w, h) => geo('<Row T="Ellipse" IX="1">' + zelle('X', n(w / 2), 'Width*0.5') + zelle('Y', n(h / 2), 'Height*0.5') + zelle('A', n(w), 'Width*1') + zelle('B', n(h / 2), 'Height*0.5') + zelle('C', n(w / 2), 'Width*0.5') + zelle('D', n(h), 'Height*1') + '</Row>'),
+    raute: (w, h) => { const XY = XYf(w, h);
+      return geo(R('MoveTo', 1, XY(0.5, 0)) + R('LineTo', 2, XY(1, 0.5)) + R('LineTo', 3, XY(0.5, 1)) + R('LineTo', 4, XY(0, 0.5)) + R('LineTo', 5, XY(0.5, 0)))
+        + geo(R('MoveTo', 1, XY(0.33, 0.33)) + R('LineTo', 2, XY(0.67, 0.67)) + R('MoveTo', 3, XY(0.33, 0.67)) + R('LineTo', 4, XY(0.67, 0.33)), true, 1); },
+    pfeil: erster => (w, h) => { const d = Math.min(h * 0.35, w * 0.2), XY = XYf(w, h);
+      return geo(R('MoveTo', 1, XY(0, 0)) + R('LineTo', 2, XY(1 - d / w, 0)) + R('LineTo', 3, XY(1, 0.5)) + R('LineTo', 4, XY(1 - d / w, 1)) + R('LineTo', 5, XY(0, 1))
+        + (erster ? '' : R('LineTo', 6, XY(d / w, 0.5))) + R('LineTo', 7, XY(0, 0))); },
+    senkrecht: (w, h) => { const XY = XYf(w, h); return geo(R('MoveTo', 1, XY(0.5, 0)) + R('LineTo', 2, XY(0.5, 1)), true); }
+  };
+  const text = (t, o) => {
+    o = o || {};
+    if (!t) return '';
+    return '<Section N="Character"><Row IX="0">' + zelle('Font', 'Calibri') + zelle('Size', n((o.pt || 8) / 72), '', 'PT') + zelle('Color', o.farbe || '#1b2430') + zelle('Style', o.fett ? 1 : 0) + '</Row></Section>'
+      + '<Section N="Paragraph"><Row IX="0">' + zelle('HorzAlign', o.links ? 0 : 1) + '</Row></Section>'
+      + '<Text>' + x(t) + '</Text>';
+  };
+  const form = (o) => {
+    const id = ++sid;
+    let c = zelle('PinX', n(o.cx)) + zelle('PinY', n(o.cy)) + zelle('Width', n(o.w)) + zelle('Height', n(o.h))
+      + zelle('LocPinX', n(o.w / 2), 'Width*0.5') + zelle('LocPinY', n(o.h / 2), 'Height*0.5') + zelle('Angle', 0)
+      + zelle('FillForegnd', !o.fuellung || o.fuellung === 'keine' ? '#ffffff' : o.fuellung) + zelle('FillPattern', o.fuellung === 'keine' ? 0 : 1)
+      + zelle('LineColor', o.linie || '#1b2430') + zelle('LineWeight', n((o.lw || 0.75) / 72), '', 'PT') + zelle('LinePattern', o.ohneRand ? 0 : (o.gestrichelt ? 2 : 1))
+      + zelle('Rounding', n(o.rund || 0)) + zelle('VerticalAlign', o.oben ? 0 : 1)
+      + zelle('LeftMargin', n(0.04)) + zelle('RightMargin', n(0.04)) + zelle('TopMargin', n(0.03)) + zelle('BottomMargin', n(0.03));
+    if (o.textUnten) c += zelle('TxtPinX', n(o.w / 2), 'Width*0.5') + zelle('TxtPinY', n(-0.2)) + zelle('TxtWidth', n(1.5)) + zelle('TxtHeight', n(0.3))
+      + zelle('TxtLocPinX', n(0.75), 'TxtWidth*0.5') + zelle('TxtLocPinY', n(0.15), 'TxtHeight*0.5');
+    let daten = '';
+    if (o.daten && o.daten.length) daten = '<Section N="Property">' + o.daten.map(d => '<Row N="' + d[0] + '">' + zelle('Label', x(d[1])) + zelle('Value', x(d[2]), '', 'STR') + zelle('Type', 0) + '</Row>').join('') + '</Section>';
+    shapes += '<Shape ID="' + id + '" Type="Shape" LineStyle="0" FillStyle="0" TextStyle="0"' + (o.name ? ' Name="' + x(o.name) + '" NameU="' + x(o.name) + '"' : '') + '>'
+      + c + daten + (o.geo === 'keine' ? '' : (o.geo || GEO.rechteck)(o.w, o.h)) + text(o.text, o) + '</Shape>';
+    return id;
+  };
+  /* Kopf: Name, Stand und SSOT-Zeile (Export-Regel) */
+  const ssot = (s.ssot || '').trim();
+  form({ cx: PW / 2, cy: PH - 0.28, w: PW - 0.4, h: 0.4, fuellung: 'keine', ohneRand: true, geo: 'keine', links: true, pt: 14, fett: true, farbe: '#651B32', text: boardName() });
+  form({ cx: PW / 2, cy: PH - 0.58, w: PW - 0.4, h: 0.22, fuellung: 'keine', ohneRand: true, geo: 'keine', links: true, pt: 7.5, farbe: '#5b6573',
+    text: 'Prozesswand ' + APP_VERSION + ' · Stand ' + heute() + ' · BPMN 2.0' + (ssot ? ' · Bei Widerspruch gilt: ' + ssot : '') });
+  /* Abschnitte als Pfeilkette über den Bahnen – Farbe wie in der Prozesslandkarte
+     (Handbuch Prozesse4SSH 5.4): 1 = Management rot, 2 = Kern blau, 3 = Unterstützung grün */
+  const art = (String(s.prozessName || boardName()).match(/^\s*([123])\./) || [])[1];
+  const KOPF = art === '1' ? '#C8323C' : art === '2' ? '#2F4FA0' : art === '3' ? '#8BB43A' : '#651B32';
+  let links = 0;
+  s.phases.forEach((ph, i) => {
+    const w = ph.w / PX - 0.04;
+    form({ cx: HX + links + 0.02 + w / 2, cy: Y0 + 0.2, w: w, h: 0.34, fuellung: KOPF, linie: KOPF, lw: 0.5, pt: 8.5, fett: true, farbe: '#ffffff',
+      geo: GEO.pfeil(i === 0), text: ph.name || ('Abschnitt ' + (i + 1)), name: 'Prozessschritt ' + (i + 1) });
+    links += ph.w / PX;
+  });
+  /* Bahnen: Titelspalte links + Fläche */
+  L.forEach((l, i) => {
+    const yo = Y0 - i * LANE_H / PX, h = LANE_H / PX;
+    form({ cx: HX / 2 + 0.05, cy: yo - h / 2, w: HX - 0.1, h: h, fuellung: l.key === 'notiz' ? '#fdf3bf' : (l.color || '#f1f2f4'), linie: '#9aa3ad', lw: 0.5, pt: 8.5, fett: true, text: laneTitle(l), name: 'Bahn ' + (i + 1) });
+    form({ cx: HX + breite / 2, cy: yo - h / 2, w: breite, h: h, fuellung: l.key === 'notiz' ? '#fffbea' : '#ffffff', linie: '#9aa3ad', lw: 0.5 });
+  });
+  /* Trennlinien zwischen den Abschnitten */
+  links = 0;
+  s.phases.slice(0, -1).forEach(ph => {
+    links += ph.w / PX;
+    form({ cx: HX + links, cy: Y0 - hoehe / 2, w: 0.01, h: hoehe, fuellung: 'keine', linie: '#b7bec7', lw: 0.5, gestrichelt: true, geo: GEO.senkrecht });
+  });
+  /* Formen – Aufgaben mit Schrittnummer wie in den Flussdiagrammen von Prozesse4SSH (z. B. 1.1.1.1.2) */
+  const shapeId = {}, vNr = {}, vPnr = prozessInfo(s).nr;
+  bpmnReihenfolge(s).filter(p => p.bpmn === 'aufgabe' || p.bpmn === 'gateway').forEach((p, i) => { vNr[p.id] = (vPnr ? vPnr + '.' : '') + (i + 1); });
+  s.postits.forEach(p => {
+    const notiz = bpmnIstNotiz(p, s), art = bpmnArt(p), t = cleanTxt(p.text || '');
+    if (notiz) {
+      const offen = (p.status || 'offen') !== 'erledigt';
+      form({ cx: X(p.x + PI_W / 2), cy: Y(p.y + 30), w: PI_W / PX, h: 60 / PX, fuellung: p.color || '#fdf3bf', linie: '#c8b45a', lw: 0.5, pt: 7.5, text: t + (offen ? ' [offen]' : ''), name: offen ? 'Offene Frage' : 'Hinweis' });
+      return;
+    }
+    const cx = X(p.x + PI_W / 2), cy = Y(p.y + 28);
+    const daten = [];
+    if (p.auftrag) daten.push(['Auftrag', 'Auftrag', p.auftrag]);
+    if (p.beleg && p.beleg !== UNBELEGT) daten.push(['Beleg', 'Beleg', p.beleg]);
+    if (art === 'aufgabe') shapeId[p.id] = form({ cx: cx, cy: cy, w: PI_W / PX, h: 60 / PX, rund: 0.08, lw: 1, pt: 8, text: (vNr[p.id] ? vNr[p.id] + ' ' : '') + t, daten: daten, name: 'Aufgabe' });
+    else if (art === 'gateway') shapeId[p.id] = form({ cx: cx, cy: cy, w: 42 / PX, h: 42 / PX, lw: 1, geo: GEO.raute, textUnten: true, pt: 7.5, text: t, daten: daten, name: 'Entscheid' });
+    else shapeId[p.id] = form({ cx: cx, cy: cy, w: 36 / PX, h: 36 / PX, lw: art === 'ende' ? 3 : 1, geo: GEO.kreis, textUnten: true, pt: 7.5, text: t, daten: daten, name: art === 'ende' ? 'Ende' : 'Start' });
+  });
+  /* Verbindungen als 1D-Linien entlang bpmnWeg (gleicher Weg wie in der Wand) */
+  s.connections.forEach(k => {
+    const a = s.postits.find(p => p.id === k.from), b = s.postits.find(p => p.id === k.to);
+    if (!a || !b || bpmnIstNotiz(a, s) || bpmnIstNotiz(b, s)) return;
+    const w = bpmnWeg(a, b, s), P = w.pts.map(q => [X(q[0]), Y(q[1])]);
+    const B = P[0], E = P[P.length - 1], dx = E[0] - B[0], dy = E[1] - B[1], len = Math.hypot(dx, dy);
+    if (len < 0.01) return;
+    const co = dx / len, si = dy / len, lok = q => [(q[0] - B[0]) * co + (q[1] - B[1]) * si, -(q[0] - B[0]) * si + (q[1] - B[1]) * co];
+    let rows = '';
+    P.forEach((q, i) => { const l = lok(q); rows += R(i ? 'LineTo' : 'MoveTo', i + 1, zelle('X', n(l[0]), 'Width*' + n(l[0] / len)) + zelle('Y', n(l[1]))); });
+    const id = ++sid, lb = lok([X(w.lx), Y(w.ly)]);
+    shapes += '<Shape ID="' + id + '" Type="Shape" LineStyle="0" FillStyle="0" TextStyle="0" Name="Fluss" NameU="Fluss">'
+      + zelle('PinX', n((B[0] + E[0]) / 2)) + zelle('PinY', n((B[1] + E[1]) / 2)) + zelle('Width', n(len)) + zelle('Height', 0)
+      + zelle('LocPinX', n(len / 2), 'Width*0.5') + zelle('LocPinY', 0) + zelle('Angle', n(Math.atan2(dy, dx)))
+      + zelle('BeginX', n(B[0])) + zelle('BeginY', n(B[1])) + zelle('EndX', n(E[0])) + zelle('EndY', n(E[1])) + zelle('ObjType', 2)
+      + zelle('LineColor', '#1b2430') + zelle('LineWeight', n(1 / 72), '', 'PT') + zelle('LinePattern', 1) + zelle('EndArrow', 4) + zelle('EndArrowSize', 1)
+      + (k.label ? zelle('TxtPinX', n(lb[0] + 0.25)) + zelle('TxtPinY', n(lb[1])) + zelle('TxtWidth', n(0.6)) + zelle('TxtHeight', n(0.18))
+        + zelle('TxtLocPinX', n(0.3), 'TxtWidth*0.5') + zelle('TxtLocPinY', n(0.09), 'TxtHeight*0.5') + zelle('TxtAngle', n(-Math.atan2(dy, dx)), '-Angle') : '')
+      + geo(rows, true) + (k.label ? text(k.label, { pt: 7.5, farbe: '#651B32', fett: true }) : '') + '</Shape>';
+  });
+  const NS = 'xmlns="http://schemas.microsoft.com/office/visio/2012/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xml:space="preserve"';
+  const H = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n';
+  const REL = 'http://schemas.openxmlformats.org/package/2006/relationships', VR = 'http://schemas.microsoft.com/visio/2010/relationships/';
+  const jetzt = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
+  return [
+    { name: '[Content_Types].xml', data: H + '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+      + '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/>'
+      + '<Override PartName="/visio/document.xml" ContentType="application/vnd.ms-visio.drawing.main+xml"/>'
+      + '<Override PartName="/visio/pages/pages.xml" ContentType="application/vnd.ms-visio.pages+xml"/>'
+      + '<Override PartName="/visio/pages/page1.xml" ContentType="application/vnd.ms-visio.page+xml"/>'
+      + '<Override PartName="/visio/windows.xml" ContentType="application/vnd.ms-visio.windows+xml"/>'
+      + '<Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/>'
+      + '<Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/></Types>' },
+    { name: '_rels/.rels', data: H + '<Relationships xmlns="' + REL + '">'
+      + '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/>'
+      + '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties" Target="docProps/app.xml"/>'
+      + '<Relationship Id="rId3" Type="' + VR + 'document" Target="visio/document.xml"/></Relationships>' },
+    { name: 'docProps/core.xml', data: H + '<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">'
+      + '<dc:title>' + x(boardName()) + '</dc:title><dc:creator>Prozesswand</dc:creator><dcterms:created xsi:type="dcterms:W3CDTF">' + jetzt + '</dcterms:created></cp:coreProperties>' },
+    { name: 'docProps/app.xml', data: H + '<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties"><Application>Prozesswand ' + APP_VERSION + '</Application></Properties>' },
+    { name: 'visio/document.xml', data: H + '<VisioDocument ' + NS + '><DocumentSettings TopPage="0" DefaultTextStyle="0" DefaultLineStyle="0" DefaultFillStyle="0"/>'
+      + '<FaceNames><FaceName NameU="Calibri" UnicodeRanges="-536859905 -1073732485 9 0" CharSets="536871423 0" Panos="2 15 5 2 2 2 4 3 2 4" Flags="325"/></FaceNames>'
+      + '<StyleSheets><StyleSheet ID="0" NameU="No Style" Name="No Style">'
+      + zelle('EnableLineProps', 1) + zelle('EnableFillProps', 1) + zelle('EnableTextProps', 1) + zelle('HideForApply', 0)
+      + zelle('LineWeight', '0.01041666666666667') + zelle('LineColor', '0') + zelle('LinePattern', 1) + zelle('FillForegnd', '1') + zelle('FillPattern', 1)
+      + zelle('LeftMargin', 0) + zelle('RightMargin', 0) + zelle('TopMargin', 0) + zelle('BottomMargin', 0) + zelle('VerticalAlign', 1)
+      + '<Section N="Character"><Row IX="0">' + zelle('Font', 'Calibri') + zelle('Color', '0') + zelle('Size', '0.1666666666666667') + '</Row></Section>'
+      + '</StyleSheet></StyleSheets></VisioDocument>' },
+    { name: 'visio/_rels/document.xml.rels', data: H + '<Relationships xmlns="' + REL + '">'
+      + '<Relationship Id="rId1" Type="' + VR + 'pages" Target="pages/pages.xml"/><Relationship Id="rId2" Type="' + VR + 'windows" Target="windows.xml"/></Relationships>' },
+    { name: 'visio/windows.xml', data: H + '<Windows ClientWidth="1600" ClientHeight="900" ' + NS + '><Window ID="0" WindowType="Drawing" WindowState="1073741824" WindowLeft="0" WindowTop="0" WindowWidth="1600" WindowHeight="900" ContainerType="Page" Page="0" ViewScale="-1" ViewCenterX="' + n(PW / 2) + '" ViewCenterY="' + n(PH / 2) + '"/></Windows>' },
+    { name: 'visio/pages/pages.xml', data: H + '<Pages ' + NS + '><Page ID="0" NameU="Prozess" Name="Prozess"><PageSheet LineStyle="0" FillStyle="0" TextStyle="0">'
+      + zelle('PageWidth', n(PW)) + zelle('PageHeight', n(PH)) + zelle('PageScale', 1, '', 'IN_F') + zelle('DrawingScale', 1, '', 'IN_F') + zelle('DrawingSizeType', 3) + zelle('PrintPageOrientation', 2)
+      + '</PageSheet><Rel r:id="rId1"/></Page></Pages>' },
+    { name: 'visio/pages/_rels/pages.xml.rels', data: H + '<Relationships xmlns="' + REL + '"><Relationship Id="rId1" Type="' + VR + 'page" Target="page1.xml"/></Relationships>' },
+    { name: 'visio/pages/page1.xml', data: H + '<PageContents ' + NS + '><Shapes>' + shapes + '</Shapes></PageContents>' }
+  ];
+}
+function downloadVsdx() {
+  if (!istBpmnWand(state)) { sysMsg('Eine Visio-Datei gibt es nur von einer BPMN-Wand (Dokumente → «Prozess aus Interview»).', true); return; }
+  const fn = seitenTitel().replace(/[\\/:*?"<>|]+/g, ' ').trim().slice(0, 80) + '.vsdx';
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([makeZip(genVsdx())], { type: 'application/vnd.ms-visio.drawing' })); a.download = fn; a.click(); URL.revokeObjectURL(a.href);
+  downloadGemeldet(fn);
+  const offen = offeneFragen().length;
+  if (offen) sysMsg('Hinweis: ' + offen + (offen === 1 ? ' offene Frage steht' : ' offene Fragen stehen') + ' mit [offen] unten in der Visio-Zeichnung.', true);
+}
+/* V82: Pflichtangaben je Prozess («Steckbrief») und Word-Datei «Prozessseite» –
+   aufgebaut nach den Pflichtangaben einer Prozessseite (Ziele, Schnittstellen, Eingabe,
+   Ausgabe, Ergebnisse, Dokumente, Rollen, Kennzahlen, Reife, Risiken, Grundlagen).
+   Alles ohne KI im Exportpfad; Fehlendes steht als [offen]. Rollen kommen aus den Bahnen. */
+const STECKBRIEF = [
+  ['ziele', 'Prozessziele', 'Wozu gibt es den Prozess? Was soll er sicherstellen?'],
+  ['geltung', 'Geltungsbereich', 'Wo gilt er: unternehmensweit, an einem Standort, in einem Bereich?'],
+  ['eingaben', 'Prozesseingabe', 'Was muss zum Start zwingend vorliegen (Informationen, Vorarbeiten, Entscheide)?'],
+  ['ausgaben', 'Prozessausgabe', 'Was liegt am Ende vor und geht an andere weiter?'],
+  ['ergebnisse', 'Prozessergebnisse', 'Welche abschliessenden Ergebnisse liegen am Ende vor?'],
+  ['schnittstellen', 'Schnittstellen und Verweise', 'Welche Prozesse kommen davor, welche danach?'],
+  ['dokumente', 'Mitgeltende Dokumente', 'Welche Weisungen, Reglemente, Checklisten oder Formulare gelten?'],
+  ['kennzahlen', 'Prozesskennzahlen', 'Woran misst man, ob der Prozess gut läuft (z. B. Durchlaufzeit, Fehlerquote)?'],
+  ['reife', 'Prozessqualität', 'Wie gut läuft er heute? Wo hakt es? (z. B. Reifegrad, Komplexität, Schlaufen)'],
+  ['risiken', 'Prozessrisiken', 'Was kann schiefgehen, und mit welchen Folgen?'],
+  ['grundlagen', 'Gesetzliche Grundlagen und Reglemente', 'Welche Gesetze, Normen oder Vorgaben gelten?']
+];
+function steckbriefSauber(sb) {
+  const o = {};
+  if (!sb || typeof sb !== 'object' || Array.isArray(sb)) sb = {};
+  STECKBRIEF.forEach(f => {
+    let v = sb[f[0]];
+    if (typeof v === 'string') v = v.split(/\n+/);
+    o[f[0]] = (Array.isArray(v) ? v : []).map(t => String(t == null ? '' : t).replace(/[\u0000-\u001f]/g, ' ').replace(/^\s*[-•]\s*/, '').replace(/\s+/g, ' ').trim().slice(0, 240))
+      .filter(t => t && !/^\[?offen\]?$/i.test(t)).slice(0, 12);
+  });
+  return o;
+}
+function steckbriefLuecken(s) { const sb = steckbriefSauber((s || state).steckbrief); return STECKBRIEF.filter(f => !sb[f[0]].length).map(f => f[1]); }
+function openSteckbrief() {
+  if (!istBpmnWand(state)) { sysMsg('Die Pflichtangaben gibt es nur auf einer BPMN-Wand.', true); return; }
+  const sb = steckbriefSauber(state.steckbrief);
+  openModal('<h3>Pflichtangaben zum Prozess</h3>'
+    + '<p style="font-size:12.5px;color:var(--muted);margin:0 0 8px">Eine Angabe pro Zeile. Leer lassen, was niemand weiss – es steht dann als [offen] in der Prozessseite. Die Rollen kommen von selbst aus den Bahnen der Wand.</p>'
+    + STECKBRIEF.map(f => '<label style="display:block;font-weight:700;font-size:13px;margin:10px 0 2px">' + esc(f[1]) + '</label>'
+      + '<div style="font-size:12px;color:var(--muted);margin-bottom:3px">' + esc(f[2]) + '</div>'
+      + '<textarea data-sb="' + f[0] + '" rows="2" style="width:100%">' + esc(sb[f[0]].join('\n')) + '</textarea>').join('')
+    + '<div class="btnrow"><button id="mCancel">Abbrechen</button><button class="go" id="sbOk">Speichern</button></div>', true);
+  document.getElementById('mCancel').onclick = closeModal;
+  document.getElementById('sbOk').onclick = () => {
+    const neu = {};
+    modalBox.querySelectorAll('[data-sb]').forEach(t => { neu[t.dataset.sb] = t.value; });
+    state.steckbrief = steckbriefSauber(neu); save(); closeModal();
+    const l = steckbriefLuecken().length;
+    sysMsg('✓ Pflichtangaben gespeichert' + (l ? ' – noch ' + l + ' offen.' : ' – alle ausgefüllt.'), true);
+  };
+}
+/* Schritte in Ablauf-Reihenfolge: dem Fluss folgen ab dem Start, Rest nach Position */
+function bpmnReihenfolge(s) {
+  const K = s.postits.filter(p => p.bpmn && !bpmnIstNotiz(p, s));
+  const nach = id => s.connections.filter(k => k.from === id).map(k => K.find(p => p.id === k.to)).filter(Boolean).sort((a, b) => a.x - b.x || a.y - b.y);
+  const erg = [], gesehen = new Set();
+  const starts = K.filter(p => p.bpmn === 'start').sort((a, b) => a.x - b.x);
+  const reihe = starts.slice();
+  while (reihe.length) { /* Breite zuerst, damit Zweige nebeneinander stehen */
+    reihe.sort((a, b) => a.x - b.x || a.y - b.y);
+    const p = reihe.shift(); if (gesehen.has(p.id)) continue;
+    gesehen.add(p.id); erg.push(p); nach(p.id).forEach(z => { if (!gesehen.has(z.id)) reihe.push(z); });
+  }
+  K.filter(p => !gesehen.has(p.id)).sort((a, b) => a.x - b.x || a.y - b.y).forEach(p => erg.push(p));
+  return erg;
+}
+/* V85: Angaben zum Prozess aus der Prozessliste (Nr., Name, Gruppe, Verantwortung, Prozesseigner) */
+function prozessInfoSauber(o) {
+  const T = (v, n) => String(v == null ? '' : v).replace(/[\u0000-\u001f<>]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, n);
+  o = o && typeof o === 'object' && !Array.isArray(o) ? o : {};
+  const r = { nr: /^\d+(\.\d+){0,3}$/.test(T(o.nr, 12)) ? T(o.nr, 12) : '', name: T(o.name, 80), gruppe: T(o.gruppe, 60), verantwortlich: T(o.verantwortlich, 100), eigner: T(o.eigner, 100) };
+  return r;
+}
+function prozessInfo(s) {
+  s = s || state;
+  const pi = prozessInfoSauber(s.prozessInfo);
+  if (!pi.nr || !pi.name) { const m = String(s.prozessName || boardName()).replace(/\s*\(Beispiel\)\s*$/, '').match(/^\s*(\d+(?:\.\d+){0,3})\s+(.+)$/); if (m) { pi.nr = pi.nr || m[1]; pi.name = pi.name || m[2].trim(); } }
+  return pi;
+}
+/* Nomenklatur: Prozess-Nr. & Prozessbezeichnung, z. B. «3.2.1 Leistungserfassung» */
+function seitenTitel(s) { const pi = prozessInfo(s); return pi.nr && pi.name ? pi.nr + ' ' + pi.name : boardName(); }
+const HAUPTPROZESSE = { 1: '1. Managementprozesse', 2: '2. Kernprozesse inkl. Medizinischem Support', 3: '3. Unterstützungsprozesse' };
+function ablagePfad(s) {
+  const pi = prozessInfo(s), t = [];
+  t.push('Prozesslandkarte');
+  if (HAUPTPROZESSE[String(pi.nr).charAt(0)]) t.push(HAUPTPROZESSE[String(pi.nr).charAt(0)]);
+  const zwei = (pi.nr.match(/^\d+\.\d+/) || [''])[0];
+  if (zwei) t.push(pi.gruppe && pi.gruppe.indexOf(zwei) === 0 ? pi.gruppe : zwei + (pi.gruppe ? ' ' + pi.gruppe : ''));
+  t.push(seitenTitel(s));
+  return t;
+}
+function genProzessseite() {
+  const s = state, sb = steckbriefSauber(s.steckbrief), L = lanes().filter(l => l.key !== 'notiz');
+  const rolleVon = p => { const l = lanes().find(x => x.key === bpmnLaneKeyVon(p, s)); return l ? laneTitle(l) : '[offen]'; };
+  const OFFEN = '<span class="platz">[offen]</span>';
+  const liste = a => a.length ? (a.length === 1 ? esc(a[0]) : '<ul>' + a.map(t => '<li>' + esc(t) + '</li>').join('') + '</ul>') : OFFEN;
+  const A = p => (p.ablauf && typeof p.ablauf === 'object') ? p.ablauf : {};
+  const reihe = bpmnReihenfolge(s), schritte = reihe.filter(p => p.bpmn === 'aufgabe' || p.bpmn === 'gateway');
+  /* Rollen und Verantwortlichkeiten aus den Bahnen */
+  const rollen = L.map(l => { const t = s.postits.filter(p => p.bpmn === 'aufgabe' && bpmnLaneKeyVon(p, s) === l.key).map(p => cleanTxt(p.text || ''));
+    return '<tr><td><b>' + esc(laneTitle(l)) + '</b></td><td>' + (t.length ? esc(t.join(' · ')) : OFFEN) + '</td></tr>'; }).join('');
+  /* Ablauf als Tabelle wie eine Arbeitsanweisung */
+  const pnr = prozessInfo(s).nr, nr = {}; schritte.forEach((p, i) => { nr[p.id] = (pnr ? pnr + '.' : '') + (i + 1); }); /* V85: wie in Prozesse4SSH, z. B. 1.1.1.1.2 */
+  const ziele = id => s.connections.filter(k => k.from === id).map(k => { const z = getPostit(k.to); return z ? (k.label ? k.label + ' → ' : '→ ') + (nr[z.id] ? nr[z.id] + ' ' : '') + cleanTxt(z.text || '') : ''; }).filter(Boolean);
+  const zeile = (n, schritt, ein, hilf, ver, mit) => '<tr><td class="c">' + n + '</td><td>' + schritt + '</td><td>' + ein + '</td><td>' + hilf + '</td><td>' + ver + '</td><td>' + mit + '</td></tr>';
+  const start = reihe.filter(p => p.bpmn === 'start'), ende = reihe.filter(p => p.bpmn === 'ende');
+  let tab = '';
+  start.forEach(p => { tab += zeile('', '<b>Vorgänger / Auslöser</b><br>' + esc(cleanTxt(p.text || '')), sb.eingaben.length ? esc(sb.eingaben.join('; ')) : OFFEN, sb.schnittstellen.length ? 'Schnittstellen: ' + esc(sb.schnittstellen.join('; ')) : '', esc(rolleVon(p)), ''); });
+  schritte.forEach(p => {
+    const a = A(p), ein = [a.eingabe ? 'Eingabe: ' + a.eingabe : '', a.ergebnis ? 'Ergebnis: ' + a.ergebnis : ''].filter(Boolean);
+    const txt = p.bpmn === 'gateway' ? '<b>Entscheid:</b> ' + esc(cleanTxt(p.text || '')) + '<br>' + esc(ziele(p.id).join('; ')) : esc(cleanTxt(p.text || ''));
+    tab += zeile(nr[p.id], txt, ein.length ? esc(ein.join(' · ')).replace(' · ', '<br>') : (p.bpmn === 'gateway' ? '' : OFFEN), a.womit ? esc(a.womit) : (p.bpmn === 'gateway' ? '' : OFFEN), esc(rolleVon(p)), a.mitwirkend ? esc(a.mitwirkend) : '');
+  });
+  ende.forEach(p => { tab += zeile('', '<b>Folgeschritt / Ende</b><br>' + esc(cleanTxt(p.text || '')), sb.ergebnisse.length ? esc(sb.ergebnisse.join('; ')) : OFFEN, '', esc(rolleVon(p)), ''); });
+  const fragen = s.postits.filter(p => bpmnIstNotiz(p, s) && (p.status || 'offen') !== 'erledigt').map(p => cleanTxt(p.text || '').replace(/^❓\s*/u, ''));
+  const hinweise = s.postits.filter(p => bpmnIstNotiz(p, s) && (p.status || 'offen') === 'erledigt' && !/^❓/u.test(p.text || '')).map(p => cleanTxt(p.text || '').replace(/^💡\s*/u, ''));
+  const luecken = steckbriefLuecken(s);
+  const feld = k => STECKBRIEF.find(f => f[0] === k)[1];
+  /* V85: Aufbau nach der Vorlage «VORLAGE Prozesse SSH360»: Seiteninformation,
+     Prozessstruktur, Prozessattribute (mit Rollen und Verantwortlichkeiten je Attribut),
+     Arbeitsschritte mit Vorgänger und Folgeschritt, Ablage in der Prozesslandkarte. */
+  const pi = prozessInfo(s), titel = seitenTitel(s);
+  const leer = '<span class="platz">[offen]</span>';
+  const kopfTab = '<table class="kopf">'
+    + '<tr><td>Seitenbezeichnung</td><td><b>' + esc(titel) + '</b></td></tr>'
+    + '<tr><td>Freigabestatus</td><td>Entwurf</td></tr>'
+    + '<tr><td>Seitentyp</td><td>Strukturseite (VORLAGE Prozesse SSH360)</td></tr>'
+    + '<tr><td>Geltungsbereich</td><td>' + liste(sb.geltung) + '</td></tr>'
+    + '<tr><td>Letzter Autor</td><td>' + leer + '</td></tr>'
+    + '<tr><td>Verantwortlich (Prozessverantwortung)</td><td>' + (pi.verantwortlich ? esc(pi.verantwortlich) : leer) + '</td></tr>'
+    + '<tr><td>Prozesseigner (inhaltliche Freigabe)</td><td>' + (pi.eigner ? esc(pi.eigner) : leer) + '</td></tr>'
+    + '<tr><td>Freigegeben durch / Freigabedatum</td><td>' + leer + '</td></tr>'
+    + '<tr><td>Version</td><td>' + leer + '</td></tr></table>';
+  const farbe = ({ 1: '#C8323C', 2: '#2F4FA0', 3: '#8BB43A' })[String(pi.nr || titel).charAt(0)] || '#651B32';
+  const struktur = '<table><tr>' + s.phases.map(ph => '<td style="background:' + farbe + ';color:#ffffff;font-weight:bold;text-align:center;border:1pt solid #ffffff">' + esc(ph.name || '') + '</td>').join('') + '</tr></table>';
+  const abs = (lab, a) => '<p style="margin:2pt 0"><i>' + lab + ':</i> ' + (a.length ? esc(a.join('; ')) : leer) + '</p>';
+  const attr = [
+    ['Prozessziele', liste(sb.ziele), 'Prozesseigner'],
+    ['Prozesseingabe und Prozessausgabe, Prozessergebnisse', abs('Prozesseingabe', sb.eingaben) + abs('Prozessausgabe', sb.ausgaben) + abs('Prozessergebnisse', sb.ergebnisse), 'Prozessverantwortlicher'],
+    ['Mitgeltende Dokumente', liste(sb.dokumente), 'Prozessverantwortlicher'],
+    ['Schnittstellen und Verweise', liste(sb.schnittstellen), 'Prozessverantwortlicher'],
+    ['Prozesskennzahlen', liste(sb.kennzahlen), 'Prozesseigner'],
+    ['Prozessqualität', liste(sb.reife), 'Prozesseigner'],
+    ['Prozessrisiken', liste(sb.risiken), 'Prozesseigner'],
+    ['Gesetzliche Grundlagen und Reglemente', liste(sb.grundlagen), 'Prozesseigner']];
+  const pflicht = '<table><tr><th style="width:26%">Prozessattribute</th><th>Beschreibung</th><th style="width:20%">Rollen und Verantwortlichkeiten</th></tr>'
+    + attr.map(a => '<tr><td><b>' + a[0] + '</b></td><td>' + a[1] + '</td><td><i>' + a[2] + '</i></td></tr>').join('') + '</table>';
+  const ablage = ablagePfad(s);
+  const body = kopfTab
+    + (luecken.length ? '<p class="platz">Noch offen: ' + esc(luecken.join(', ')) + '. Attribute des Prozesseigners sind Entwürfe aus dem Interview und von ihm zu bestätigen.</p>' : '<p class="platz">Attribute des Prozesseigners sind Entwürfe aus dem Interview und von ihm zu bestätigen.</p>')
+    + '<h2>Prozessstruktur</h2>' + struktur
+    + '<h2>Prozessattribute</h2>' + pflicht
+    + '<h2>Rollen und Verantwortlichkeiten im Ablauf</h2><table><tr><th style="width:30%">Rolle</th><th>Aufgaben im Prozess</th></tr>' + rollen + '</table>'
+    + '<h2>Prozess-Flowchart</h2><p>Grafik nach BPMN 2.0 mit Swimlanes: Dateien «' + esc(titel) + '.bpmn» und «' + esc(titel) + '.vsdx» aus derselben Wand.</p>'
+    + '<h2>Arbeitsschritte</h2>'
+    + '<table><tr><th style="width:5%">Nr.</th><th style="width:27%">Arbeitsschritte</th><th style="width:20%">Eingabe / Ergebnis</th><th style="width:18%">Hilfsmittel / Dokumente / Schnittstellen</th><th style="width:15%">Verantwortlich</th><th style="width:15%">Mitwirkend</th></tr>' + tab + '</table>'
+    + '<h2>Offene Fragen</h2>' + (fragen.length ? '<ul>' + fragen.map(t => '<li>' + esc(t) + ' <span class="platz">[offen]</span></li>').join('') + '</ul>' : '<p>Keine.</p>')
+    + (hinweise.length ? '<h2>Hinweise aus dem Interview</h2><ul>' + hinweise.map(t => '<li>' + esc(t) + '</li>').join('') + '</ul>' : '')
+    + '<h2>Ablage in Prozesse4SSH</h2><table class="kopf">'
+    + '<tr><td>Ort in der Prozesslandkarte</td><td>' + esc(ablage.join(' → ')) + '</td></tr>'
+    + '<tr><td>Seitentyp und Vorlage</td><td>Wikiseite, VORLAGE Prozesse SSH360 (3. Ebene: Prozessbeschreibung)</td></tr>'
+    + '<tr><td>Titel der Seite</td><td>' + esc(titel) + '</td></tr>'
+    + '<tr><td>Mitgeltende Dokumente</td><td>je als Dateiseite, Titel «' + esc(pi.nr || '[Nr.]') + ' ' + esc(pi.name || '[Prozess]') + '-Dokumenttitel»</td></tr>'
+    + '<tr><td>Arbeitsanweisungen (4. Ebene)</td><td>VORLAGE Arbeitsanweisungen, dem Prozess untergeordnet</td></tr></table>'
+    + '<h2>Prüfung und Freigabe</h2><table><tr><th style="width:30%">Schritt</th><th style="width:30%">Wer</th><th style="width:20%">Datum</th><th>Visum</th></tr>'
+    + '<tr><td>Prozessentwurf geprüft</td><td>Prozessverantwortliche/r' + (pi.verantwortlich ? ': ' + esc(pi.verantwortlich) : '') + '</td><td></td><td></td></tr>'
+    + '<tr><td>Inhaltliche Freigabe</td><td>Prozesseigner' + (pi.eigner ? ': ' + esc(pi.eigner) : ' (SL)') + '</td><td></td><td></td></tr>'
+    + '<tr><td>Formelle Freigabe</td><td>Prozessmanager</td><td></td><td></td></tr></table>';
+  return docShell(titel, body);
+}
+function downloadProzessseite() {
+  if (!istBpmnWand(state)) { sysMsg('Die Prozessseite gibt es nur von einer BPMN-Wand.', true); return; }
+  downloadDoc(seitenTitel().replace(/[\\/:*?"<>|]+/g, ' ').trim().slice(0, 80) + '.doc', genProzessseite());
+  const l = steckbriefLuecken().length;
+  if (l) sysMsg('Hinweis: ' + l + (l === 1 ? ' Pflichtangabe fehlt' : ' Pflichtangaben fehlen') + ' noch – sie stehen als [offen] in der Datei. Ergänzen: «Pflichtangaben».', true);
+}
 /* Auftrag an die KI: aus der Abschrift eines Interviews wird eine Prozess-Beschreibung.
    Dasselbe Format liest auch der Import – so geht es mit dem Abo ohne API-Kosten. */
 const BPMN_FORMAT = '{"prozess":"Nummer und Name","rollen":["Rolle A","Rolle B"],'
-  + '"abschnitte":[{"name":"Abschnitt","elemente":[{"id":"e1","art":"start|aufgabe|gateway|ende","rolle":"Rolle A","text":"höchstens 80 Zeichen","womit":"System, Formular, Telefon oder leer","ergebnis":"was danach vorhanden ist oder leer","nach":[{"zu":"e2","wenn":"nur bei Entscheid: ja, nein oder kurze Bedingung"}]}]}],'
-  + '"offen":[{"frage":"offene Frage","abschnitt":"Name des Abschnitts"}],"hinweise":[{"text":"wichtige Nebenbemerkung","abschnitt":"Name des Abschnitts"}]}';
+  + '"abschnitte":[{"name":"Abschnitt","elemente":[{"id":"e1","art":"start|aufgabe|gateway|ende","rolle":"Rolle A","text":"höchstens 80 Zeichen","eingabe":"was für diesen Schritt vorliegen muss oder leer","womit":"System, Formular, Dokument oder leer","ergebnis":"was danach vorhanden ist oder leer","mitwirkend":"weitere beteiligte Rolle oder leer","nach":[{"zu":"e2","wenn":"nur bei Entscheid: ja, nein oder kurze Bedingung"}]}]}],'
+  + '"offen":[{"frage":"offene Frage","abschnitt":"Name des Abschnitts"}],"hinweise":[{"text":"wichtige Nebenbemerkung","abschnitt":"Name des Abschnitts"}],"steckbrief":{"ziele":[],"geltung":[],"eingaben":[],"ausgaben":[],"ergebnisse":[],"schnittstellen":[],"dokumente":[],"kennzahlen":[],"reife":[],"risiken":[],"grundlagen":[]}}';
 const BPMN_SYS = 'Du strukturierst die Abschrift eines Interviews zu einem Arbeitsprozess nach BPMN 2.0. '
   + 'Antworte NUR mit einem JSON-Objekt in genau diesem Format: ' + BPMN_FORMAT + '\n'
   + 'Regeln:\n'
@@ -980,7 +1318,8 @@ const BPMN_SYS = 'Du strukturierst die Abschrift eines Interviews zu einem Arbei
   + '4. Eine "aufgabe" ist eine Tätigkeit einer Rolle: Verb und Objekt, höchstens 80 Zeichen. Ein neuer Schritt beginnt, wenn Rolle oder Hilfsmittel wechselt.\n'
   + '5. Ein "gateway" steht dort, wo der Ablauf sich verzweigt. Sein Text ist die Frage (z. B. «Vor Ort lösbar?»), jede Verbindung danach trägt "wenn".\n'
   + '6. 3 bis 6 Abschnitte in der Reihenfolge des Ablaufs, je 1 bis 5 Elemente. Jedes Element ausser dem Ende hat mindestens einen Eintrag in "nach".\n'
-  + '7. Schweizer Schreibweise (ss statt ß). Keine Angaben zu Patientinnen und Patienten.';
+  + '7. Schweizer Schreibweise (ss statt ß). Keine Angaben zu Patientinnen und Patienten.\n'
+  + '8. "steckbrief" sammelt die Pflichtangaben einer Prozessseite: ziele (wozu), geltung (wo der Prozess gilt), eingaben (was zum Start vorliegen muss), ausgaben (was weitergeht), ergebnisse (was am Ende vorliegt), schnittstellen (Prozesse davor und danach), dokumente (Weisungen, Reglemente, Checklisten, Formulare), kennzahlen (Messgrössen), reife (wie gut es heute läuft, wo es hakt), risiken, grundlagen (Gesetze, Normen, Vorgaben). Je Feld kurze Einträge (höchstens 160 Zeichen). Nur Gesagtes; was nicht vorkam, bleibt eine leere Liste – nie raten.';
 function bpmnAuftragText(name, abschrift) {
   return BPMN_SYS + '\n\nProzess: ' + (name || '[offen]') + '\n\nAbschrift des Interviews:\n' + abschrift;
 }
@@ -996,6 +1335,30 @@ function bpmnVorschau(erg, beleg, name) {
   sysMsg('🧩 Vorschau «' + nm + '» nach BPMN 2.0: ' + (st.lanes.length - 1) + ' Rollen, ' + st.postits.filter(c => c.bpmn).length + ' Schritte, ' + fr + ' offene Fragen. Oben «Als neue Wand» wählen – oder verwerfen.');
   return st;
 }
+/* V83: Beispiel einer BPMN-Wand (erfunden, kein echter Betrieb) – zum Ausprobieren von
+   Pflichtangaben, Prozessseite, BPMN- und Visio-Datei ohne Konto und ohne KI. */
+const BPMN_BEISPIEL = { prozess: '9.1 Störung beheben', rollen: ['Melder', 'Disponent', 'Fachperson'],
+  abschnitte: [
+    { name: 'Melden', elemente: [
+      { id: 'a', art: 'start', rolle: 'Melder', text: 'Störung festgestellt', nach: [{ zu: 'b' }] },
+      { id: 'b', art: 'aufgabe', rolle: 'Melder', text: 'Ticket erstellen', eingabe: 'Ort und Art der Störung', womit: 'Ticketsystem', ergebnis: 'Ticket', nach: [{ zu: 'c' }] }] },
+    { name: 'Zuweisen', elemente: [
+      { id: 'c', art: 'aufgabe', rolle: 'Disponent', text: 'Fachperson zuweisen', womit: 'Ticketsystem', ergebnis: 'zugewiesenes Ticket', nach: [{ zu: 'd' }] }] },
+    { name: 'Beheben', elemente: [
+      { id: 'd', art: 'aufgabe', rolle: 'Fachperson', text: 'Vor Ort gehen', nach: [{ zu: 'e' }] },
+      { id: 'e', art: 'gateway', rolle: 'Fachperson', text: 'Sofort lösbar?', nach: [{ zu: 'f', wenn: 'nein' }, { zu: 'g', wenn: 'ja' }] },
+      { id: 'f', art: 'aufgabe', rolle: 'Fachperson', text: 'Ersatzteil besorgen', mitwirkend: 'Einkauf', nach: [{ zu: 'g' }] },
+      { id: 'g', art: 'aufgabe', rolle: 'Fachperson', text: 'Störung beheben', ergebnis: 'Anlage läuft', nach: [{ zu: 'h' }] },
+      { id: 'h', art: 'ende', rolle: 'Melder', text: 'Rückmeldung erhalten' }] }],
+  offen: [{ frage: 'Wer gibt Kosten über dem Limit frei?', abschnitt: 'Beheben' }],
+  hinweise: [{ text: 'Oft wird zuerst angerufen', abschnitt: 'Melden' }],
+  steckbrief: { ziele: ['Störungen rasch und sicher beheben'], schnittstellen: ['9.2 Wartung planen'], kennzahlen: ['Zeit bis zur Behebung'], risiken: ['Ausfall ohne Ersatzteil'] } };
+function ladeBpmnBeispiel() {
+  if (previewState) { sysMsg('Zuerst die offene Vorschau übernehmen oder verwerfen.', true); return; }
+  bpmnVorschau(BPMN_BEISPIEL, 'Beispiel (erfunden)', '9.1 Störung beheben (Beispiel)');
+  if (uebungsModus) document.getElementById('pvNeu').click();
+  sysMsg('🧩 Beispiel eines Prozesses nach BPMN 2.0. Probier unter «Was willst du erstellen?» die Prozessseite, die BPMN- und die Visio-Datei – und den Knopf «Pflichtangaben» unter «Dokumente».', true);
+}
 /* V79: Ein auf spitaeler.html aufgenommener Prozess wird ohne Konto gezeigt (Übungs-Modus:
    nichts wird gespeichert). Die Beschreibung liegt im Browser-Speicher desselben Geräts. */
 function aufnahmeOeffnen() {
@@ -1007,8 +1370,10 @@ function aufnahmeOeffnen() {
     const name = String(a.name || (a.erg && a.erg.prozess) || 'Prozess').replace(/\s+/g, ' ').trim().slice(0, 60);
     if (hatWand) { newBoardFrom(name, normalizeState(a.wand), true); }
     else { bpmnVorschau(a.erg, 'Interview, ausgewertet am ' + heute(), name); document.getElementById('pvNeu').click(); }
-    state.goal = ''; goalInput.value = ''; autoResizeGoal(); kiLog.innerHTML = ''; render();
-    const kannSpeichern = /^[A-Za-z0-9_-]{16,64}$/.test(String(a.s || ''));
+    const piAlt = prozessInfoSauber(state.prozessInfo), piNeu = prozessInfoSauber({ nr: a.nr, name: a.nurName, gruppe: a.gruppe, verantwortlich: a.funktion, eigner: a.eigner });
+    Object.keys(piNeu).forEach(k => { if (!piNeu[k]) piNeu[k] = piAlt[k]; }); state.prozessInfo = piNeu;
+    state.goal = ''; goalInput.value = ''; autoResizeGoal(); kiLog.innerHTML = ''; save(); render();
+    const kannSpeichern = /^[A-Za-z0-9_-]{16,64}$/.test(String(a.s || '')) || /^[A-Za-z0-9_-]{16,64}$/.test(String(a.z || '')); /* V83: auch mit persönlichem Zugang */
     if (kannSpeichern) aufnahmeLeiste(a, name);
     sysMsg('🧩 Dein Prozess nach BPMN 2.0. Stimmt etwas nicht? Karte anklicken und Text ändern, offene Fragen über «Beantworten» klären. '
       + (kannSpeichern ? 'Danach unten «Änderungen speichern» drücken.' : 'Hier wird nichts gespeichert.')
@@ -1020,15 +1385,17 @@ function aufnahmeOeffnen() {
 function aufnahmeLeiste(a, name) {
   let bar = document.getElementById('aufnBar');
   if (!bar) { bar = document.createElement('div'); bar.id = 'aufnBar'; document.body.appendChild(bar); }
-  bar.innerHTML = '<button type="button" id="aufnZurueck">&larr; Zur Prozessliste</button><span id="aufnInfo"></span><button type="button" class="go" id="aufnSpeichern">Änderungen speichern</button>';
+  bar.innerHTML = '<button type="button" id="aufnZurueck">&larr; Zur Prozessliste</button><span id="aufnInfo"></span><button type="button" id="aufnSteck">Pflichtangaben</button><button type="button" id="aufnSeite">Prozessseite (Word)</button><button type="button" class="go" id="aufnSpeichern">Änderungen speichern</button>';
+  document.getElementById('aufnSteck').onclick = openSteckbrief;
+  document.getElementById('aufnSeite').onclick = downloadProzessseite;
   document.getElementById('aufnZurueck').onclick = () => { if (history.length > 1) history.back(); else location.href = 'spitaeler.html'; };
   const info = document.getElementById('aufnInfo');
   document.getElementById('aufnSpeichern').onclick = async function () {
     this.disabled = true; info.textContent = 'Wird gespeichert …';
-    const w = { wandTyp: 'bpmn', lanes: state.lanes, phases: state.phases, postits: state.postits, connections: state.connections, milestones: state.milestones, ssot: state.ssot };
+    const w = { wandTyp: 'bpmn', lanes: state.lanes, phases: state.phases, postits: state.postits, connections: state.connections, milestones: state.milestones, ssot: state.ssot, steckbrief: state.steckbrief || null, prozessInfo: state.prozessInfo || null };
     try {
       const r = await fetch(SUPABASE_URL + '/functions/v1/prozess-aufnahme', { method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ aktion: 'speichern', sammlung: a.s, nr: String(a.nr || ''), name: String(a.nurName || name), wand: w }) });
+        body: JSON.stringify(Object.assign({ aktion: 'speichern', nr: String(a.nr || ''), name: String(a.nurName || name), wand: w }, a.s ? { sammlung: a.s } : { zugang: a.z })) });
       const j = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(j.error || ('Fehler ' + r.status));
       try { a.wand = w; localStorage.setItem('pw-aufnahme', JSON.stringify(a)); } catch (e) {}
@@ -1149,7 +1516,11 @@ function normalizeState(d) {
     /* V70: Antworten aus dem Interview – nur in der Wand, fuer «Weiter fragen» */
     interview: d.interview && typeof d.interview === 'object' ? d.interview : null,
     /* V71: KI-Fahrplan – Anwendungen und Stundensatz für den Sparpotenzial-Rechner */
-    fahrplan: d.fahrplan && typeof d.fahrplan === 'object' && Array.isArray(d.fahrplan.faelle) ? d.fahrplan : null
+    fahrplan: d.fahrplan && typeof d.fahrplan === 'object' && Array.isArray(d.fahrplan.faelle) ? d.fahrplan : null,
+    /* V82: Pflichtangaben einer BPMN-Wand (nur Text, geprüft) */
+    steckbrief: d.steckbrief && typeof d.steckbrief === 'object' ? steckbriefSauber(d.steckbrief) : null,
+    /* V85: Angaben aus der Prozessliste */
+    prozessInfo: d.prozessInfo && typeof d.prozessInfo === 'object' ? prozessInfoSauber(d.prozessInfo) : null
   };
   /* V72 Sicherheit (Prüfung 31.10.2026): eine präparierte Wand-Datei konnte über Felder
      wie owner, id oder due fremden Code in die Seite schmuggeln (Import-Vorschau reichte).
@@ -1171,6 +1542,7 @@ function normalizeState(d) {
     if (p.rang != null) p.rang = ZAHL(p.rang, undefined);
     if (p.erledigtAm != null) p.erledigtAm = DATUM(p.erledigtAm);
     if (p.bpmn != null && ['start', 'aufgabe', 'gateway', 'ende'].indexOf(p.bpmn) < 0) delete p.bpmn; /* V78 */
+    if (p.ablauf != null) { const ab = {}; if (OBJ(p.ablauf)) ['eingabe', 'womit', 'ergebnis', 'mitwirkend'].forEach(k => { if (p.ablauf[k] != null && String(p.ablauf[k]).trim()) ab[k] = String(p.ablauf[k]).replace(/\s+/g, ' ').trim().slice(0, 200); }); if (Object.keys(ab).length) p.ablauf = ab; else delete p.ablauf; } /* V82 */
     return p; });
   s.connections = s.connections.filter(OBJ)
     .map(c => { const o = { id: neu(c.id, 'c'), from: idMap[c.from] || c.from, to: idMap[c.to] || c.to };
@@ -2056,6 +2428,7 @@ function openStart() {
     + startBigBtn('stIv', '🎤', 'Interview: Die Wand fragt, du antwortest', 'Acht kurze Fragen. Beim Antworten baut sich deine Wand selbst auf. Kein Vorwissen nötig.')
     + startBigBtn('stChat', '💬', 'Projekt aus einem Chat', 'Du hast mit ChatGPT, Claude oder Copilot über dein Projekt gesprochen? Brief einfügen – die Wand fragt nur noch, was fehlt.')
     + startBigBtn('stFoto', '📷', 'Foto einer Papierwand', 'Du hast schon an einer Wand aus Papier gearbeitet? Foto hochladen – die KI baut daraus die digitale Wand.')
+    + startBigBtn('stBpmn', '🧩', 'Prozess nach BPMN 2.0 (Beispiel)', 'Ein fertig aufgenommener Ablauf mit Bahnen pro Rolle – zum Ausprobieren von Prozessseite, BPMN- und Visio-Datei.')
     + startBigBtn('stHeute', '☀️', 'Zeig mir, was heute zu tun ist', 'Öffnet die Übersicht: was fertig ist, was auf dich wartet, wo du entscheiden musst.')
     + startBigBtn('stZiel', '🎯', 'Mit einem Ziel starten', 'Du schreibst dein Ziel in deinen Worten – die Wand macht es mit dir SMART und baut daraus das Projekt.')
     + startBigBtn('stNeu', '✨', 'Neues Projekt starten', 'Die Wand stellt dir eine Frage nach der anderen und baut daraus dein Projekt.')
@@ -2069,6 +2442,7 @@ function openStart() {
   document.getElementById('stFoto').onclick = () => { closeModal(); openFotoImport(); };
   document.getElementById('stChat').onclick = () => { closeModal(); openChatImport(); };
   document.getElementById('stHeute').onclick = () => { closeModal(); openDash(); };
+  document.getElementById('stBpmn').onclick = () => { closeModal(); ladeBpmnBeispiel(); };
   document.getElementById('stZiel').onclick = startMitZiel;
   document.getElementById('stNeu').onclick = startNeuesProjekt;
   document.getElementById('stWeiter').onclick = closeModal;
@@ -3108,7 +3482,7 @@ function openKiKonto(then) {
   openModal('<h3>&#129302; Die KI gibt es mit einem Gratis-Konto</h3>'
     + '<p style="font-size:13px;margin:2px 0 8px">Mit einem Konto bekommst du ein Start-Guthaben. Damit ordnet die KI deine Antworten, erg&auml;nzt die Wand und schreibt Berichte. '
     + 'Du brauchst keinen eigenen Schl&uuml;ssel und keine Kreditkarte.</p>'
-    + (uebungsModus && state && state.interview ? '<p style="font-size:13px;margin:0 0 8px">&#10003; Deine Wand aus dem Interview kommt ins neue Konto mit.</p>' : '')
+    + (wandMitnehmbar() ? '<p style="font-size:13px;margin:0 0 8px">&#10003; Diese Wand kommt mit in dein Konto &ndash; auch wenn du dich mit einem bestehenden Konto anmeldest.</p>' : '')
     + '<div class="btnrow"><button class="go" id="kkNeu">Gratis-Konto erstellen</button><button id="kkLogin">Ich habe ein Konto</button><button id="mCancel">Sp&auml;ter</button></div>'
     + '<button id="kkKey" style="margin-top:12px;font:inherit;font-size:12px;border:0;background:none;color:var(--muted);cursor:pointer;padding:0;text-decoration:underline">Ich habe einen eigenen Anthropic-Schl&uuml;ssel</button>');
   document.getElementById('kkNeu').onclick = () => zumKonto(true);
@@ -3119,8 +3493,11 @@ function openKiKonto(then) {
 /* Vom Uebungs-Modus ins Konto: die Interview-Wand wird mitgenommen
    (localStorage, 1 Tag gueltig – ueberlebt auch den Bestaetigungs-Link per Mail) */
 const MITNEHMEN = 'pw-mitnehmen';
+/* V84: auch Prozess-Wände (BPMN) kommen mit – vorher nur Interview-Wände, nach dem Login
+   sah man dann die alten Wände des Kontos statt der Wand, an der man gerade war. */
+function wandMitnehmbar() { return !!(uebungsModus && state && (state.interview || istBpmnWand(state))); }
 function zumKonto(neu) {
-  if (uebungsModus && state && state.interview) {
+  if (wandMitnehmbar()) {
     const b = activeBoard();
     try { localStorage.setItem(MITNEHMEN, JSON.stringify({ name: b ? b.name : 'Interview', state, bis: Date.now() + 86400000 })); } catch (e) {}
   }
@@ -3133,7 +3510,7 @@ function mitgenommeneWand() {
   try { m = JSON.parse(localStorage.getItem(MITNEHMEN)); localStorage.removeItem(MITNEHMEN); } catch (e) {}
   if (!m || !m.state || !(m.bis > Date.now())) return false;
   newBoardFrom(m.name || 'Interview', normalizeState(m.state), true);
-  sysMsg('✅ Deine Wand «' + (m.name || 'Interview') + '» aus dem Interview ist jetzt in deinem Konto gespeichert. Die KI steht dir ab sofort zur Verfügung.', true);
+  sysMsg('✅ Deine Wand «' + (m.name || 'Interview') + '» ist jetzt in deinem Konto gespeichert und offen. Die KI steht dir ab sofort zur Verfügung. Deine übrigen Wände findest du oben links.', true);
   return true;
 }
 
@@ -5497,7 +5874,7 @@ document.getElementById('docsBtn').onclick = () => {
     + '<label style="margin-top:12px">Projekt einlesen</label>'
     + '<div class="btnrow" style="margin-top:4px"><button class="go" id="dChat" title="Projekt-Brief aus ChatGPT, Claude oder Copilot einfügen – die Wand fragt nur noch, was fehlt">&#128172; Projekt aus einem Chat</button><button class="go" id="dFoto" title="Foto einer Moderationswand aus Papier: die KI liest Zettel, Phasen und Tore &ndash; mit Vorschau">&#128247; Foto einer Papierwand</button><button class="go" id="dImport" title="Fertige Strukturdatei (JSON) aus dem Chat einlesen &ndash; mit Vorschau; die Zielleiste bleibt unber&uuml;hrt">Import (JSON)</button>'
     + '<button class="go" id="dAbschrift" title="Abschrift eines Interviews einf&uuml;gen &ndash; daraus entsteht eine Wand nach BPMN 2.0: eine Bahn pro Rolle, Start, Aufgaben, Entscheide, Ende">&#127908; Prozess aus Interview (BPMN)</button>'
-    + (istBpmnWand(state) ? '<button class="go" id="dBpmn" title="Die Wand als BPMN-2.0-Datei speichern &ndash; &ouml;ffnet sich in Camunda Modeler, bpmn.io, Signavio und ADONIS; ohne KI">BPMN 2.0 (.bpmn)</button>' : '')
+    + (istBpmnWand(state) ? '<button class="go" id="dBpmn" title="Die Wand als BPMN-2.0-Datei speichern &ndash; &ouml;ffnet sich in Camunda Modeler, bpmn.io, Signavio und ADONIS; ohne KI">BPMN 2.0 (.bpmn)</button><button class="go" id="dVsdx" title="Die Wand als Visio-Zeichnung speichern &ndash; Bahnen, Formen und Pfeile wie auf der Wand; ohne KI">Visio (.vsdx)</button><button class="go" id="dSeite" title="Prozessseite mit allen Pflichtangaben, Rollen und Ablauf-Tabelle (Word); ohne KI">Prozessseite (Word)</button><button id="dSteck" title="Ziele, Schnittstellen, Dokumente, Kennzahlen, Risiken … eintragen oder ergänzen">Pflichtangaben</button>' : '')
     + '<button class="go" id="dRepoWand" title="Claude analysiert ein ganzes Repo und schickt die fertige Strukturdatei &ndash; im Abo, keine API-Kosten">&rarr; Wand aus einem Repo (Claude)</button></div>'
     + '<div style="font-size:10.5px;color:var(--muted);margin-top:3px">&laquo;Wand aus einem Repo&raquo; kopiert dir den fertigen Auftrag f&uuml;r Claude. Dort einf&uuml;gen &rarr; du bekommst die Strukturdatei zur&uuml;ck &rarr; hier mit &laquo;Import&raquo; einlesen (mit Vorschau).</div>'
     + '<label style="margin-top:12px">Umfrage auswerten <span style="font-weight:400;text-transform:none">(liest die Antworten aus Supabase &ndash; nur du kannst das)</span></label>'
@@ -5619,6 +5996,9 @@ document.getElementById('docsBtn').onclick = () => {
   document.getElementById('dImport').onclick = () => { closeModal(); document.getElementById('importFile').click(); };
   document.getElementById('dAbschrift').onclick = () => { closeModal(); openAbschriftImport(); };
   if (document.getElementById('dBpmn')) document.getElementById('dBpmn').onclick = () => { closeModal(); downloadBpmn(); };
+  if (document.getElementById('dVsdx')) document.getElementById('dVsdx').onclick = () => { closeModal(); downloadVsdx(); };
+  if (document.getElementById('dSeite')) document.getElementById('dSeite').onclick = () => { closeModal(); downloadProzessseite(); };
+  if (document.getElementById('dSteck')) document.getElementById('dSteck').onclick = () => { closeModal(); openSteckbrief(); };
   document.getElementById('dFoto').onclick = () => { closeModal(); openFotoImport(); };
   document.getElementById('dChat').onclick = () => { closeModal(); openChatImport(); };
   document.getElementById('dAnalyse').onclick = () => { closeModal(); openAnalyse(); };
@@ -6263,7 +6643,9 @@ function wwOptionen() {
   const erledigt = state.postits.filter(c => istArbeitsLane(laneKeyOfY(c.y)) && (c.status || 'offen') === 'erledigt').length;
   const ki = kiBereit();
   const L = [];
+  if (istBpmnWand(state)) { const lk = steckbriefLuecken(); L.push({ id: 'prozessseite', ic: '📄', titel: 'Prozessseite (Word)', satz: 'Alle Pflichtangaben, Rollen und der Ablauf als Tabelle – die Vorlage für Prozesse4SSH, ohne KI.', vorher: (lk.length ? [lk.length + (lk.length === 1 ? ' Pflichtangabe ergänzen' : ' Pflichtangaben ergänzen') + ' (Knopf «Pflichtangaben»)'] : []).concat(fr ? [fr + (fr === 1 ? ' offene Frage beantworten' : ' offene Fragen beantworten')] : []), knopf: 'Erstellen' }); }
   if (istBpmnWand(state)) L.push({ id: 'bpmn', ic: '🧩', titel: 'BPMN-2.0-Datei', satz: 'Der Prozess als Datei für Camunda Modeler, bpmn.io, Signavio oder ADONIS – ohne KI.', vorher: fr ? [fr + (fr === 1 ? ' offene Frage beantworten' : ' offene Fragen beantworten')] : [], knopf: 'Speichern' });
+  if (istBpmnWand(state)) L.push({ id: 'vsdx', ic: '📐', titel: 'Visio-Zeichnung', satz: 'Der Prozess als Visio-Datei (.vsdx) mit Bahnen, Formen und Pfeilen – zum Weitergeben ans Projektteam, ohne KI.', vorher: fr ? [fr + (fr === 1 ? ' offene Frage beantworten' : ' offene Fragen beantworten')] : [], knopf: 'Speichern' });
   if (state.fahrplan) L.push({ id: 'fahrplan', ic: '💰', titel: 'Sparpotenzial und Entscheidungsvorlage', satz: 'Rechner in Franken pro Jahr und die Vorlage für Geschäftsleitung, IT und Fachbereich (Word).', vorher: [], knopf: 'Öffnen' });
   L.push({ id: 'auftrag', ic: '📄', titel: 'Projektauftrag (Word)', satz: 'Für die Entscheider: Ausgangslage, Ziel, Phasen, Tore mit Kriterien, Aufgaben und ein Block zum Unterschreiben.',
     vorher: [].concat(state.goal ? [] : ['Ziel unten in der Zielleiste eintragen'],
@@ -6312,6 +6694,8 @@ function wwErstellen(id) {
   const name = boardName();
   if (id === 'fahrplan') { openFahrplan(); return; }
   if (id === 'bpmn') { downloadBpmn(); return; }
+  if (id === 'vsdx') { downloadVsdx(); return; }
+  if (id === 'prozessseite') { downloadProzessseite(); return; }
   if (id === 'auftrag') {
     if (kiBereit()) { kiBericht('auftrag'); return; }
     downloadDoc('Projektauftrag - ' + name + '.doc', genAuftrag(''));
@@ -7674,6 +8058,7 @@ async function initAuth() {
     sysMsg('🧪 Übungs-Modus: Das Beispielprojekt «Quartier-Gemeinschaftsgarten» ist geladen – klick dich frei durch, kaputt geht nichts. Nichts wird gespeichert: Beim Neuladen beginnt die Übung frisch. Für richtiges Arbeiten die Seite ohne Zusatz öffnen und ein Konto erstellen.', true);
     if (new URLSearchParams(location.search).has('interview')) openInterview();
     else if (new URLSearchParams(location.search).has('fahrplan')) ladeFahrplanBeispiel();
+    else if (new URLSearchParams(location.search).has('bpmn')) ladeBpmnBeispiel();
     else if (new URLSearchParams(location.search).has('rundgang')) setTimeout(rgStart, 600);
     return;
   }

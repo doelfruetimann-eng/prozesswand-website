@@ -57,6 +57,7 @@
 <body>
 <header><div class="in">
   <h1>Prozessaufnahme für Spitäler</h1>
+  <p id="persoenlich" class="klein" style="display:none;color:#fff;opacity:.85;margin:4px 0 0"></p>
   <p id="unter">Vom Gespräch zum Prozess nach BPMN 2.0 – in drei Schritten.</p>
 </div></header>
 
@@ -79,7 +80,7 @@
 
   <div class="karte">
     <h2><span class="nr">2</span>Interview mit der KI führen</h2>
-    <p>Ein KI-Interviewer fragt dich rund 20 Minuten lang zum Ablauf: Auslöser, Schritte, Ausnahmen und Kontrollen. Du sprichst einfach, wie du es einer neuen Kollegin erklären würdest. Das Gespräch wird aufgezeichnet.</p>
+    <p>Ein KI-Interviewer fragt dich rund 25 Minuten lang zum Ablauf: Auslöser, Schritte, Ausnahmen, Kontrollen und die Angaben für die Prozessseite. Du sprichst einfach, wie du es einer neuen Kollegin erklären würdest. Das Gespräch wird aufgezeichnet.</p>
     <p class="klein">Bitte keine Namen und keine Angaben zu Patientinnen und Patienten nennen – Funktionen genügen. Das Gespräch beendest du selbst mit dem Auflege-Knopf.</p>
     <div id="gBox">
       <button class="knopf" id="gStart" type="button" disabled>Gespräch starten</button>
@@ -104,17 +105,22 @@
     <h2>Stand der Prozesse</h2>
     <p id="standZahl" style="font-weight:700"></p>
     <div id="standBalken" style="height:10px;border-radius:5px;background:var(--rose);overflow:hidden;margin:4px 0 8px"><div style="height:100%;width:0;background:var(--bx)"></div></div>
-    <p class="klein">Wer den Link hat, sieht diese Liste und kann aufgenommene Prozesse ansehen.</p>
+    <p class="klein" id="standHinweis">Wer den Link hat, sieht diese Liste und kann aufgenommene Prozesse ansehen.</p>
     <div id="uebersicht"></div>
   </div>
 
-  <div class="karte">
+  <div class="karte" id="einrichtenKarte">
     <details id="einrichten">
       <summary>Für die Koordination: Wand bauen und Prozessliste einrichten</summary>
       <h2 style="margin-top:14px">Aus einem Gespräch die Wand bauen</h2>
       <p>Die Gespräche liegen im ElevenLabs-Konto, zu dem der KI-Interviewer gehört (dort beim Interviewer unter «Conversations»). Wähle oben den Prozess, kopiere die Abschrift und füge sie in der Prozesswand ein. Was im Gespräch offen blieb, steht danach als Frage auf der Wand. Von dort speicherst du die BPMN-2.0-Datei.</p>
       <a class="knopf" id="wandBtn" aria-disabled="true" href="#">Wand öffnen und Abschrift einfügen</a>
       <p class="klein" style="margin-top:10px">Dafür braucht es ein Konto in der Prozesswand.</p>
+      <h2 style="margin-top:22px">Persönliche Links für die Prozessverantwortlichen</h2>
+      <p>Jede zuständige Funktion aus der Liste bekommt einen eigenen Link. Damit sieht die Person nur ihre eigenen Prozesse, kann sie aufnehmen, ansehen und ändern. Ihr in der Koordination seht mit diesem Link weiterhin alles.</p>
+      <p><button class="knopf" id="persBtn" type="button">Persönliche Links erzeugen</button>
+      <button class="knopf neben" id="persAlle" type="button" style="display:none">Alle Links kopieren</button></p>
+      <div id="persAus"></div>
       <h2 style="margin-top:22px">Eigene Prozessliste einrichten</h2>
       <p>Hier entsteht ein Link, der deine Prozessliste und deinen KI-Interviewer enthält. Die Liste wird <b>nicht auf dieser Website gespeichert</b> – sie steckt nur im Link. Gib ihn nur an die Personen weiter, die Prozesse aufnehmen.</p>
       <label for="eTitel">Titel (z. B. Organisation und Bereich)</label>
@@ -123,7 +129,7 @@
       <input type="text" id="eKontakt" maxlength="90" placeholder="z. B. Vorname Name und Vorname Name">
       <label for="eAgent">Kennung des KI-Interviewers (ElevenLabs, beginnt mit agent_)</label>
       <input type="text" id="eAgent" maxlength="60" placeholder="agent_…">
-      <label for="eListe">Prozesse – pro Zeile: Nummer; Name; Gruppe; zuständige Person oder Funktion</label>
+      <label for="eListe">Prozesse – pro Zeile: Nummer; Name; Gruppe; Prozessverantwortung; Prozesseigner (die letzte Angabe kann fehlen)</label>
       <textarea id="eListe" rows="8" placeholder="3.2.4; Kreditorenmanagement; Finanzen; Leitung Rechnungswesen&#10;3.7.1; Gebäudeinstandhaltung; Immobilien; Leitung Immobilien und Betrieb"></textarea>
       <p style="margin-top:12px"><button class="knopf" id="linkBtn" type="button">Link erzeugen</button>
       <button class="knopf neben" id="kopieBtn" type="button" style="display:none">Link kopieren</button></p>
@@ -149,7 +155,7 @@
   $('fussWand').href = WAND;
 
   /* Einstellung aus dem Link lesen: ?l=<base64url von {t, a, p:[[nr, name, gruppe, funktion], …]}> */
-  var cfg = { t: '', a: '', k: '', s: '', p: [] };
+  var cfg = { t: '', a: '', k: '', s: '', z: '', w: '', p: [] };
   try {
     var l = new URLSearchParams(location.search).get('l');
     if (l) {
@@ -157,13 +163,22 @@
       cfg.t = T(o.t, 90);
       cfg.k = T(o.k, 90);
       cfg.s = /^[A-Za-z0-9_-]{16,64}$/.test(String(o.s || '')) ? String(o.s) : '';
+      /* V83: persönlicher Link – Zugangsschlüssel statt Sammlungs-Schlüssel; welche Prozesse dazugehören, entscheidet der Dienst */
+      cfg.z = !cfg.s && /^[A-Za-z0-9_-]{16,64}$/.test(String(o.z || '')) ? String(o.z) : '';
+      cfg.w = cfg.z ? T(o.w, 80) : '';
       cfg.a = /^agent_[A-Za-z0-9]{6,50}$/.test(String(o.a || '')) ? String(o.a) : '';
       cfg.p = (Array.isArray(o.p) ? o.p : []).slice(0, 200).map(function (z) {
         z = Array.isArray(z) ? z : [];
-        return { nr: T(z[0], 12), name: T(z[1], 80), gruppe: T(z[2], 60), funktion: T(z[3], 80) };
+        return { nr: T(z[0], 12), name: T(z[1], 80), gruppe: T(z[2], 60), funktion: T(z[3], 80), eigner: T(z[4], 100) };
       }).filter(function (z) { return z.name; });
     }
-  } catch (e) { cfg = { t: '', a: '', k: '', s: '', p: [] }; }
+  } catch (e) { cfg = { t: '', a: '', k: '', s: '', z: '', w: '', p: [] }; }
+  var persoenlich = !!cfg.z, zugangOk = !!(cfg.s || cfg.z);
+  if (persoenlich) {
+    $('einrichtenKarte').style.display = 'none';
+    $('standHinweis').textContent = 'Hier siehst du die Prozesse, für die du zuständig bist.';
+    $('persoenlich').style.display = ''; $('persoenlich').textContent = 'Dein persönlicher Link' + (cfg.w ? ' · ' + cfg.w : '') + '. Gib ihn nicht weiter.';
+  }
 
   if (cfg.t) $('unter').textContent = cfg.t + ' – vom Gespräch zum Prozess nach BPMN 2.0.';
   $('kontakt').textContent = cfg.k ? 'Fragen dazu beantwortet die Koordination: ' + cfg.k + '.' : '';
@@ -215,7 +230,7 @@
     });
     /* Freie Eingabe: «3.7.1 Gebäudeinstandhaltung» */
     var roh = $('suche').value.trim();
-    if (roh.length >= 4 && !gruppen.length) {
+    if (roh.length >= 4 && !gruppen.length && !persoenlich) {
       var m = roh.match(/^(\d+(?:\.\d+){0,3})\s+(.+)$/);
       var eigen = { nr: T(m ? m[1] : '', 12), name: T(m ? m[2] : roh, 80), gruppe: '', funktion: '' };
       var b2 = document.createElement('button'); b2.type = 'button'; b2.className = 'proz' + (gewaehlt && gewaehlt.name === eigen.name ? ' gewaehlt' : '');
@@ -229,7 +244,7 @@
   /* ---------- V79: Gespräch auf der Seite, Mitschrift, Fortsetzen, Abschliessen ---------- */
   var DIENST = 'https://bvbjxofdcugpfsccwlzv.supabase.co/functions/v1/prozess-aufnahme';
   var conv = null, laeuft = false, aend = null; /* aend = { basis } im Änderungsgespräch */
-  function schluessel() { return gewaehlt ? 'pa-' + (cfg.s || 'ohne') + '-' + (gewaehlt.nr || gewaehlt.name) + (aend ? '-aend' : '') : ''; }
+  function schluessel() { return gewaehlt ? 'pa-' + (cfg.s || cfg.z || 'ohne') + '-' + (gewaehlt.nr || gewaehlt.name) + (aend ? '-aend' : '') : ''; }
   function laden() { try { return JSON.parse(localStorage.getItem(schluessel())) || { zeilen: [] }; } catch (e) { return { zeilen: [] }; } }
   function sichern(d) { try { localStorage.setItem(schluessel(), JSON.stringify(d)); } catch (e) {} }
   function abschriftText(d) { return d.zeilen.map(function (z) { return (z.q === 'du' ? 'Antwort: ' : 'Interviewer: ') + z.t; }).join('\n'); }
@@ -239,7 +254,7 @@
     box.textContent = ''; box.style.display = n ? 'block' : 'none';
     d.zeilen.forEach(function (z) { var e = document.createElement('div'); e.className = z.q; var b = document.createElement('b'); b.textContent = z.q === 'du' ? 'Du' : 'KI'; e.appendChild(b); e.appendChild(document.createTextNode(z.t)); box.appendChild(e); });
     box.scrollTop = box.scrollHeight;
-    var bereit = !!(gewaehlt && cfg.a && cfg.s);
+    var bereit = !!(gewaehlt && cfg.a && zugangOk);
     $('gStart').disabled = !bereit || laeuft;
     $('gStart').textContent = n ? 'Gespräch fortsetzen' : (aend ? 'Änderungsgespräch starten' : 'Gespräch starten');
     $('gStart').style.display = (laeuft || d.fertig) ? 'none' : '';
@@ -252,7 +267,7 @@
     if (d.fertig) { an.setAttribute('aria-disabled', 'false'); erg.style.display = ''; erg.textContent = aend ? 'Deine Änderung ist eingearbeitet und bei der Koordination angekommen.' : 'Dein Prozess ist aufgenommen und bei der Koordination angekommen.'; }
     else { an.setAttribute('aria-disabled', 'true'); erg.style.display = 'none'; }
     if (!laeuft) {
-      if (!cfg.a || !cfg.s) info('Für diese Seite ist noch kein KI-Interviewer hinterlegt. Die Koordination richtet ihn unten ein.');
+      if (!cfg.a || !zugangOk) info('Für diese Seite ist noch kein KI-Interviewer hinterlegt. Die Koordination richtet ihn unten ein.');
       else if (!gewaehlt) info('Wähle zuerst oben deinen Prozess.');
       else if (d.fertig) info(aend ? 'Die Änderung ist abgeschlossen.' : 'Das Interview ist abgeschlossen.');
       else if (aend && !n) info('Änderung zu «' + (gewaehlt.nr ? gewaehlt.nr + ' ' : '') + gewaehlt.name + '»: Der Interviewer kennt den bisherigen Ablauf. Sag ihm einfach, was nicht stimmt, was fehlt oder was weg kann.');
@@ -294,12 +309,13 @@
     if (!confirm('Die Mitschrift auf diesem Gerät löschen und von vorne beginnen?')) return; try { localStorage.removeItem(schluessel()); } catch (e) {} gespraechZeigen();
   };
   function dienst(koerper) {
-    koerper.sammlung = cfg.s;
+    if (cfg.s) koerper.sammlung = cfg.s; else koerper.zugang = cfg.z;
     return fetch(DIENST, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(koerper) })
       .then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j && j.error ? j.error : 'Fehler ' + r.status); return j; }); });
   }
   function zurWand(erg, name, wand, nr, nurName) {
-    try { localStorage.setItem('pw-aufnahme', JSON.stringify({ erg: erg, wand: wand || null, name: name, nr: nr || '', nurName: nurName || '', s: cfg.s, zeit: Date.now() })); } catch (e) {}
+    var q = cfg.p.filter(function (x) { return pKey(x.nr, x.name) === pKey(nr, nurName); })[0] || {}; /* V85: Gruppe, Verantwortung, Prozesseigner für die Prozessseite */
+    try { localStorage.setItem('pw-aufnahme', JSON.stringify({ erg: erg, wand: wand || null, name: name, nr: nr || '', nurName: nurName || '', gruppe: q.gruppe || '', funktion: q.funktion || '', eigner: q.eigner || '', s: cfg.s, z: cfg.z, zeit: Date.now() })); } catch (e) {}
     location.href = WAND + '?beispiel=1&aufnahme=1';
   }
   $('gFertig').onclick = function () {
@@ -338,6 +354,8 @@
       K.forEach(function (c) { if (c.bpmn) z.push('- ' + (ART[c.bpmn] || 'Aufgabe') + ' [' + rolle(c) + ']: ' + txt[c.id]); });
       (x.wand.connections || []).forEach(function (k) { if (txt[k.from] && txt[k.to]) z.push('  Ablauf: ' + txt[k.from] + ' → ' + txt[k.to] + (k.label ? ' (' + T(k.label, 40) + ')' : '')); });
       K.forEach(function (c) { if (!c.bpmn && /❓/.test(c.text || '') && c.status !== 'erledigt') z.push('- Offene Frage: ' + txt[c.id].replace(/^❓\s*/, '')); });
+      var sb = x.wand.steckbrief && typeof x.wand.steckbrief === 'object' ? x.wand.steckbrief : {};
+      Object.keys(sb).forEach(function (k) { if (Array.isArray(sb[k]) && sb[k].length) z.push('Steckbrief ' + T(k, 20) + ': ' + sb[k].map(function (t) { return T(t, 200); }).join('; ')); });
       return z.join('\n');
     }
     return JSON.stringify(x.ergebnis || {});
@@ -378,7 +396,7 @@
   }
   function uebersichtLaden() {
     standZeichnen();
-    if (!cfg.s) return;
+    if (!zugangOk) return;
     dienst({ aktion: 'liste' }).then(function (j) {
       erledigt = {};
       ((j && j.liste) || []).forEach(function (z) { var k = pKey(z.prozess_nr, z.prozess_name); if (!erledigt[k]) erledigt[k] = z; }); /* Liste ist neueste zuerst */
@@ -390,18 +408,57 @@
   $('suche').addEventListener('input', zeichnen);
   waehlen(null);
 
+  /* V83: Persönliche Links – je Funktion ein Zugang beim Dienst (nur mit dem Koordinations-Link) */
+  var persText = '';
+  if (!cfg.s) $('persBtn').disabled = true;
+  $('persBtn').onclick = function () {
+    var knopf = this, aus = $('persAus'); aus.textContent = ''; persText = '';
+    var wer = [], je = {};
+    cfg.p.forEach(function (p) { if (!p.nr || !p.funktion) return; if (!je[p.funktion]) { je[p.funktion] = []; wer.push(p.funktion); } je[p.funktion].push(p); });
+    var ohne = cfg.p.filter(function (p) { return !p.nr || !p.funktion; }).length;
+    if (!wer.length) { aus.textContent = 'In der Liste fehlen Nummer oder zuständige Funktion – dann geht es nicht.'; return; }
+    knopf.disabled = true; knopf.textContent = 'Wird erzeugt …';
+    var zeilen = [];
+    wer.reduce(function (kette, f) {
+      return kette.then(function () {
+        return dienst({ aktion: 'zugang_neu', nrs: je[f].map(function (p) { return p.nr; }) }).then(function (j) {
+          var l = location.origin + location.pathname + '?l=' + b64uEnc(JSON.stringify({ t: cfg.t, a: cfg.a, k: cfg.k, z: j.zugang, w: f,
+            p: je[f].map(function (p) { return [p.nr, p.name, p.gruppe, p.funktion, p.eigner]; }) }));
+          zeilen.push({ f: f, n: je[f].length, l: l });
+        });
+      });
+    }, Promise.resolve()).then(function () {
+      zeilen.forEach(function (z) {
+        var r = document.createElement('div'); r.className = 'zeile';
+        var sp = document.createElement('span'); var b0 = document.createElement('b'); b0.textContent = z.f; sp.appendChild(b0);
+        var w = document.createElement('span'); w.className = 'wer'; w.textContent = z.n + (z.n === 1 ? ' Prozess' : ' Prozesse'); sp.appendChild(w);
+        var re = document.createElement('span'); re.className = 'rechts';
+        var b = document.createElement('button'); b.type = 'button'; b.textContent = 'Link kopieren';
+        b.onclick = function () { if (navigator.clipboard) navigator.clipboard.writeText(z.l).then(function () { b.textContent = '✓ kopiert'; }, function () { b.textContent = 'Bitte von Hand kopieren'; }); };
+        re.appendChild(b); r.appendChild(sp); r.appendChild(re); aus.appendChild(r);
+        persText += z.f + ':\n' + z.l + '\n\n';
+      });
+      if (ohne) { var h = document.createElement('p'); h.className = 'klein'; h.textContent = ohne + (ohne === 1 ? ' Prozess ohne Nummer oder Funktion hat' : ' Prozesse ohne Nummer oder Funktion haben') + ' keinen persönlichen Link.'; aus.appendChild(h); }
+      $('persAlle').style.display = ''; knopf.disabled = false; knopf.textContent = 'Persönliche Links erzeugen';
+    }).catch(function (e) { knopf.disabled = false; knopf.textContent = 'Persönliche Links erzeugen'; aus.textContent = 'Nicht erzeugt: ' + (e.message || e); });
+  };
+  $('persAlle').onclick = function () {
+    var b = this;
+    if (navigator.clipboard) navigator.clipboard.writeText(persText).then(function () { b.textContent = '✓ alle kopiert'; }, function () { b.textContent = 'Bitte von Hand kopieren'; });
+  };
+
   /* Einrichten: Liste → Link */
   if (cfg.t) $('eTitel').value = cfg.t;
   if (cfg.a) $('eAgent').value = cfg.a;
   if (cfg.k) $('eKontakt').value = cfg.k;
-  if (cfg.p.length) $('eListe').value = cfg.p.map(function (p) { return [p.nr, p.name, p.gruppe, p.funktion].join('; '); }).join('\n');
+  if (cfg.p.length) $('eListe').value = cfg.p.map(function (p) { return [p.nr, p.name, p.gruppe, p.funktion, p.eigner].join('; ').replace(/;\s*$/, ''); }).join('\n');
   if (!cfg.p.length && !cfg.a) $('einrichten').open = true;
   var link = '';
   function zufall() { var a = new Uint8Array(18); crypto.getRandomValues(a); return Array.prototype.map.call(a, function (b) { return 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789'[b % 56]; }).join(''); }
   $('linkBtn').onclick = function () {
     var aus = $('linkAus'), ag = $('eAgent').value.trim();
     var p = $('eListe').value.split(/\n/).map(function (z) { return z.split(';').map(function (x) { return T(x, 80); }); })
-      .filter(function (z) { return z.length >= 2 && z[1]; }).map(function (z) { return [z[0] || '', z[1], z[2] || '', z[3] || '']; });
+      .filter(function (z) { return z.length >= 2 && z[1]; }).map(function (z) { return [z[0] || '', z[1], z[2] || '', z[3] || '', z[4] || '']; });
     aus.style.display = '';
     if (ag && !/^agent_[A-Za-z0-9]{6,50}$/.test(ag)) { aus.textContent = 'Die Kennung des Interviewers stimmt nicht. Sie beginnt mit «agent_» und enthält nur Buchstaben und Zahlen.'; $('kopieBtn').style.display = 'none'; return; }
     if (!p.length) { aus.textContent = 'Bitte mindestens einen Prozess eintragen: Nummer; Name; Gruppe; Funktion.'; $('kopieBtn').style.display = 'none'; return; }
