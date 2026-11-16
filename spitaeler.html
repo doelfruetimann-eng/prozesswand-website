@@ -151,7 +151,7 @@
 
   <div class="karte">
     <h2><span class="nr">3</span>Prozess ansehen und speichern</h2>
-    <p>Wenn du das Interview abschliesst, entsteht daraus dein Prozess nach BPMN 2.0 – eine Bahn pro Rolle, mit Start, Aufgaben, Entscheiden und Ende. Du siehst ihn sofort, kannst ihn als BPMN-2.0-Datei speichern, und die Koordination erhält ihn von selbst.</p>
+    <p>Wenn du das Interview abschliesst, entsteht daraus dein Prozess nach BPMN 2.0 – eine Bahn pro Rolle, mit Start, Aufgaben, Entscheiden und Ende. Er öffnet sich von selbst, und die Koordination erhält ihn ebenfalls von selbst. Mit dem Knopf hier öffnest du ihn später wieder.</p>
     <div id="ergebnis" class="wahl" style="display:none"></div>
     <p style="margin-top:12px"><a class="knopf" id="ansehenBtn" href="#" aria-disabled="true">Prozess ansehen und speichern</a></p>
     <p class="klein" id="kontakt"></p>
@@ -173,11 +173,14 @@
 
   <div class="karte" id="einrichtenKarte">
     <details id="einrichten">
-      <summary>Für die Koordination: Wand bauen und Prozessliste einrichten</summary>
-      <h2 style="margin-top:14px">Aus einem Gespräch die Wand bauen</h2>
-      <p>Die Gespräche liegen im ElevenLabs-Konto, zu dem der KI-Interviewer gehört (dort beim Interviewer unter «Conversations»). Wähle oben den Prozess, kopiere die Abschrift und füge sie in der Prozesswand ein. Was im Gespräch offen blieb, steht danach als Frage auf der Wand. Von dort speicherst du die BPMN-2.0-Datei.</p>
-      <a class="knopf" id="wandBtn" aria-disabled="true" href="#">Wand öffnen und Abschrift einfügen</a>
-      <p class="klein" style="margin-top:10px">Dafür braucht es ein Konto in der Prozesswand.</p>
+      <summary>Für die Koordination: persönliche Links und Prozessliste</summary>
+      <p style="margin-top:14px"><b>Die Prozesse entstehen von selbst.</b> Sobald jemand «Interview abschliessen» klickt, wird der Prozess gebaut und öffnet sich. Du findest ihn danach oben unter «Stand der Prozesse» und öffnest ihn mit «Ansehen». Du musst nichts kopieren.</p>
+      <details id="notweg">
+        <summary>Notlösung: Das Gespräch wurde in einem eigenen Fenster geführt</summary>
+        <p>Nur dann fehlt die Mitschrift auf dieser Seite. Die Gespräche liegen im ElevenLabs-Konto, zu dem der KI-Interviewer gehört (dort beim Interviewer unter «Conversations»). Wähle oben den Prozess, kopiere dort die Abschrift und füge sie in der Prozesswand ein.</p>
+        <a class="knopf neben" id="wandBtn" aria-disabled="true" href="#">Wand öffnen und Abschrift einfügen</a>
+        <p class="klein" style="margin-top:10px">Dafür braucht es ein Konto in der Prozesswand.</p>
+      </details>
       <h2 style="margin-top:22px">Persönliche Links für die Prozessverantwortlichen</h2>
       <p>Jede zuständige Funktion aus der Liste bekommt einen eigenen Link. Damit sieht die Person nur ihre eigenen Prozesse, kann sie aufnehmen, ansehen und ändern. Ihr in der Koordination seht mit diesem Link weiterhin alles.</p>
       <p><button class="knopf" id="persBtn" type="button">Persönliche Links erzeugen</button>
@@ -416,7 +419,7 @@
   }
   function zurWand(erg, name, wand, nr, nurName) {
     var q = cfg.p.filter(function (x) { return pKey(x.nr, x.name) === pKey(nr, nurName); })[0] || {}; /* V85: Gruppe, Verantwortung, Prozesseigner für die Prozessseite */
-    try { localStorage.setItem('pw-aufnahme', JSON.stringify({ erg: erg, wand: wand || null, name: name, nr: nr || '', nurName: nurName || '', gruppe: q.gruppe || '', funktion: q.funktion || '', eigner: q.eigner || '', ober: (function (o) { return o ? o.nr + ' ' + o.name : ''; })(oberVon(q)), s: cfg.s, z: cfg.z, zeit: Date.now() })); } catch (e) {}
+    try { localStorage.setItem('pw-aufnahme', JSON.stringify({ erg: erg, wand: wand || null, name: name, nr: nr || '', nurName: nurName || '', gruppe: q.gruppe || '', funktion: q.funktion || '', eigner: q.eigner || '', zurueck: location.href, ober: (function (o) { return o ? o.nr + ' ' + o.name : ''; })(oberVon(q)), s: cfg.s, z: cfg.z, zeit: Date.now() })); } catch (e) {}
     location.href = WAND + '?beispiel=1&aufnahme=1';
   }
   $('gFertig').onclick = function () {
@@ -430,7 +433,9 @@
     }).then(function (j) {
       d = laden(); d.fertig = true; d.id = j.id; d.erg = j.ergebnis; sichern(d);
       knopf.disabled = false; gespraechZeigen(); uebersichtLaden();
-      info('Fertig. Unten bei Schritt 3 kannst du deinen Prozess ansehen und speichern.');
+      info('Fertig. Dein Prozess öffnet sich gleich von selbst …');
+      /* V91: die Wand öffnet sich von selbst – niemand muss den Knopf bei Schritt 3 suchen */
+      var g = gewaehlt; setTimeout(function () { zurWand(j.ergebnis, (g.nr ? g.nr + ' ' : '') + g.name, null, g.nr, g.name); }, 1500);
     }).catch(function (e) { knopf.disabled = false; gespraechZeigen(); info(String(e.message || e) + ' Die Mitschrift bleibt auf diesem Gerät gespeichert.'); });
   };
   $('ansehenBtn').onclick = function (ev) {

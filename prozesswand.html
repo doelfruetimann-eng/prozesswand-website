@@ -666,7 +666,7 @@ body.rg-on #wegLeiste { display:none; }
 <script>
 "use strict";
 
-const APP_VERSION = 'V90';
+const APP_VERSION = 'V91';
 /* V49: einheitlicher Wegweiser nach jedem «An Claude kopieren» */
 function claudeHinweis() {
   sysMsg('📋 Kopiert! Jetzt: 1. Claude öffnen (claude.ai bzw. deine Prozesswand-Sitzung) → 2. ins Schreibfeld klicken → 3. Cmd+V (einfügen) → 4. Senden. Mehr braucht es nicht.', true);
@@ -1394,7 +1394,11 @@ function aufnahmeLeiste(a, name) {
   bar.innerHTML = '<button type="button" id="aufnZurueck">&larr; Zur Prozessliste</button><span id="aufnInfo"></span><button type="button" id="aufnSteck">Pflichtangaben</button><button type="button" id="aufnSeite">Prozessseite (Word)</button><button type="button" class="go" id="aufnSpeichern">Änderungen speichern</button>';
   document.getElementById('aufnSteck').onclick = openSteckbrief;
   document.getElementById('aufnSeite').onclick = downloadProzessseite;
-  document.getElementById('aufnZurueck').onclick = () => { if (history.length > 1) history.back(); else location.href = 'spitaeler.html'; };
+  document.getElementById('aufnZurueck').onclick = () => {
+    /* V91: zurück auf genau die Seite, von der die Aufnahme kam (auch umfrage.win/prozesse/), frisch geladen */
+    let z = ''; try { const u = new URL(String(a.zurueck || '')); if (u.origin === location.origin && u.protocol === location.protocol) z = u.href; } catch (e) {}
+    if (z) location.href = z; else if (history.length > 1) history.back(); else location.href = 'spitaeler.html';
+  };
   const info = document.getElementById('aufnInfo');
   document.getElementById('aufnSpeichern').onclick = async function () {
     this.disabled = true; info.textContent = 'Wird gespeichert …';
