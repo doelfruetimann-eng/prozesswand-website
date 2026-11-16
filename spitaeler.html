@@ -48,6 +48,12 @@
   .zeile .rechts { display:flex; gap:6px; align-items:center; flex-wrap:wrap; justify-content:flex-end; }
   .proz.teil { margin-left:22px; border-style:dashed; }
   .zeile.teil > span:first-child { padding-left:18px; }
+  .hilfe ol, .hilfe ul { margin:6px 0 10px; padding-left:22px; font-size:14.5px; line-height:1.5; }
+  .hilfe li { margin:3px 0; }
+  .hilfe dl { margin:6px 0 10px; font-size:14.5px; line-height:1.5; }
+  .hilfe dt { font-weight:700; margin-top:8px; }
+  .hilfe dd { margin:0; color:var(--muted); }
+  .hilfe details + details { margin-top:8px; border-top:1px solid var(--line); padding-top:8px; }
   #tpBox { margin-top:10px; font-size:14px; }
   #tpBox input { margin:6px 0; }
   .proz .ok { display:block; color:#2e6b2e; font-weight:700; font-size:12.5px; }
@@ -74,6 +80,42 @@
     </details>
   </div>
 
+  <div class="karte hilfe">
+    <details id="hilfeTeil">
+      <summary>Hilfe: Was ist ein Teilprozess, und wann brauche ich einen?</summary>
+      <p>Manche Prozesse sind nicht ein einzelner Ablauf, sondern bestehen aus mehreren. Jeder dieser Abläufe ist ein <b>Teilprozess</b> mit eigener Nummer. So ist auch das Prozess-System aufgebaut: oben eine Übersichtsseite, darunter je eine Seite pro Ablauf.</p>
+      <p><b>Faustregel</b></p>
+      <ul>
+        <li><b>Ohne Teilprozesse:</b> Dein Prozess hat einen Auslöser, einen Ablauf und ein Ergebnis. Dann nimmst du ihn direkt auf.</li>
+        <li><b>Mit Teilprozessen:</b> Es gibt mehrere Abläufe mit verschiedenen Auslösern, anderen Beteiligten oder anderen Ergebnissen. Dann nimmst du jeden Teil einzeln auf. Der Prozess selbst braucht kein eigenes Interview.</li>
+      </ul>
+      <p><b>Beispiel</b> (erfunden): Der Prozess «4.2 Entsorgung» besteht aus drei Abläufen: «4.2.1 Hauskehricht und Wertstoffe entsorgen», «4.2.2 Sonderabfälle entsorgen» und «4.2.3 Vertrauliche Akten vernichten».</p>
+      <ol>
+        <li>Klick bei Schritt 1 auf den Prozess, hier «4.2 Entsorgung».</li>
+        <li>Klapp darunter «Besteht dieser Prozess aus mehreren Teilen?» auf.</li>
+        <li>Tipp den Namen des ersten Teils ein, hier «Hauskehricht und Wertstoffe entsorgen», und klick auf «Teilprozess anlegen».</li>
+        <li>Der Teil steht jetzt eingerückt unter dem Prozess, hat die Nummer 4.2.1 und ist schon gewählt.</li>
+        <li>Klick auf «Gespräch starten» und erzähl nur diesen einen Ablauf. Die KI weiss, dass es ein Teil ist.</li>
+        <li>Klick am Schluss auf «Interview abschliessen».</li>
+        <li>Für den nächsten Teil klickst du wieder auf «4.2 Entsorgung» und legst ihn an. Er bekommt von selbst die Nummer 4.2.2.</li>
+      </ol>
+      <p><b>Was daraus entsteht:</b> Jeder Teilprozess bekommt einen eigenen Ablauf nach BPMN 2.0 mit Prozessseite (Word), BPMN-Datei und Visio-Datei. Die Koordination erstellt für den Prozess eine Übersicht mit allen Teilprozessen und ihrem Stand.</p>
+    </details>
+    <details id="hilfeSpeicher">
+      <summary>Hilfe: Wo wird was gespeichert?</summary>
+      <dl>
+        <dt>Prozessliste</dt><dd>Nur im Link. Wer den Link hat, sieht sie.</dd>
+        <dt>Mitschrift während des Gesprächs</dt><dd>Im Browser auf deinem Gerät. Ein unterbrochenes Gespräch setzt du darum nur auf demselben Gerät im selben Browser fort.</dd>
+        <dt>Aufzeichnung des Gesprächs</dt><dd>Im ElevenLabs-Konto, zu dem der KI-Interviewer gehört. Zugang hat nur die Koordination.</dd>
+        <dt>Abgeschlossenes Interview und der Prozess daraus</dt><dd>In der Datenbank der Prozesswand. Mail-Adressen und Telefonnummern werden vorher entfernt. Die Koordination sieht alle Prozesse, mit einem persönlichen Link siehst du nur deine eigenen.</dd>
+        <dt>Änderungen am Prozess</dt><dd>In derselben Datenbank, aber erst nach einem Klick auf «Änderungen speichern».</dd>
+        <dt>Word-, BPMN- und Visio-Dateien</dt><dd>Im Ordner «Downloads» auf deinem Gerät.</dd>
+        <dt>Angelegter Teilprozess ohne Interview</dt><dd>Nur im Browser auf deinem Gerät, bis das Interview abgeschlossen ist.</dd>
+      </dl>
+      <p><b>Gut zu wissen:</b> Eine KI (Claude von Anthropic) wertet die Mitschrift aus. Nenne darum keine Namen und keine Angaben zu Patientinnen und Patienten, Funktionen genügen. Verbindlich ist am Schluss nur der Eintrag im Prozess-System der Organisation.</p>
+    </details>
+  </div>
+
   <div class="karte">
     <h2><span class="nr">1</span>Prozess wählen</h2>
     <p id="wahlText">Welchen Prozess nimmst du auf? Tippe Nummer und Name ein.</p>
@@ -83,7 +125,7 @@
     <div id="tpBox" style="display:none">
       <details id="tpDetails">
         <summary>Besteht dieser Prozess aus mehreren Teilen? Teilprozess anlegen</summary>
-        <p class="klein" style="margin:6px 0 0">Jeder Teil wird einzeln aufgenommen und bekommt eine eigene Nummer, z. B. <span id="tpBeispiel">3.2.4.1</span>. So entstehen dieselben Ebenen wie in Prozesse4SSH.</p>
+        <p class="klein" style="margin:6px 0 0">Jeder Teil wird einzeln aufgenommen und bekommt eine eigene Nummer, z. B. <span id="tpBeispiel">3.2.4.1</span>. So entstehen dieselben Ebenen wie in Prozesse4SSH. <a href="#hilfeTeil" id="tpHilfe">Beispiel ansehen</a></p>
         <label for="tpName">Name des Teilprozesses</label>
         <input type="text" id="tpName" maxlength="80" placeholder="z. B. Rechnung erfassen und prüfen">
         <button class="knopf" id="tpBtn" type="button">Teilprozess anlegen</button>
@@ -288,6 +330,7 @@
   function naechsteNr(p) { var m = 0; kinderVon(p).forEach(function (q) { m = Math.max(m, +q.nr.split('.').pop() || 0); });
     Object.keys(typeof erledigt === 'undefined' ? {} : erledigt).forEach(function (k) { var z = erledigt[k]; if (oberNr(z.prozess_nr) === p.nr) m = Math.max(m, +String(z.prozess_nr).split('.').pop() || 0); });
     return m + 1; }
+  $('tpHilfe').onclick = function (ev) { ev.preventDefault(); var h = $('hilfeTeil'); h.open = true; h.scrollIntoView({ behavior: 'smooth', block: 'start' }); };
   $('tpBtn').onclick = function () {
     var o = gewaehlt, name = T($('tpName').value, 80);
     if (!o || !/^\d+(\.\d+){1,2}$/.test(o.nr || '') || oberVon(o)) return;
