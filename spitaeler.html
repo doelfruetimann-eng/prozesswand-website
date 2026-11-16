@@ -47,7 +47,7 @@
   .zeile .wer { display:block; font-size:12.5px; color:var(--muted); }
   .zeile .rechts { display:flex; gap:6px; align-items:center; flex-wrap:wrap; justify-content:flex-end; }
   .proz .ok { display:block; color:#2e6b2e; font-weight:700; font-size:12.5px; }
-  .zeile button { font:inherit; font-size:13.5px; font-weight:700; color:var(--bx); background:#fff; border:2px solid var(--bx); border-radius:8px; padding:6px 12px; cursor:pointer; min-height:40px; }
+  #uebKnoepfe button, .zeile button { font:inherit; font-size:13.5px; font-weight:700; color:var(--bx); background:#fff; border:2px solid var(--bx); border-radius:8px; padding:6px 12px; cursor:pointer; min-height:40px; }
   #linkAus { word-break:break-all; font-size:12.5px; background:var(--rose); border-radius:8px; padding:10px 12px; margin-top:10px; display:none; }
   footer { max-width:860px; margin:0 auto; padding:0 16px 30px; font-size:12.5px; color:var(--muted); }
   footer a { color:var(--bx); }
@@ -81,7 +81,7 @@
   <div class="karte">
     <h2><span class="nr">2</span>Interview mit der KI führen</h2>
     <p>Ein KI-Interviewer fragt dich rund 25 Minuten lang zum Ablauf: Auslöser, Schritte, Ausnahmen, Kontrollen und die Angaben für die Prozessseite. Du sprichst einfach, wie du es einer neuen Kollegin erklären würdest. Das Gespräch wird aufgezeichnet.</p>
-    <p class="klein">Bitte keine Namen und keine Angaben zu Patientinnen und Patienten nennen – Funktionen genügen. Das Gespräch beendest du selbst mit dem Auflege-Knopf.</p>
+    <p class="klein">Bitte keine Namen und keine Angaben zu Patientinnen und Patienten nennen – Funktionen genügen. Am Schluss drückst du selbst «Interview abschliessen».</p>
     <div id="gBox">
       <button class="knopf" id="gStart" type="button" disabled>Gespräch starten</button>
       <button class="knopf neben" id="gStop" type="button" style="display:none">Unterbrechen</button>
@@ -107,6 +107,12 @@
     <div id="standBalken" style="height:10px;border-radius:5px;background:var(--rose);overflow:hidden;margin:4px 0 8px"><div style="height:100%;width:0;background:var(--bx)"></div></div>
     <p class="klein" id="standHinweis">Wer den Link hat, sieht diese Liste und kann aufgenommene Prozesse ansehen.</p>
     <div id="uebersicht"></div>
+    <div id="uebBereich" style="display:none;margin-top:14px;border-top:1px solid var(--line);padding-top:10px">
+      <p style="font-weight:700;margin:0 0 6px">Prozessübersicht pro Bereich (Word)</p>
+      <p class="klein" style="margin:0 0 8px">Eine Seite pro Bereich wie in Prozesse4SSH: Teilprozesse, Stand und Prozessattribute aus den Interviews.</p>
+      <div id="uebKnoepfe" class="rechts" style="display:flex;flex-wrap:wrap;gap:6px"></div>
+      <p class="klein" id="uebInfo" style="margin-top:6px"></p>
+    </div>
   </div>
 
   <div class="karte" id="einrichtenKarte">
@@ -403,7 +409,82 @@
       standZeichnen();
     }).catch(function () {});
   }
+  /* V86: Prozessübersicht pro Bereich (Word) – wie eine Seite «Prozessübersicht» in Prozesse4SSH:
+     Seiteninformation, Teilprozesse als Pfeilkette, Tabelle mit Stand, Prozessattribute aus den
+     Steckbriefen der aufgenommenen Teilprozesse (je mit Nummer). Ohne KI, nichts erfunden. */
+  var ATTR = [
+    ['ziele', 'Ziel der Prozessübersicht', 'Prozesseigner'],
+    ['eingabe', 'Prozesseingabe und Prozessausgabe, Prozessergebnisse', 'Prozessverantwortlicher'],
+    ['dokumente', 'Mitgeltende Dokumente', 'Prozessverantwortlicher'],
+    ['schnittstellen', 'Schnittstellen und Verweise', 'Prozessverantwortlicher'],
+    ['kennzahlen', 'Prozesskennzahlen', 'Prozesseigner'],
+    ['reife', 'Prozessqualität', 'Prozesseigner'],
+    ['risiken', 'Prozessrisiken', 'Prozesseigner'],
+    ['grundlagen', 'Gesetzliche Grundlagen und Reglemente', 'Prozesseigner']];
+  function h(t) { return String(t == null ? '' : t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+  function steckVon(x) {
+    var sb = (x && x.wand && x.wand.steckbrief) || (x && x.ergebnis && x.ergebnis.steckbrief) || {};
+    var o = {}; ['ziele', 'eingaben', 'ausgaben', 'ergebnisse', 'dokumente', 'schnittstellen', 'kennzahlen', 'reife', 'risiken', 'grundlagen'].forEach(function (k) {
+      var v = sb[k]; if (typeof v === 'string') v = v.split(/\n+/);
+      o[k] = (Array.isArray(v) ? v : []).map(function (t) { return T(t, 240); }).filter(function (t) { return t && !/^\[?offen\]?$/i.test(t); }).slice(0, 12);
+    });
+    return o;
+  }
+  function uebersichtDoc(gruppe, teile, daten) {
+    var OFFEN = '<span style="color:#666;font-style:italic">[offen]</span>';
+    var nr = (gruppe.match(/^\d+(?:\.\d+)?/) || [''])[0], farbe = ({ 1: '#C8323C', 2: '#2F4FA0', 3: '#8BB43A' })[nr.charAt(0)] || '#651B32';
+    var HP = { 1: '1. Managementprozesse', 2: '2. Kernprozesse inkl. Medizinischem Support', 3: '3. Unterstützungsprozesse' }[nr.charAt(0)] || '';
+    var eigner = teile.map(function (p) { return p.eigner; }).filter(Boolean)[0] || '';
+    var sammeln = function (k) { var a = []; teile.forEach(function (p) { var d = daten[pKey(p.nr, p.name)]; if (!d) return; d[k].forEach(function (t) { a.push(t + ' (' + p.nr + ')'); }); }); return a; };
+    var liste = function (a) { return a.length ? '<ul style="margin:2pt 0 2pt 14pt;padding:0">' + a.map(function (t) { return '<li>' + h(t) + '</li>'; }).join('') + '</ul>' : OFFEN; };
+    var zelle = function (k) {
+      if (k === 'eingabe') return ['eingaben', 'ausgaben', 'ergebnisse'].map(function (q, i) { var a = sammeln(q); return '<p style="margin:2pt 0"><i>' + ['Prozesseingabe', 'Prozessausgabe', 'Prozessergebnisse'][i] + ':</i> ' + (a.length ? h(a.join('; ')) : OFFEN) + '</p>'; }).join('');
+      return k === 'ziele' ? OFFEN : liste(sammeln(k));
+    };
+    var aufgenommen = teile.filter(function (p) { return erledigt[pKey(p.nr, p.name)]; }).length;
+    var css = 'body{font-family:Calibri,Arial,sans-serif;font-size:9.5pt;color:#333;margin:1.8cm 2cm}h1{font-size:18pt;color:#651B32;margin:0}h2{font-size:13pt;color:#651B32;margin:14pt 0 4pt;border-bottom:.5pt solid #C9CCC4;padding-bottom:2pt}'
+      + 'table{border-collapse:collapse;width:100%;margin:6pt 0}td,th{border:.5pt solid #C9CCC4;padding:4pt 6pt;font-size:9.5pt;vertical-align:top;text-align:left}th{background:#651B32;color:#fff;font-size:9pt}.k td:first-child{width:32%;background:#FAF6F7;font-weight:bold}';
+    var heute = new Date(); var dat = ('0' + heute.getDate()).slice(-2) + '.' + ('0' + (heute.getMonth() + 1)).slice(-2) + '.' + heute.getFullYear();
+    var b = '<h1>' + h(gruppe) + '</h1><p style="color:#666;margin:2pt 0 8pt">Prozesswand · ' + dat + ' · Entwurf aus den Interviews</p>'
+      + '<p style="font-weight:bold;color:#651B32;margin:2pt 0">Bei Widerspruch gilt: die freigegebene Seite in Prozesse4SSH.</p>'
+      + '<table class="k"><tr><td>Seitenbezeichnung</td><td><b>' + h(gruppe) + '</b></td></tr><tr><td>Freigabestatus</td><td>Entwurf</td></tr>'
+      + '<tr><td>Seitentyp</td><td>Prozessübersicht (VORLAGE Prozessübersicht SSH 360)</td></tr><tr><td>Geltungsbereich</td><td>' + OFFEN + '</td></tr>'
+      + '<tr><td>Letzter Autor</td><td>' + OFFEN + '</td></tr><tr><td>Verantwortlich</td><td>' + (eigner ? h(eigner) : OFFEN) + '</td></tr>'
+      + '<tr><td>Freigegeben durch / Freigabedatum</td><td>' + OFFEN + '</td></tr><tr><td>Version</td><td>' + OFFEN + '</td></tr></table>'
+      + '<h2>Prozessübersicht</h2><table><tr>' + teile.map(function (p) { return '<td style="background:' + farbe + ';color:#fff;font-weight:bold;text-align:center;border:1pt solid #fff">' + h(p.nr + ' ' + p.name) + '</td>'; }).join('') + '</tr></table>'
+      + '<table><tr><th style="width:12%">Nr.</th><th>Teilprozess</th><th style="width:30%">Prozessverantwortung</th><th style="width:18%">Stand</th></tr>'
+      + teile.map(function (p) { var a = erledigt[pKey(p.nr, p.name)]; return '<tr><td>' + h(p.nr) + '</td><td>' + h(p.name) + '</td><td>' + (p.funktion ? h(p.funktion) : OFFEN) + '</td><td>' + (a ? 'aufgenommen ' + h(String(a.erstellt || '').slice(0, 10).split('-').reverse().join('.')) : 'offen') + '</td></tr>'; }).join('')
+      + '</table><p style="color:#666">' + aufgenommen + ' von ' + teile.length + ' Teilprozessen aufgenommen. Jede Zeile wird in Prozesse4SSH zum Link auf die Prozessbeschreibung.</p>'
+      + '<h2>Prozessattribute</h2><table><tr><th style="width:26%">Prozessattribute</th><th>Beschreibung</th><th style="width:20%">Rollen und Verantwortlichkeiten</th></tr>'
+      + ATTR.map(function (a) { return '<tr><td><b>' + a[1] + '</b></td><td>' + zelle(a[0]) + '</td><td><i>' + a[2] + '</i></td></tr>'; }).join('') + '</table>'
+      + '<p style="color:#666;font-style:italic">Zusammengetragen aus den Interviews der Teilprozesse (Nummer in Klammern). Das Ziel der Prozessübersicht legt der Prozesseigner fest.</p>'
+      + '<h2>Ablage in Prozesse4SSH</h2><table class="k"><tr><td>Ort in der Prozesslandkarte</td><td>' + h(['Prozesslandkarte', HP, gruppe].filter(Boolean).join(' → ')) + '</td></tr>'
+      + '<tr><td>Untergeordnete Seiten</td><td>' + h(teile.map(function (p) { return p.nr + ' ' + p.name; }).join(', ')) + '</td></tr></table>';
+    return '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word"><head><meta charset="utf-8"><title>' + h(gruppe) + '</title><style>' + css + '</style></head><body>' + b + '</body></html>';
+  }
+  function uebersichtLaden2(gruppe, knopf) {
+    var teile = cfg.p.filter(function (p) { return (p.gruppe || 'Prozesse') === gruppe; });
+    var daten = {}, offen = teile.filter(function (p) { return erledigt[pKey(p.nr, p.name)]; });
+    knopf.disabled = true; var alt = knopf.textContent; knopf.textContent = 'Wird erstellt …';
+    offen.reduce(function (kette, p) {
+      return kette.then(function () { return dienst({ aktion: 'hole', id: erledigt[pKey(p.nr, p.name)].id }).then(function (x) { daten[pKey(p.nr, p.name)] = steckVon(x); }).catch(function () {}); });
+    }, Promise.resolve()).then(function () {
+      var html = uebersichtDoc(gruppe, teile, daten), a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob(['﻿' + html], { type: 'application/msword' }));
+      a.download = gruppe.replace(/[\\/:*?"<>|]+/g, ' ').trim() + '.doc'; document.body.appendChild(a); a.click(); a.remove();
+      knopf.disabled = false; knopf.textContent = '✓ ' + alt.replace(/^✓ /, '');
+      $('uebInfo').textContent = 'Gespeichert im Ordner «Downloads»: ' + a.download;
+    });
+  }
+  function uebKnoepfe() {
+    var box = $('uebKnoepfe'); if (!box) return; box.textContent = '';
+    if (!cfg.s) { $('uebBereich').style.display = 'none'; return; }
+    var gruppen = []; cfg.p.forEach(function (p) { var g = p.gruppe || 'Prozesse'; if (gruppen.indexOf(g) < 0) gruppen.push(g); });
+    $('uebBereich').style.display = gruppen.length ? '' : 'none';
+    gruppen.forEach(function (g) { var b = document.createElement('button'); b.type = 'button'; b.textContent = g; b.onclick = function () { uebersichtLaden2(g, b); }; box.appendChild(b); });
+  }
   uebersichtLaden();
+  uebKnoepfe();
 
   $('suche').addEventListener('input', zeichnen);
   waehlen(null);
