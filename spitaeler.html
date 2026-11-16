@@ -62,6 +62,14 @@
 
 <main>
   <div class="karte">
+    <details id="videoKurs" ontoggle="if(!this.open)this.querySelector('video').pause()">
+      <summary>So funktioniert es – Kurzvideo (1:31)</summary>
+      <video src="https://prozesswand.ch/videos/prozessaufnahme.mp4?v=1116" poster="https://prozesswand.ch/bilder/prozessaufnahme-poster.jpg?v=1116" controls preload="none" playsinline style="width:100%;margin-top:10px;border-radius:8px;background:#000" aria-label="Kurzvideo: Prozess aufnehmen, ansehen und ändern"></video>
+      <p class="klein">Beispiel mit erfundenem Musterspital. Prozess wählen, Gespräch führen, Wand ansehen, ändern und speichern.</p>
+    </details>
+  </div>
+
+  <div class="karte">
     <h2><span class="nr">1</span>Prozess wählen</h2>
     <p id="wahlText">Welchen Prozess nimmst du auf? Tippe Nummer und Name ein.</p>
     <input type="text" id="suche" placeholder="Suchen oder eintippen, z. B. 3.7.1 Gebäudeinstandhaltung" autocomplete="off">
