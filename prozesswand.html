@@ -666,7 +666,7 @@ body.rg-on #wegLeiste { display:none; }
 <script>
 "use strict";
 
-const APP_VERSION = 'V87';
+const APP_VERSION = 'V88';
 /* V49: einheitlicher Wegweiser nach jedem «An Claude kopieren» */
 function claudeHinweis() {
   sysMsg('📋 Kopiert! Jetzt: 1. Claude öffnen (claude.ai bzw. deine Prozesswand-Sitzung) → 2. ins Schreibfeld klicken → 3. Cmd+V (einfügen) → 4. Senden. Mehr braucht es nicht.', true);
@@ -1930,7 +1930,55 @@ function closeModal() {
 }
 overlay.addEventListener('click', e => { if (e.target === overlay) closeModal(); });
 
-function openPostitModal(id) {
+/* V88: Einfaches Fenster für einen Schritt auf der Prozess-Wand (Wunsch Dölf 16.11.2026:
+   «einfacher und übersichtlicher»). Nur, was ein Schritt braucht, mit Fragen als Feldnamen.
+   Alles Weitere (Auftrag, Aufgaben, KI-Dialog …) über «Alle Felder». Gleiche Felder-IDs wie
+   das grosse Fenster (mText, mBpmn, data-ablauf, mSave), damit nichts doppelt gepflegt wird. */
+function openSchrittModal(id) {
+  const card = getPostit(id); if (!card) return;
+  const notiz = bpmnIstNotiz(card), L = lanes().filter(l => l.key !== 'notiz'), lk = bpmnLaneKeyVon(card);
+  const A = card.ablauf || {}, ART = bpmnArt(card);
+  const feld = (k, frage, bsp) => '<label for="sf-' + k + '">' + frage + '</label><input type="text" id="sf-' + k + '" data-ablauf="' + k + '" maxlength="160" placeholder="' + bsp + '" value="' + esc(A[k] || '') + '">';
+  const offen = notiz && (card.status || 'offen') !== 'erledigt';
+  openModal('<h3>' + (notiz ? (/^\s*❓/u.test(card.text || '') ? 'Offene Frage' : 'Hinweis') : 'Schritt bearbeiten') + '</h3>'
+    + '<label for="mText">' + (notiz ? 'Text' : 'Was wird getan?') + '</label><textarea id="mText" rows="2" placeholder="z. B. Rechnung im System erfassen">' + esc(card.text) + '</textarea>'
+    + (notiz ? '<label style="display:flex;gap:8px;align-items:center;text-transform:none;letter-spacing:0;margin-top:10px"><input type="checkbox" id="sfGeklaert"' + (offen ? '' : ' checked') + '> geklärt</label>'
+      : '<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 12px">'
+      + '<div><label for="sfRolle">Wer macht es?</label><select id="sfRolle" style="width:100%">' + L.map(l => '<option value="' + esc(l.key) + '"' + (l.key === lk ? ' selected' : '') + '>' + esc(laneTitle(l)) + '</option>').join('') + '</select></div>'
+      + '<div><label for="mBpmn">Art</label><select id="mBpmn" style="width:100%">' + [['aufgabe', 'Tätigkeit'], ['gateway', 'Entscheid (ja / nein)'], ['start', 'Start'], ['ende', 'Ende']].map(o => '<option value="' + o[0] + '"' + (ART === o[0] ? ' selected' : '') + '>' + o[1] + '</option>').join('') + '</select></div></div>'
+      + feld('womit', 'Womit? (System, Formular, Telefon …)', 'z. B. SAP, Ticketsystem')
+      + feld('eingabe', 'Was muss vorher da sein?', 'z. B. visierte Rechnung')
+      + feld('ergebnis', 'Was ist danach da?', 'z. B. verbuchte Rechnung')
+      + feld('frist', 'Bis wann?', 'z. B. innert 2 Arbeitstagen, T0 − 9 Tage')
+      + feld('mitwirkend', 'Wer hilft mit?', 'z. B. Einkauf'))
+    + '<p style="font-size:12px;color:var(--muted);margin:10px 0 0">Leer lassen, was du nicht weisst. Es steht dann als [offen] in der Prozessseite.</p>'
+    + '<div class="btnrow"><button class="go" id="mSave">Speichern</button><button id="mCancel">Abbrechen</button>'
+    + '<button id="sfMehr" style="margin-left:auto">Alle Felder</button><button class="del" id="mDel">Löschen</button></div>', true);
+  const lesen = () => {
+    const t = document.getElementById('mText').value.trim(); if (t) card.text = t;
+    if (notiz) { const g = document.getElementById('sfGeklaert').checked; card.status = g ? 'erledigt' : 'offen'; card.checked = true; }
+    else {
+      card.bpmn = document.getElementById('mBpmn').value;
+      const ab = {}; modalBox.querySelectorAll('[data-ablauf]').forEach(e => { const v = e.value.replace(/\s+/g, ' ').trim().slice(0, 160); if (v) ab[e.dataset.ablauf] = v; });
+      if (Object.keys(ab).length) card.ablauf = ab; else delete card.ablauf;
+      const neu = document.getElementById('sfRolle').value, idx = laneKeys().indexOf(neu);
+      if (neu !== lk && idx >= 0) card.y = idx * LANE_H + 8; /* andere Rolle = andere Bahn */
+    }
+  };
+  document.getElementById('mSave').onclick = () => { lesen(); save(); render(); closeModal(); };
+  document.getElementById('mCancel').onclick = closeModal;
+  document.getElementById('sfMehr').onclick = () => { lesen(); save(); render(); closeModal(); openPostitModal(id, true); };
+  const del = document.getElementById('mDel');
+  del.onclick = () => {
+    if (del.dataset.sicher !== '1') { del.dataset.sicher = '1'; del.textContent = 'Wirklich löschen?'; return; }
+    state.postits = state.postits.filter(x => x.id !== id);
+    state.connections = state.connections.filter(c => c.from !== id && c.to !== id);
+    save(); render(); closeModal();
+  };
+  setTimeout(() => { const t = document.getElementById('mText'); if (t) t.focus(); }, 30);
+}
+function openPostitModal(id, alleFelder) {
+  if (!alleFelder && istBpmnWand()) { openSchrittModal(id); return; } /* V88 */
   const card = getPostit(id); if (!card) return;
   const pi = phaseIndexOfX(card.x), ph = state.phases[pi] || {};
   const istAnspruch = laneKeyOfY(card.y) === 'anspruch';
