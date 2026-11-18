@@ -666,7 +666,7 @@ body.rg-on #wegLeiste { display:none; }
 <script>
 "use strict";
 
-const APP_VERSION = 'V94';
+const APP_VERSION = 'V95';
 /* V49: einheitlicher Wegweiser nach jedem «An Claude kopieren» */
 function claudeHinweis() {
   sysMsg('📋 Kopiert! Jetzt: 1. Claude öffnen (claude.ai bzw. deine Prozesswand-Sitzung) → 2. ins Schreibfeld klicken → 3. Cmd+V (einfügen) → 4. Senden. Mehr braucht es nicht.', true);
@@ -1244,12 +1244,26 @@ function genPptx() {
     form({ x: RAND + RL.length * lb, y: ly, w: lb, h: 300000, lw: 0, nurText: true, links: true, pt: 8, fett: true, farbe: fr ? '9B1C31' : '2E7D4F',
       text: fr ? fr + (fr === 1 ? ' offene Frage' : ' offene Fragen') + ' (letzte Folie)' : 'Keine offenen Fragen', name: 'Stand', ins: 0 });
   };
+  /* V95: Dokumentenebene – eigene Bahn unter den Rollen (vor den offenen Fragen). Je Schritt ein
+     Dokument-Symbol mit dem, was der Schritt liefert (Ergebnis) und womit gearbeitet wird (Hilfsmittel).
+     Nur was auf der Wand steht; Schritte ohne Angabe bekommen kein Symbol. Nichts wird gekürzt. */
+  const NY = Math.max(0, L.findIndex(l => l.key === 'notiz')) * LANE_H || H;
+  const dok = [];
+  bpmnReihenfolge(s).filter(p => (p.bpmn === 'aufgabe' || p.bpmn === 'gateway') && p.ablauf && (p.ablauf.ergebnis || p.ablauf.womit)).sort((a, b) => a.x - b.x || a.y - b.y).forEach(p => {
+    const z = [];
+    if (p.ablauf.ergebnis) z.push((vNr[p.id] ? vNr[p.id] + '  ' : '') + p.ablauf.ergebnis);
+    if (p.ablauf.womit) z.push((p.ablauf.ergebnis || !vNr[p.id] ? '' : vNr[p.id] + '  ') + 'mit: ' + p.ablauf.womit);
+    const h = Math.round((12 + z.reduce((t, x) => t + Math.ceil(x.length / 34), 0) * 9.6) / 0.78);
+    const y = dok.filter(d => Math.abs(d.p.x - p.x) < PI_W + 8).reduce((t, d) => Math.max(t, d.y + d.h + 5), 7);
+    dok.push({ p: p, zeilen: z, h: h, y: y });
+  });
+  const DOKH = Math.max(58, dok.reduce((t, d) => Math.max(t, d.y + d.h + 7), 0));
   /* Zeichnet den Ausschnitt x0..x1 der Wand (in Wand-Pixeln) so gross wie möglich auf die Folie */
   const zeichne = (x0, x1) => {
-    const wpx = HX + (x1 - x0), hpx = KOPF + H;
+    const wpx = HX + (x1 - x0), hpx = KOPF + H + DOKH;
     const k = Math.min((SW - 2 * RAND) / wpx, (UNTEN - OBEN) / hpx, 9525 * 1.6), z = k / 9525;
     const LX = RAND + ((SW - 2 * RAND) - wpx * k) / 2;
-    const X = px => LX + (HX + px - x0) * k, Y = py => OBEN + (KOPF + py) * k;
+    const X = px => LX + (HX + px - x0) * k, Y = py => OBEN + (KOPF + py + (py >= NY ? DOKH : 0)) * k;
     const pt = v => Math.max(1, Math.round(v * z * 10) / 10), lw = v => Math.max(0.25, v * z), ins = 4 * k;
     let links = 0;
     s.phases.forEach((ph, i) => {
@@ -1263,6 +1277,9 @@ function genPptx() {
       form({ x: X(x0) - HX * k, y: Y(i * LANE_H), w: HX * k, h: LANE_H * k, fill: notiz ? 'FDF3BF' : farbe(l.color, 'F1F2F4'), line: '9AA3AD', lw: lw(0.5), pt: pt(8.5), fett: true, text: laneTitle(l), name: 'Bahn ' + (i + 1), ins: ins });
       form({ x: X(x0), y: Y(i * LANE_H), w: (x1 - x0) * k, h: LANE_H * k, fill: notiz ? 'FFFBEA' : 'FFFFFF', line: '9AA3AD', lw: lw(0.5), name: 'Bahnfläche' });
     });
+    const DY = OBEN + (KOPF + NY) * k;
+    form({ x: X(x0) - HX * k, y: DY, w: HX * k, h: DOKH * k, fill: 'E3E7EC', line: '9AA3AD', lw: lw(0.5), pt: pt(8.5), fett: true, text: 'Dokumente und Hilfsmittel', name: 'Dokumentenebene', ins: ins });
+    form({ x: X(x0), y: DY, w: (x1 - x0) * k, h: DOKH * k, fill: 'F6F7F9', line: '9AA3AD', lw: lw(0.5), name: 'Bahnfläche' });
     links = 0;
     s.phases.slice(0, -1).forEach(ph => { links += ph.w; if (links > x0 + 1 && links < x1 - 1) weg([[X(links), Y(0)], [X(links), Y(H)]], { line: 'B7BEC7', lw: lw(0.5), dash: true, name: 'Trennlinie' }); });
     const drin = p => { const m = p.x + PI_W / 2; return m >= x0 && (m < x1 || x1 >= GANZ); };
@@ -1284,6 +1301,8 @@ function genPptx() {
       }
       if (c.label && w.lx >= x0 && w.lx <= x1) form({ x: X(w.lx), y: Y(w.ly - 13), w: 80 * k, h: 15 * k, lw: 0, nurText: true, links: true, pt: pt(7.5), fett: true, farbe: '651B32', text: c.label, name: 'Beschriftung', ins: 0 });
     });
+    dok.filter(d => drin(d.p)).forEach(d => form({ x: X(d.p.x), y: DY + d.y * k, w: PI_W * k, h: d.h * k, prst: 'flowChartDocument', fill: 'FFFFFF', line: STARK[rolleIdx(d.p) % STARK.length], lw: lw(0.9),
+      pt: pt(7), links: true, oben: true, zeilen: d.zeilen, name: 'Dokument', ins: 3 * k }));
     s.postits.filter(drin).forEach(p => {
       const art = bpmnArt(p), t = cleanTxt(p.text || '');
       if (bpmnIstNotiz(p, s)) {
