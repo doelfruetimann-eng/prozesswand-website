@@ -666,7 +666,7 @@ body.rg-on #wegLeiste { display:none; }
 <script>
 "use strict";
 
-const APP_VERSION = 'V92';
+const APP_VERSION = 'V94';
 /* V49: einheitlicher Wegweiser nach jedem «An Claude kopieren» */
 function claudeHinweis() {
   sysMsg('📋 Kopiert! Jetzt: 1. Claude öffnen (claude.ai bzw. deine Prozesswand-Sitzung) → 2. ins Schreibfeld klicken → 3. Cmd+V (einfügen) → 4. Senden. Mehr braucht es nicht.', true);
@@ -1131,6 +1131,257 @@ function downloadVsdx() {
   downloadGemeldet(fn);
   const offen = offeneFragen().length;
   if (offen) sysMsg('Hinweis: ' + offen + (offen === 1 ? ' offene Frage steht' : ' offene Fragen stehen') + ' mit [offen] unten in der Visio-Zeichnung.', true);
+}
+/* V93: PowerPoint-Datei (.pptx) aus der BPMN-Wand – ohne KI (Export-Regel), mit dem eigenen
+   Mini-ZIP-Schreiber. Folien A4 quer (V94). Folie 1 = «Auf einen Blick», Folie 2 = ganzer Ablauf mit Bahnen. Ist er breiter als eine Folie, folgt je
+   Abschnitt eine Folie in lesbarer Grösse (lange Abschnitte in Teilen); am Schluss die
+   offenen Fragen. Gleiche Lage wie Wand, BPMN- und Visio-Datei (bpmnWeg). Alle Formen sind
+   echte PowerPoint-Formen (verschiebbar, Text änderbar), kein Bild. */
+function genPptx() {
+  const s = state, L = lanes();
+  const x = v => esc(String(v == null ? '' : v).replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, ''));
+  const E = v => Math.round(v);
+  const farbe = (c, ers) => /^#[0-9a-fA-F]{6}$/.test(c || '') ? c.slice(1).toUpperCase() : ers;
+  /* V94: Folien im Format A4 quer (297 x 210 mm) – jede Folie passt beim Drucken genau auf ein Blatt */
+  const SW = 10692000, SH = 7560000, RAND = 300000, OBEN = 960000, UNTEN = SH - 420000;
+  const HX = 170, KOPF = 40, H = L.length * LANE_H, TEIL = 1020, GANZ = canvasW(s);
+  const folien = [];
+  let cur = null;
+  const absatz = (t, o) => { if (t && typeof t === 'object') { o = Object.assign({}, o, t); t = t.t; } return absatzXml(t, o); };
+  const absatzXml = (t, o) => '<a:p><a:pPr' + (o.punkt ? ' marL="285750" indent="-285750"' : '') + ' algn="' + (o.links ? 'l' : 'ctr') + '">'
+    + (o.punkt ? '<a:spcAft><a:spcPts val="600"/></a:spcAft><a:buFont typeface="Arial"/><a:buChar char="&#8226;"/>' : '') + '</a:pPr>'
+    + (t ? '<a:r><a:rPr lang="de-CH" sz="' + Math.max(100, Math.round((o.pt || 8) * 100)) + '" b="' + (o.fett ? 1 : 0) + '" dirty="0"><a:solidFill><a:srgbClr val="' + (o.farbe || '1B2430') + '"/></a:solidFill><a:latin typeface="Calibri"/><a:cs typeface="Calibri"/></a:rPr><a:t>' + x(t) + '</a:t></a:r>' : '') + '</a:p>';
+  const form = o => {
+    const id = ++cur.id, lw = o.lw == null ? 0.75 : o.lw, ins = E(o.ins == null ? 36000 : o.ins);
+    cur.xml += '<p:sp><p:nvSpPr><p:cNvPr id="' + id + '" name="' + x(o.name || 'Form') + '"/><p:cNvSpPr' + (o.nurText ? ' txBox="1"' : '') + '/><p:nvPr/></p:nvSpPr><p:spPr>'
+      + '<a:xfrm><a:off x="' + E(o.x) + '" y="' + E(o.y) + '"/><a:ext cx="' + E(Math.max(0, o.w)) + '" cy="' + E(Math.max(0, o.h)) + '"/></a:xfrm>'
+      + '<a:prstGeom prst="' + (o.prst || 'rect') + '"><a:avLst>' + (o.adj != null ? '<a:gd name="adj" fmla="val ' + o.adj + '"/>' : '') + '</a:avLst></a:prstGeom>'
+      + (o.fill ? '<a:solidFill><a:srgbClr val="' + o.fill + '"/></a:solidFill>' : '<a:noFill/>')
+      + (lw ? '<a:ln w="' + E(lw * 12700) + '"><a:solidFill><a:srgbClr val="' + (o.line || '1B2430') + '"/></a:solidFill>' + (o.dash ? '<a:prstDash val="dash"/>' : '') + '</a:ln>' : '<a:ln><a:noFill/></a:ln>')
+      + '</p:spPr>'
+      + (o.text || o.zeilen ? '<p:txBody><a:bodyPr wrap="square" lIns="' + ins + '" tIns="' + ins + '" rIns="' + ins + '" bIns="' + ins + '" anchor="' + (o.oben ? 't' : 'ctr') + '"><a:noAutofit/></a:bodyPr><a:lstStyle/>'
+        + (o.zeilen || String(o.text).split('\n')).map(t => absatz(t, o)).join('') + '</p:txBody>' : '') + '</p:sp>';
+  };
+  /* Linienzug in EMU: 2 Punkte = Linie, mehr = freie Form; Pfeilspitze am Ende */
+  const weg = (P, o) => {
+    P = P.map(q => [E(q[0]), E(q[1])]);
+    const xs = P.map(q => q[0]), ys = P.map(q => q[1]);
+    const x0 = Math.min.apply(null, xs), y0 = Math.min.apply(null, ys), w = Math.max.apply(null, xs) - x0, h = Math.max.apply(null, ys) - y0;
+    if (!w && !h) return;
+    if (P.length > 2 && (!w || !h)) P = [P[0], P[P.length - 1]];
+    const id = ++cur.id;
+    const ln = '<a:ln w="' + E((o.lw || 1) * 12700) + '"><a:solidFill><a:srgbClr val="' + (o.line || '1B2430') + '"/></a:solidFill>' + (o.dash ? '<a:prstDash val="dash"/>' : '') + '<a:round/>'
+      + (o.pfeil ? '<a:tailEnd type="triangle" w="med" len="med"/>' : '') + '</a:ln>';
+    const xfrm = flip => '<a:xfrm' + flip + '><a:off x="' + x0 + '" y="' + y0 + '"/><a:ext cx="' + w + '" cy="' + h + '"/></a:xfrm>';
+    if (P.length === 2) {
+      cur.xml += '<p:cxnSp><p:nvCxnSpPr><p:cNvPr id="' + id + '" name="' + x(o.name || 'Linie') + '"/><p:cNvCxnSpPr/><p:nvPr/></p:nvCxnSpPr><p:spPr>'
+        + xfrm((P[1][0] < P[0][0] ? ' flipH="1"' : '') + (P[1][1] < P[0][1] ? ' flipV="1"' : '')) + '<a:prstGeom prst="line"><a:avLst/></a:prstGeom>' + ln + '</p:spPr></p:cxnSp>';
+      return;
+    }
+    cur.xml += '<p:sp><p:nvSpPr><p:cNvPr id="' + id + '" name="' + x(o.name || 'Linie') + '"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr>' + xfrm('')
+      + '<a:custGeom><a:avLst/><a:gdLst/><a:ahLst/><a:cxnLst/><a:rect l="0" t="0" r="r" b="b"/><a:pathLst><a:path w="' + w + '" h="' + h + '" fill="none">'
+      + P.map((q, i) => (i ? '<a:lnTo>' : '<a:moveTo>') + '<a:pt x="' + (q[0] - x0) + '" y="' + (q[1] - y0) + '"/>' + (i ? '</a:lnTo>' : '</a:moveTo>')).join('')
+      + '</a:path></a:pathLst></a:custGeom><a:noFill/>' + ln + '</p:spPr></p:sp>';
+  };
+  const ssot = (s.ssot || '').trim();
+  const fuss = 'Prozesswand ' + APP_VERSION + ' · Stand ' + heute() + ' · BPMN 2.0' + (ssot ? ' · Bei Widerspruch gilt: ' + ssot : '');
+  const neueFolie = (titel, unter) => {
+    cur = { id: 1, xml: '' }; folien.push(cur);
+    form({ x: 0, y: 0, w: SW, h: 70000, fill: '651B32', lw: 0, name: 'Balken' });
+    form({ x: RAND, y: 170000, w: SW - 2 * RAND, h: 420000, lw: 0, nurText: true, links: true, pt: 20, fett: true, farbe: '651B32', text: titel, name: 'Titel', ins: 0 });
+    if (unter) form({ x: RAND, y: 590000, w: SW - 2 * RAND, h: 270000, lw: 0, nurText: true, links: true, pt: 11, farbe: '5B6573', text: unter, name: 'Untertitel', ins: 0 });
+    form({ x: RAND, y: SH - 320000, w: SW - 2 * RAND, h: 230000, lw: 0, nurText: true, links: true, pt: 8, farbe: '5B6573', text: fuss + ' · Folie ' + folien.length, name: 'Fusszeile', ins: 0 });
+  };
+  /* Farbe der Abschnitts-Kette wie in der Visio-Datei (1 rot, 2 blau, 3 grün, sonst Bordeaux) */
+  const art1 = (String(s.prozessName || boardName()).match(/^\s*([123])\./) || [])[1];
+  const KF = art1 === '1' ? 'C8323C' : art1 === '2' ? '2F4FA0' : art1 === '3' ? '8BB43A' : '651B32';
+  const vNr = {}, vPnr = prozessInfo(s).nr;
+  bpmnReihenfolge(s).filter(p => p.bpmn === 'aufgabe' || p.bpmn === 'gateway').forEach((p, i) => { vNr[p.id] = (vPnr ? vPnr + '.' : '') + (i + 1); });
+  /* V94: «Auf einen Blick» – der ganze Prozess auf EINEM A4-Blatt: Abschnitte als Spalten, Schritte als
+     Karten in der Farbe der Rolle, in der Reihenfolge des Ablaufs. Die genauen Wege stehen auf den Bahnen-Folien. */
+  const STARK = ['2F6FB0', '2E7D4F', '7A4FA3', 'B8860B', 'B8456B', '5B6573', '1F8A8A', 'A0522D', '4B5FA8'];
+  const RL = L.filter(l => l.key !== 'notiz');
+  const rolleIdx = p => Math.max(0, RL.findIndex(l => l.key === bpmnLaneKeyVon(p, s)));
+  const blick = () => {
+    const n = s.phases.length, grenzen = [];
+    let acc = 0; s.phases.forEach(ph => { acc += ph.w; grenzen.push(acc); });
+    const phaseVon = p => { const m = p.x + PI_W / 2, i = grenzen.findIndex(g => m < g); return i < 0 ? n - 1 : i; };
+    const spalten = s.phases.map(() => []);
+    bpmnReihenfolge(s).forEach(p => spalten[phaseVon(p)].push(p));
+    const reihen = n > 6 ? 2 : 1, proReihe = Math.ceil(n / reihen);
+    const LEG = 430000, KH = 380000, LUECKE = 80000, ABST = 110000, PAD = 70000, ZW = 150000;
+    const flaecheH = (UNTEN - OBEN - LEG - (reihen - 1) * ZW) / reihen;
+    const gew = p => bpmnArt(p) === 'start' || bpmnArt(p) === 'ende' ? 0.5 : 1;
+    let u = 950000;
+    spalten.forEach(sp => { if (sp.length) u = Math.min(u, (flaecheH - KH - 3 * PAD - (sp.length - 1) * LUECKE) / sp.reduce((t, p) => t + gew(p), 0)); });
+    const spW = (SW - 2 * RAND - (proReihe - 1) * ABST) / proReihe;
+    const gr = Math.max(5.5, Math.min(11, 10 * Math.min(u / 820000, spW / 1850000)));
+    s.phases.forEach((ph, i) => {
+      const x0 = RAND + (i % proReihe) * (spW + ABST), y0 = OBEN + Math.floor(i / proReihe) * (flaecheH + ZW);
+      form({ x: x0, y: y0 + KH * 0.5, w: spW, h: flaecheH - KH * 0.5, prst: 'roundRect', adj: 4000, fill: 'F6F2F4', lw: 0, name: 'Spalte' });
+      form({ x: x0, y: y0, w: spW, h: KH, prst: i === 0 ? 'homePlate' : 'chevron', adj: 28000, fill: KF, line: KF, lw: 0.5, pt: Math.min(11, gr + 1), fett: true, farbe: 'FFFFFF',
+        text: (i + 1) + '  ' + (ph.name || ('Abschnitt ' + (i + 1))), name: 'Abschnitt ' + (i + 1), ins: 30000 });
+      let y = y0 + KH + PAD * 1.5;
+      spalten[i].forEach(p => {
+        const art = bpmnArt(p), h = u * gew(p), ri = rolleIdx(p), stark = STARK[ri % STARK.length], t = cleanTxt(p.text || ''), rolle = RL[ri] ? laneTitle(RL[ri]) : '';
+        const o = { x: x0 + PAD, y: y, w: spW - 2 * PAD, h: h, prst: 'roundRect', lw: 1, ins: 50000, pt: gr, links: true };
+        if (art === 'start' || art === 'ende') Object.assign(o, { adj: 50000, links: false, fill: art === 'start' ? 'E6F4EA' : 'FBE9EC', line: art === 'start' ? '2E7D4F' : '9B1C31', lw: art === 'ende' ? 2 : 1,
+          name: art === 'start' ? 'Karte Start' : 'Karte Ende', zeilen: [{ t: (art === 'start' ? 'Start: ' : 'Ende: ') + t, fett: true, pt: gr * 0.9, farbe: art === 'start' ? '1E5B38' : '7A1526' }] });
+        else if (art === 'gateway') {
+          const wege = s.connections.filter(c => c.from === p.id).map(c => { const zl = s.postits.find(q => q.id === c.to); return zl ? (c.label ? c.label + ' → ' : '→ ') + (vNr[zl.id] || cleanTxt(zl.text || '')) : ''; }).filter(Boolean);
+          Object.assign(o, { adj: 12000, fill: 'FFF6D5', line: 'B8860B', name: 'Karte Entscheid',
+            zeilen: [{ t: 'Entscheid: ' + t, fett: true }].concat(wege.length ? [{ t: wege.join('   ·   '), pt: gr * 0.8, farbe: '7A5A00' }] : []).concat(rolle ? [{ t: rolle, pt: gr * 0.75, farbe: '7A5A00' }] : []) });
+        } else Object.assign(o, { adj: 12000, fill: farbe(RL[ri] && RL[ri].color, 'F1F2F4'), line: stark, name: 'Karte Schritt',
+          zeilen: [{ t: (vNr[p.id] ? vNr[p.id] + '  ' : '') + t }, { t: rolle + (p.ablauf && p.ablauf.frist ? '  ·  ' + p.ablauf.frist : ''), pt: gr * 0.78, fett: true, farbe: stark }] });
+        form(o); y += h + LUECKE;
+      });
+    });
+    const ly = UNTEN - LEG + 120000, lb = (SW - 2 * RAND) / (RL.length + 1), fr = offeneFragen().length;
+    RL.forEach((l, i) => {
+      form({ x: RAND + i * lb, y: ly + 75000, w: 150000, h: 150000, prst: 'roundRect', adj: 20000, fill: farbe(l.color, 'F1F2F4'), line: STARK[i % STARK.length], lw: 1, name: 'Legende' });
+      form({ x: RAND + i * lb + 200000, y: ly, w: lb - 240000, h: 300000, lw: 0, nurText: true, links: true, pt: 8, text: laneTitle(l), name: 'Rolle', ins: 0 });
+    });
+    form({ x: RAND + RL.length * lb, y: ly, w: lb, h: 300000, lw: 0, nurText: true, links: true, pt: 8, fett: true, farbe: fr ? '9B1C31' : '2E7D4F',
+      text: fr ? fr + (fr === 1 ? ' offene Frage' : ' offene Fragen') + ' (letzte Folie)' : 'Keine offenen Fragen', name: 'Stand', ins: 0 });
+  };
+  /* Zeichnet den Ausschnitt x0..x1 der Wand (in Wand-Pixeln) so gross wie möglich auf die Folie */
+  const zeichne = (x0, x1) => {
+    const wpx = HX + (x1 - x0), hpx = KOPF + H;
+    const k = Math.min((SW - 2 * RAND) / wpx, (UNTEN - OBEN) / hpx, 9525 * 1.6), z = k / 9525;
+    const LX = RAND + ((SW - 2 * RAND) - wpx * k) / 2;
+    const X = px => LX + (HX + px - x0) * k, Y = py => OBEN + (KOPF + py) * k;
+    const pt = v => Math.max(1, Math.round(v * z * 10) / 10), lw = v => Math.max(0.25, v * z), ins = 4 * k;
+    let links = 0;
+    s.phases.forEach((ph, i) => {
+      const a = Math.max(links, x0), b = Math.min(links + ph.w, x1);
+      if (b - a > 20) form({ x: X(a) + 2 * k, y: OBEN + 3 * k, w: (b - a - 4) * k, h: 31 * k, prst: i === 0 && a === links ? 'homePlate' : 'chevron', adj: 30000, fill: KF, line: KF, lw: lw(0.5),
+        pt: pt(8.5), fett: true, farbe: 'FFFFFF', text: ph.name || ('Abschnitt ' + (i + 1)), name: 'Prozessschritt ' + (i + 1), ins: ins });
+      links += ph.w;
+    });
+    L.forEach((l, i) => {
+      const notiz = l.key === 'notiz';
+      form({ x: X(x0) - HX * k, y: Y(i * LANE_H), w: HX * k, h: LANE_H * k, fill: notiz ? 'FDF3BF' : farbe(l.color, 'F1F2F4'), line: '9AA3AD', lw: lw(0.5), pt: pt(8.5), fett: true, text: laneTitle(l), name: 'Bahn ' + (i + 1), ins: ins });
+      form({ x: X(x0), y: Y(i * LANE_H), w: (x1 - x0) * k, h: LANE_H * k, fill: notiz ? 'FFFBEA' : 'FFFFFF', line: '9AA3AD', lw: lw(0.5), name: 'Bahnfläche' });
+    });
+    links = 0;
+    s.phases.slice(0, -1).forEach(ph => { links += ph.w; if (links > x0 + 1 && links < x1 - 1) weg([[X(links), Y(0)], [X(links), Y(H)]], { line: 'B7BEC7', lw: lw(0.5), dash: true, name: 'Trennlinie' }); });
+    const drin = p => { const m = p.x + PI_W / 2; return m >= x0 && (m < x1 || x1 >= GANZ); };
+    /* Verbindungen zuerst, damit die Formen darüber liegen; am Folienrand abgeschnitten = geht auf der nächsten Folie weiter */
+    s.connections.forEach(c => {
+      const a = s.postits.find(p => p.id === c.from), b = s.postits.find(p => p.id === c.to);
+      if (!a || !b || bpmnIstNotiz(a, s) || bpmnIstNotiz(b, s)) return;
+      const w = bpmnWeg(a, b, s), P = w.pts;
+      const schnitt = (p, q, g) => [g, p[1] + (q[1] - p[1]) * (g - p[0]) / (q[0] - p[0])];
+      let zug = null;
+      for (let i = 0; i < P.length - 1; i++) {
+        let A = P[i], B = P[i + 1], endeDrin = true;
+        if ((A[0] < x0 && B[0] < x0) || (A[0] > x1 && B[0] > x1)) { zug = null; continue; }
+        if (A[0] < x0) { A = schnitt(P[i], P[i + 1], x0); zug = null; } else if (A[0] > x1) { A = schnitt(P[i], P[i + 1], x1); zug = null; }
+        if (B[0] < x0) { B = schnitt(P[i], P[i + 1], x0); endeDrin = false; } else if (B[0] > x1) { B = schnitt(P[i], P[i + 1], x1); endeDrin = false; }
+        if (!zug) zug = [A];
+        zug.push(B);
+        if (!endeDrin || i === P.length - 2) { weg(zug.map(q => [X(q[0]), Y(q[1])]), { lw: lw(1), pfeil: endeDrin && i === P.length - 2, name: 'Fluss' }); zug = null; }
+      }
+      if (c.label && w.lx >= x0 && w.lx <= x1) form({ x: X(w.lx), y: Y(w.ly - 13), w: 80 * k, h: 15 * k, lw: 0, nurText: true, links: true, pt: pt(7.5), fett: true, farbe: '651B32', text: c.label, name: 'Beschriftung', ins: 0 });
+    });
+    s.postits.filter(drin).forEach(p => {
+      const art = bpmnArt(p), t = cleanTxt(p.text || '');
+      if (bpmnIstNotiz(p, s)) {
+        const offen = (p.status || 'offen') !== 'erledigt';
+        form({ x: X(p.x), y: Y(p.y), w: PI_W * k, h: 60 * k, fill: farbe(p.color, 'FDF3BF'), line: 'C8B45A', lw: lw(0.5), pt: pt(7.5), text: t + (offen ? ' [offen]' : ''), name: offen ? 'Offene Frage' : 'Hinweis', ins: ins });
+        return;
+      }
+      const cx = p.x + PI_W / 2, cy = p.y + 28;
+      if (art === 'aufgabe') { form({ x: X(p.x), y: Y(p.y - 2), w: PI_W * k, h: 60 * k, prst: 'roundRect', adj: 12000, fill: 'FFFFFF', line: STARK[rolleIdx(p) % STARK.length], lw: lw(1.25), pt: pt(8), text: (vNr[p.id] ? vNr[p.id] + ' ' : '') + t + (p.ablauf && p.ablauf.frist ? '\n(' + p.ablauf.frist + ')' : ''), name: 'Aufgabe', ins: ins }); return; }
+      if (art === 'gateway') form({ x: X(cx - 21), y: Y(cy - 21), w: 42 * k, h: 42 * k, prst: 'diamond', fill: 'FFF6D5', line: 'B8860B', lw: lw(1.25), pt: pt(9), fett: true, farbe: '7A5A00', text: 'X', name: 'Entscheid', ins: 0 });
+      else form({ x: X(cx - 18), y: Y(cy - 18), w: 36 * k, h: 36 * k, prst: 'ellipse', fill: art === 'ende' ? 'FBE9EC' : 'E6F4EA', line: art === 'ende' ? '9B1C31' : '2E7D4F', lw: lw(art === 'ende' ? 3 : 1.25), name: art === 'ende' ? 'Ende' : 'Start' });
+      if (t) form({ x: X(cx - 76), y: Y(cy + 22), w: 152 * k, h: 30 * k, lw: 0, nurText: true, oben: true, pt: pt(7.5), text: t, name: 'Beschriftung', ins: 0 });
+    });
+  };
+  const titel = seitenTitel(s);
+  const schritte = s.postits.filter(p => !bpmnIstNotiz(p, s) && bpmnArt(p) === 'aufgabe').length, rollen = L.filter(l => l.key !== 'notiz').length;
+  neueFolie(titel, 'Auf einen Blick · ' + s.phases.length + (s.phases.length === 1 ? ' Abschnitt' : ' Abschnitte') + ' · ' + schritte + (schritte === 1 ? ' Schritt' : ' Schritte') + ' · ' + rollen + (rollen === 1 ? ' Rolle' : ' Rollen'));
+  blick();
+  neueFolie(titel, 'Ganzer Ablauf mit Bahnen (BPMN 2.0)');
+  zeichne(0, GANZ);
+  if (GANZ > TEIL) { /* zu breit für eine lesbare Folie: je Abschnitt eine eigene, lange Abschnitte in Teilen */
+    let links = 0;
+    s.phases.forEach((ph, i) => {
+      const teile = Math.max(1, Math.ceil(ph.w / TEIL)), tw = teile === 1 ? ph.w : Math.ceil(ph.w / teile / BPMN_SPALTE) * BPMN_SPALTE;
+      for (let j = 0; j < teile; j++) {
+        const a = links + j * tw, b = j === teile - 1 ? links + ph.w : Math.min(links + ph.w, a + tw);
+        if (b - a < 20 || (j > 0 && !s.postits.some(p => { const m = p.x + PI_W / 2; return m >= a && m < b; }))) continue;
+        neueFolie(titel, 'Abschnitt ' + (i + 1) + ' von ' + s.phases.length + ': ' + (ph.name || ('Abschnitt ' + (i + 1))) + (teile > 1 ? ' (Teil ' + (j + 1) + ' von ' + teile + ')' : ''));
+        zeichne(a, b);
+      }
+      links += ph.w;
+    });
+  }
+  const fragen = offeneFragen().map(f => frageText(f.c) + (s.phases.length > 1 && s.phases[f.i] && s.phases[f.i].name ? ' (' + s.phases[f.i].name + ')' : ''));
+  for (let i = 0; i < fragen.length; i += 12) {
+    const teil = fragen.slice(i, i + 12);
+    neueFolie(titel, 'Offene Fragen' + (fragen.length > 12 ? ' (' + (i + 1) + ' bis ' + (i + teil.length) + ' von ' + fragen.length + ')' : '') + ' – noch zu klären');
+    form({ x: RAND + 100000, y: OBEN + 60000, w: SW - 2 * RAND - 200000, h: UNTEN - OBEN - 60000, lw: 0, nurText: true, links: true, oben: true, punkt: true, pt: teil.length > 8 ? 14 : 18, zeilen: teil.map(t => t + ' [offen]'), name: 'Offene Fragen', ins: 0 });
+  }
+  const H1 = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n';
+  const NA = 'xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"', NR = 'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"', NP = 'xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"';
+  const REL = 'http://schemas.openxmlformats.org/package/2006/relationships', OR = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/', CT = 'application/vnd.openxmlformats-officedocument.presentationml.';
+  const rels = l => H1 + '<Relationships xmlns="' + REL + '">' + l.map((r, i) => '<Relationship Id="rId' + (i + 1) + '" Type="' + (/^http/.test(r[0]) ? r[0] : OR + r[0]) + '" Target="' + r[1] + '"/>').join('') + '</Relationships>';
+  const baum = inhalt => '<p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/><a:chOff x="0" y="0"/><a:chExt cx="0" cy="0"/></a:xfrm></p:grpSpPr>' + inhalt + '</p:spTree>';
+  const stil = sz => '<a:lvl1pPr algn="l"><a:defRPr sz="' + sz + '"><a:solidFill><a:schemeClr val="tx1"/></a:solidFill><a:latin typeface="+mn-lt"/></a:defRPr></a:lvl1pPr>';
+  const voll = c => '<a:solidFill><a:schemeClr val="' + c + '"/></a:solidFill>';
+  const schrift = '<a:latin typeface="Calibri"/><a:ea typeface=""/><a:cs typeface=""/>';
+  const jetzt = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
+  const teile = [
+    { name: '[Content_Types].xml', data: H1 + '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+      + '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/>'
+      + '<Override PartName="/ppt/presentation.xml" ContentType="' + CT + 'presentation.main+xml"/>'
+      + '<Override PartName="/ppt/slideMasters/slideMaster1.xml" ContentType="' + CT + 'slideMaster+xml"/>'
+      + '<Override PartName="/ppt/slideLayouts/slideLayout1.xml" ContentType="' + CT + 'slideLayout+xml"/>'
+      + folien.map((f, i) => '<Override PartName="/ppt/slides/slide' + (i + 1) + '.xml" ContentType="' + CT + 'slide+xml"/>').join('')
+      + '<Override PartName="/ppt/presProps.xml" ContentType="' + CT + 'presProps+xml"/>'
+      + '<Override PartName="/ppt/tableStyles.xml" ContentType="' + CT + 'tableStyles+xml"/>'
+      + '<Override PartName="/ppt/theme/theme1.xml" ContentType="application/vnd.openxmlformats-officedocument.theme+xml"/>'
+      + '<Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/>'
+      + '<Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/></Types>' },
+    { name: '_rels/.rels', data: rels([['officeDocument', 'ppt/presentation.xml'], ['http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties', 'docProps/core.xml'], ['extended-properties', 'docProps/app.xml']]) },
+    { name: 'docProps/core.xml', data: H1 + '<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">'
+      + '<dc:title>' + x(titel) + '</dc:title><dc:creator>Prozesswand</dc:creator><dcterms:created xsi:type="dcterms:W3CDTF">' + jetzt + '</dcterms:created></cp:coreProperties>' },
+    { name: 'docProps/app.xml', data: H1 + '<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties"><Application>Prozesswand ' + APP_VERSION + '</Application><Slides>' + folien.length + '</Slides></Properties>' },
+    { name: 'ppt/presentation.xml', data: H1 + '<p:presentation ' + NA + ' ' + NR + ' ' + NP + '><p:sldMasterIdLst><p:sldMasterId id="2147483648" r:id="rId1"/></p:sldMasterIdLst><p:sldIdLst>'
+      + folien.map((f, i) => '<p:sldId id="' + (256 + i) + '" r:id="rId' + (i + 5) + '"/>').join('') + '</p:sldIdLst><p:sldSz cx="' + SW + '" cy="' + SH + '"/><p:notesSz cx="6858000" cy="9144000"/></p:presentation>' },
+    { name: 'ppt/_rels/presentation.xml.rels', data: rels([['slideMaster', 'slideMasters/slideMaster1.xml'], ['theme', 'theme/theme1.xml'], ['presProps', 'presProps.xml'], ['tableStyles', 'tableStyles.xml']].concat(folien.map((f, i) => ['slide', 'slides/slide' + (i + 1) + '.xml']))) },
+    { name: 'ppt/presProps.xml', data: H1 + '<p:presentationPr ' + NA + ' ' + NR + ' ' + NP + '/>' },
+    { name: 'ppt/tableStyles.xml', data: H1 + '<a:tblStyleLst ' + NA + ' def="{5C22544A-7EE6-4342-B048-85BB5C5F7E24}"/>' },
+    { name: 'ppt/theme/theme1.xml', data: H1 + '<a:theme ' + NA + ' name="Prozesswand"><a:themeElements><a:clrScheme name="Prozesswand">'
+      + [['dk1', '1B2430'], ['lt1', 'FFFFFF'], ['dk2', '651B32'], ['lt2', 'F3EBEE'], ['accent1', '651B32'], ['accent2', '2F4FA0'], ['accent3', '8BB43A'], ['accent4', 'C8323C'], ['accent5', 'C8B45A'], ['accent6', '5B6573'], ['hlink', '651B32'], ['folHlink', '5B6573']]
+        .map(c => '<a:' + c[0] + '><a:srgbClr val="' + c[1] + '"/></a:' + c[0] + '>').join('')
+      + '</a:clrScheme><a:fontScheme name="Prozesswand"><a:majorFont>' + schrift + '</a:majorFont><a:minorFont>' + schrift + '</a:minorFont></a:fontScheme>'
+      + '<a:fmtScheme name="Prozesswand"><a:fillStyleLst>' + voll('phClr') + voll('phClr') + voll('phClr') + '</a:fillStyleLst>'
+      + '<a:lnStyleLst>' + [6350, 12700, 19050].map(w => '<a:ln w="' + w + '">' + voll('phClr') + '<a:prstDash val="solid"/></a:ln>').join('') + '</a:lnStyleLst>'
+      + '<a:effectStyleLst><a:effectStyle><a:effectLst/></a:effectStyle><a:effectStyle><a:effectLst/></a:effectStyle><a:effectStyle><a:effectLst/></a:effectStyle></a:effectStyleLst>'
+      + '<a:bgFillStyleLst>' + voll('phClr') + voll('phClr') + voll('phClr') + '</a:bgFillStyleLst></a:fmtScheme></a:themeElements></a:theme>' },
+    { name: 'ppt/slideMasters/slideMaster1.xml', data: H1 + '<p:sldMaster ' + NA + ' ' + NR + ' ' + NP + '><p:cSld><p:bg><p:bgPr><a:solidFill><a:srgbClr val="FFFFFF"/></a:solidFill><a:effectLst/></p:bgPr></p:bg>' + baum('') + '</p:cSld>'
+      + '<p:clrMap bg1="lt1" tx1="dk1" bg2="lt2" tx2="dk2" accent1="accent1" accent2="accent2" accent3="accent3" accent4="accent4" accent5="accent5" accent6="accent6" hlink="hlink" folHlink="folHlink"/>'
+      + '<p:sldLayoutIdLst><p:sldLayoutId id="2147483649" r:id="rId1"/></p:sldLayoutIdLst>'
+      + '<p:txStyles><p:titleStyle>' + stil(2000) + '</p:titleStyle><p:bodyStyle>' + stil(1200) + '</p:bodyStyle><p:otherStyle>' + stil(1200) + '</p:otherStyle></p:txStyles></p:sldMaster>' },
+    { name: 'ppt/slideMasters/_rels/slideMaster1.xml.rels', data: rels([['slideLayout', '../slideLayouts/slideLayout1.xml'], ['theme', '../theme/theme1.xml']]) },
+    { name: 'ppt/slideLayouts/slideLayout1.xml', data: H1 + '<p:sldLayout ' + NA + ' ' + NR + ' ' + NP + ' type="blank" preserve="1"><p:cSld name="Leer">' + baum('') + '</p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sldLayout>' },
+    { name: 'ppt/slideLayouts/_rels/slideLayout1.xml.rels', data: rels([['slideMaster', '../slideMasters/slideMaster1.xml']]) }
+  ];
+  folien.forEach((f, i) => {
+    teile.push({ name: 'ppt/slides/slide' + (i + 1) + '.xml', data: H1 + '<p:sld ' + NA + ' ' + NR + ' ' + NP + '><p:cSld>' + baum(f.xml) + '</p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sld>' });
+    teile.push({ name: 'ppt/slides/_rels/slide' + (i + 1) + '.xml.rels', data: rels([['slideLayout', '../slideLayouts/slideLayout1.xml']]) });
+  });
+  return teile;
+}
+function downloadPptx() {
+  if (!istBpmnWand(state)) { sysMsg('Eine PowerPoint-Datei gibt es nur von einer BPMN-Wand (Dokumente → «Prozess aus Interview»).', true); return; }
+  const fn = seitenTitel().replace(/[\\/:*?"<>|]+/g, ' ').trim().slice(0, 80) + '.pptx';
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([makeZip(genPptx())], { type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation' })); a.download = fn; a.click(); URL.revokeObjectURL(a.href);
+  downloadGemeldet(fn);
+  const offen = offeneFragen().length;
+  if (offen) sysMsg('Hinweis: ' + offen + (offen === 1 ? ' offene Frage steht' : ' offene Fragen stehen') + ' mit [offen] auf der letzten Folie.', true);
 }
 /* V82: Pflichtangaben je Prozess («Steckbrief») und Word-Datei «Prozessseite» –
    aufgebaut nach den Pflichtangaben einer Prozessseite (Ziele, Schnittstellen, Eingabe,
@@ -5937,7 +6188,7 @@ document.getElementById('docsBtn').onclick = () => {
     + '<label style="margin-top:12px">Projekt einlesen</label>'
     + '<div class="btnrow" style="margin-top:4px"><button class="go" id="dChat" title="Projekt-Brief aus ChatGPT, Claude oder Copilot einfügen – die Wand fragt nur noch, was fehlt">&#128172; Projekt aus einem Chat</button><button class="go" id="dFoto" title="Foto einer Moderationswand aus Papier: die KI liest Zettel, Phasen und Tore &ndash; mit Vorschau">&#128247; Foto einer Papierwand</button><button class="go" id="dImport" title="Fertige Strukturdatei (JSON) aus dem Chat einlesen &ndash; mit Vorschau; die Zielleiste bleibt unber&uuml;hrt">Import (JSON)</button>'
     + '<button class="go" id="dAbschrift" title="Abschrift eines Interviews einf&uuml;gen &ndash; daraus entsteht eine Wand nach BPMN 2.0: eine Bahn pro Rolle, Start, Aufgaben, Entscheide, Ende">&#127908; Prozess aus Interview (BPMN)</button>'
-    + (istBpmnWand(state) ? '<button class="go" id="dBpmn" title="Die Wand als BPMN-2.0-Datei speichern &ndash; &ouml;ffnet sich in Camunda Modeler, bpmn.io, Signavio und ADONIS; ohne KI">BPMN 2.0 (.bpmn)</button><button class="go" id="dVsdx" title="Die Wand als Visio-Zeichnung speichern &ndash; Bahnen, Formen und Pfeile wie auf der Wand; ohne KI">Visio (.vsdx)</button><button class="go" id="dSeite" title="Prozessseite mit allen Pflichtangaben, Rollen und Ablauf-Tabelle (Word); ohne KI">Prozessseite (Word)</button><button id="dSteck" title="Ziele, Schnittstellen, Dokumente, Kennzahlen, Risiken … eintragen oder ergänzen">Pflichtangaben</button>' : '')
+    + (istBpmnWand(state) ? '<button class="go" id="dBpmn" title="Die Wand als BPMN-2.0-Datei speichern &ndash; &ouml;ffnet sich in Camunda Modeler, bpmn.io, Signavio und ADONIS; ohne KI">BPMN 2.0 (.bpmn)</button><button class="go" id="dVsdx" title="Die Wand als Visio-Zeichnung speichern &ndash; Bahnen, Formen und Pfeile wie auf der Wand; ohne KI">Visio (.vsdx)</button><button class="go" id="dPptx" title="Der Prozess als PowerPoint-Folien im Format A4 quer &ndash; ganzer Ablauf, je Abschnitt eine Folie, offene Fragen; druckt genau auf A4; ohne KI">PowerPoint (.pptx)</button><button class="go" id="dSeite" title="Prozessseite mit allen Pflichtangaben, Rollen und Ablauf-Tabelle (Word); ohne KI">Prozessseite (Word)</button><button id="dSteck" title="Ziele, Schnittstellen, Dokumente, Kennzahlen, Risiken … eintragen oder ergänzen">Pflichtangaben</button>' : '')
     + '<button class="go" id="dRepoWand" title="Claude analysiert ein ganzes Repo und schickt die fertige Strukturdatei &ndash; im Abo, keine API-Kosten">&rarr; Wand aus einem Repo (Claude)</button></div>'
     + '<div style="font-size:10.5px;color:var(--muted);margin-top:3px">&laquo;Wand aus einem Repo&raquo; kopiert dir den fertigen Auftrag f&uuml;r Claude. Dort einf&uuml;gen &rarr; du bekommst die Strukturdatei zur&uuml;ck &rarr; hier mit &laquo;Import&raquo; einlesen (mit Vorschau).</div>'
     + '<label style="margin-top:12px">Umfrage auswerten <span style="font-weight:400;text-transform:none">(liest die Antworten aus Supabase &ndash; nur du kannst das)</span></label>'
@@ -6060,6 +6311,7 @@ document.getElementById('docsBtn').onclick = () => {
   document.getElementById('dAbschrift').onclick = () => { closeModal(); openAbschriftImport(); };
   if (document.getElementById('dBpmn')) document.getElementById('dBpmn').onclick = () => { closeModal(); downloadBpmn(); };
   if (document.getElementById('dVsdx')) document.getElementById('dVsdx').onclick = () => { closeModal(); downloadVsdx(); };
+  if (document.getElementById('dPptx')) document.getElementById('dPptx').onclick = () => { closeModal(); downloadPptx(); };
   if (document.getElementById('dSeite')) document.getElementById('dSeite').onclick = () => { closeModal(); downloadProzessseite(); };
   if (document.getElementById('dSteck')) document.getElementById('dSteck').onclick = () => { closeModal(); openSteckbrief(); };
   document.getElementById('dFoto').onclick = () => { closeModal(); openFotoImport(); };
@@ -6709,6 +6961,7 @@ function wwOptionen() {
   if (istBpmnWand(state)) { const lk = steckbriefLuecken(); L.push({ id: 'prozessseite', ic: '📄', titel: 'Prozessseite (Word)', satz: 'Alle Pflichtangaben, Rollen und der Ablauf als Tabelle – die Vorlage für Prozesse4SSH, ohne KI.', vorher: (lk.length ? [lk.length + (lk.length === 1 ? ' Pflichtangabe ergänzen' : ' Pflichtangaben ergänzen') + ' (Knopf «Pflichtangaben»)'] : []).concat(fr ? [fr + (fr === 1 ? ' offene Frage beantworten' : ' offene Fragen beantworten')] : []), knopf: 'Erstellen' }); }
   if (istBpmnWand(state)) L.push({ id: 'bpmn', ic: '🧩', titel: 'BPMN-2.0-Datei', satz: 'Der Prozess als Datei für Camunda Modeler, bpmn.io, Signavio oder ADONIS – ohne KI.', vorher: fr ? [fr + (fr === 1 ? ' offene Frage beantworten' : ' offene Fragen beantworten')] : [], knopf: 'Speichern' });
   if (istBpmnWand(state)) L.push({ id: 'vsdx', ic: '📐', titel: 'Visio-Zeichnung', satz: 'Der Prozess als Visio-Datei (.vsdx) mit Bahnen, Formen und Pfeilen – zum Weitergeben ans Projektteam, ohne KI.', vorher: fr ? [fr + (fr === 1 ? ' offene Frage beantworten' : ' offene Fragen beantworten')] : [], knopf: 'Speichern' });
+  if (istBpmnWand(state)) L.push({ id: 'pptx', ic: '📽', titel: 'PowerPoint-Folien', satz: 'Der Prozess als PowerPoint-Datei (.pptx) im Format A4 quer: eine Folie mit dem ganzen Ablauf, bei langen Prozessen je Abschnitt eine Folie in gross, am Schluss die offenen Fragen – zum Zeigen und zum Drucken auf A4, ohne KI.', vorher: fr ? [fr + (fr === 1 ? ' offene Frage beantworten' : ' offene Fragen beantworten')] : [], knopf: 'Speichern' });
   if (state.fahrplan) L.push({ id: 'fahrplan', ic: '💰', titel: 'Sparpotenzial und Entscheidungsvorlage', satz: 'Rechner in Franken pro Jahr und die Vorlage für Geschäftsleitung, IT und Fachbereich (Word).', vorher: [], knopf: 'Öffnen' });
   L.push({ id: 'auftrag', ic: '📄', titel: 'Projektauftrag (Word)', satz: 'Für die Entscheider: Ausgangslage, Ziel, Phasen, Tore mit Kriterien, Aufgaben und ein Block zum Unterschreiben.',
     vorher: [].concat(state.goal ? [] : ['Ziel unten in der Zielleiste eintragen'],
@@ -6758,6 +7011,7 @@ function wwErstellen(id) {
   if (id === 'fahrplan') { openFahrplan(); return; }
   if (id === 'bpmn') { downloadBpmn(); return; }
   if (id === 'vsdx') { downloadVsdx(); return; }
+  if (id === 'pptx') { downloadPptx(); return; }
   if (id === 'prozessseite') { downloadProzessseite(); return; }
   if (id === 'auftrag') {
     if (kiBereit()) { kiBericht('auftrag'); return; }
