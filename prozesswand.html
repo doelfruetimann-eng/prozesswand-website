@@ -666,7 +666,7 @@ body.rg-on #wegLeiste { display:none; }
 <script>
 "use strict";
 
-const APP_VERSION = 'V95';
+const APP_VERSION = 'V96';
 /* V49: einheitlicher Wegweiser nach jedem «An Claude kopieren» */
 function claudeHinweis() {
   sysMsg('📋 Kopiert! Jetzt: 1. Claude öffnen (claude.ai bzw. deine Prozesswand-Sitzung) → 2. ins Schreibfeld klicken → 3. Cmd+V (einfügen) → 4. Senden. Mehr braucht es nicht.', true);
@@ -1573,9 +1573,198 @@ function genProzessseite() {
     + '<tr><td>Formelle Freigabe</td><td>Prozessmanager</td><td></td><td></td></tr></table>';
   return docShell(titel, body);
 }
+/* V96: Vorlage für Word-Dateien. Standard = Prozesswand (Bordeaux, Calibri). Eine eigene Vorlage
+   (z. B. die eines Betriebs: Schrift, Kopfzeile mit Logo, Fusszeile) kommt über
+   window.PW_VORLAGE = { schrift, rubrik, fuss, logo (data:-Bild png/jpeg), logoB, logoH }.
+   Sie steht NICHT in diesem Repo – die Seite, die die Wand ausliefert, setzt sie beim Bauen. */
+function docVorlage() {
+  const v = (typeof window !== 'undefined' && window.PW_VORLAGE && typeof window.PW_VORLAGE === 'object') ? window.PW_VORLAGE : null;
+  const T = (t, n) => String(t == null ? '' : t).replace(/[\u0000-\u001f<>]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, n);
+  if (!v) return { eigen: false, schrift: 'Calibri', pt: 10, titel: '651B32', kopfFill: '651B32', kopfText: 'FFFFFF', label: 'F3EBEE', gruppe: 'F3EBEE', linie: 'CDBFC5', rubrik: '', fuss: '', logo: null };
+  let logo = null; const m = /^data:image\/(png|jpeg);base64,([A-Za-z0-9+/=]+)$/.exec(String(v.logo || ''));
+  if (m && m[2].length < 400000) { try { const bin = atob(m[2]), u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
+    logo = { daten: u, typ: m[1], b: Math.min(4000, Math.max(1, +v.logoB || 350)), h: Math.min(4000, Math.max(1, +v.logoH || 100)) }; } catch (e) {} }
+  return { eigen: true, schrift: /^[A-Za-z0-9 ]{2,30}$/.test(String(v.schrift || '')) ? String(v.schrift) : 'Arial', pt: 9, titel: '000000', kopfFill: '', kopfText: '000000', label: '', gruppe: 'F2F2F2', linie: 'BFBFBF',
+    rubrik: T(v.rubrik, 60), fuss: T(v.fuss, 90), logo: logo };
+}
+/* V96: Prozessseite als echte Word-Datei (.docx) – ohne KI (Export-Regel), mit dem eigenen
+   Mini-ZIP-Schreiber. Feste Spaltenbreiten (die frühere .doc-Fassung war eine Webseite und
+   zerfiel in manchen Programmen), Arbeitsschritte im Querformat und nach Abschnitt gegliedert,
+   Kopfzeilen der Tabellen wiederholen sich, offene Fragen als Tabelle zum Ausfüllen.
+   Aufbau nach dem Handbuch Prozesse4SSH: Seiteninformation (4.1), Pflichtangaben (4.2),
+   Prozessstruktur und Flowchart (5.4), Freigabe in zwei Stufen (6).
+   Inhalt wie genProzessseite() – bei Änderungen beide pflegen. */
+function genProzessseiteDocx() {
+  const s = state, sb = steckbriefSauber(s.steckbrief), L = lanes().filter(l => l.key !== 'notiz'), V = docVorlage();
+  const x = v => esc(String(v == null ? '' : v).replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, ''));
+  const pi = prozessInfo(s), titel = seitenTitel(s), ssotT = (s.ssot || '').trim();
+  const GELB = 'FFF6D5', GRAU = '5B6573', AKZ = V.titel;
+  const KF = ({ 1: 'C8323C', 2: '2F4FA0', 3: '8BB43A' })[String(pi.nr || titel).charAt(0)] || '651B32';
+  const HOCH = 9638, QUER = 14570; /* nutzbare Breite in Twips: A4 mit 2 cm Rand */
+  const R = (t, o) => { o = o || {}; const g = o.pt ? Math.round(o.pt * 2) : 0;
+    return '<w:r><w:rPr>' + (o.b ? '<w:b/>' : '') + (o.i ? '<w:i/>' : '') + (o.farbe ? '<w:color w:val="' + o.farbe + '"/>' : '') + (o.sperr ? '<w:spacing w:val="' + o.sperr + '"/>' : '') + (g ? '<w:sz w:val="' + g + '"/><w:szCs w:val="' + g + '"/>' : '')
+      + (o.gelb ? '<w:shd w:val="clear" w:color="auto" w:fill="' + GELB + '"/>' : '') + '</w:rPr><w:t xml:space="preserve">' + x(t) + '</w:t></w:r>'; };
+  const OFFEN = () => R('[offen]', { i: true, farbe: '8A6D00', gelb: true });
+  const P = (inhalt, o) => { o = o || {};
+    return '<w:p><w:pPr>' + (o.stil ? '<w:pStyle w:val="' + o.stil + '"/>' : '') + (o.halten ? '<w:keepNext/>' : '') + (o.punkt ? '<w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr>' : '')
+      + (o.rand ? '<w:pBdr><w:' + o.rand + ' w:val="single" w:sz="' + (o.randDick || 4) + '" w:space="4" w:color="' + (o.randFarbe || '7F7F7F') + '"/></w:pBdr>' : '')
+      + (o.tab ? '<w:tabs><w:tab w:val="right" w:pos="' + o.tab + '"/></w:tabs>' : '')
+      + '<w:spacing w:before="' + (o.vor || 0) + '" w:after="' + (o.nach == null ? 60 : o.nach) + '"/>' + (o.mitte ? '<w:jc w:val="center"/>' : '') + (o.abschnitt || '') + '</w:pPr>'
+      + (Array.isArray(inhalt) ? inhalt.join('') : (inhalt || '')) + '</w:p>'; };
+  const H = t => P(R(t), { stil: 'Titel1' });
+  const liste = a => !a.length ? P(OFFEN()) : a.length === 1 ? P(R(a[0])) : a.map(t => P(R(t), { punkt: true, nach: 30 })).join('');
+  const Z = (inhalt, o) => '<w:tc><w:tcPr><w:tcW w:w="' + o.w + '" w:type="dxa"/>' + (o.spanne ? '<w:gridSpan w:val="' + o.spanne + '"/>' : '')
+    + (o.unten ? '<w:tcBorders><w:bottom w:val="single" w:sz="8" w:space="0" w:color="808080"/></w:tcBorders>' : '')
+    + (o.fill ? '<w:shd w:val="clear" w:color="auto" w:fill="' + o.fill + '"/>' : '') + (o.mitteV ? '<w:vAlign w:val="center"/>' : '') + '</w:tcPr>' + (inhalt || P('')) + '</w:tc>';
+  const ZEILE = (zellen, kopf) => '<w:tr><w:trPr><w:cantSplit/>' + (kopf ? '<w:tblHeader/>' : '') + '</w:trPr>' + zellen.join('') + '</w:tr>';
+  const TAB = (breiten, zeilen, randFarbe) => { const b = n => '<w:' + n + ' w:val="single" w:sz="4" w:space="0" w:color="' + (randFarbe || V.linie) + '"/>';
+    return '<w:tbl><w:tblPr><w:tblW w:w="' + breiten.reduce((a, c) => a + c, 0) + '" w:type="dxa"/><w:tblBorders>' + b('top') + b('left') + b('bottom') + b('right') + b('insideH') + b('insideV') + '</w:tblBorders>'
+      + '<w:tblLayout w:type="fixed"/><w:tblCellMar><w:top w:w="70" w:type="dxa"/><w:left w:w="110" w:type="dxa"/><w:bottom w:w="70" w:type="dxa"/><w:right w:w="110" w:type="dxa"/></w:tblCellMar></w:tblPr>'
+      + '<w:tblGrid>' + breiten.map(c => '<w:gridCol w:w="' + c + '"/>').join('') + '</w:tblGrid>' + zeilen.join('') + '</w:tbl>' + P('', { nach: 0 }); };
+  const KOPF = (breiten, texte) => ZEILE(texte.map((t, i) => Z(P(R(t, { b: true, farbe: V.kopfText }), { nach: 0 }), { w: breiten[i], fill: V.kopfFill, unten: !V.kopfFill, mitteV: true })), true);
+  const PAAR = (b, lab, inhalt) => ZEILE([Z(P(R(lab, { b: true }), { nach: 0 }), { w: b[0], fill: V.label }), Z(inhalt, { w: b[1] })]);
+  const seite = quer => '<w:sectPr><w:headerReference w:type="default" r:id="' + (quer ? 'rId6' : 'rId5') + '"/><w:footerReference w:type="default" r:id="' + (quer ? 'rId4' : 'rId3') + '"/><w:pgSz w:w="' + (quer ? 16838 : 11906) + '" w:h="' + (quer ? 11906 : 16838) + '"' + (quer ? ' w:orient="landscape"' : '')
+    + '/><w:pgMar w:top="1418" w:right="1134" w:bottom="1134" w:left="1134" w:header="567" w:footer="454" w:gutter="0"/></w:sectPr>';
+  const rolleVon = p => { const l = lanes().find(z => z.key === bpmnLaneKeyVon(p, s)); return l ? laneTitle(l) : '[offen]'; };
+  const A = p => (p.ablauf && typeof p.ablauf === 'object') ? p.ablauf : {};
+  const reihe = bpmnReihenfolge(s), schritte = reihe.filter(p => p.bpmn === 'aufgabe' || p.bpmn === 'gateway');
+  const nr = {}; schritte.forEach((p, i) => { nr[p.id] = (pi.nr ? pi.nr + '.' : '') + (i + 1); });
+  const ziele = id => s.connections.filter(k => k.from === id).map(k => { const z = getPostit(k.to); return z ? (k.label ? k.label + ' → ' : '→ ') + (nr[z.id] ? nr[z.id] + ' ' : '') + cleanTxt(z.text || '') : ''; }).filter(Boolean);
+  const fragen = s.postits.filter(p => bpmnIstNotiz(p, s) && (p.status || 'offen') !== 'erledigt').map(p => cleanTxt(p.text || '').replace(/^❓\s*/u, ''));
+  const hinweise = s.postits.filter(p => bpmnIstNotiz(p, s) && (p.status || 'offen') === 'erledigt' && !/^❓/u.test(p.text || '')).map(p => cleanTxt(p.text || '').replace(/^💡\s*/u, ''));
+  const luecken = steckbriefLuecken(s);
+  let d = '';
+  /* Titel */
+  if (V.rubrik) d += P(R(V.rubrik.toUpperCase(), { b: true, pt: 8, sperr: 50 }), { nach: 120 });
+  d += P(R(titel, { b: true, farbe: AKZ, pt: 22 }), { nach: 40 });
+  d += P(R('Prozessseite · Entwurf · Stand ' + heute(), { farbe: GRAU, pt: 9.5 }), { nach: ssotT ? 20 : 80, rand: ssotT ? '' : 'bottom', randDick: 12, randFarbe: AKZ });
+  if (ssotT) d += P(R('Bei Widerspruch gilt: ' + ssotT, { b: true, farbe: AKZ, pt: 9.5 }), { nach: 80, rand: 'bottom', randDick: 12, randFarbe: AKZ });
+  /* Seiteninformation (Handbuch 4.1) */
+  const B2 = [3000, HOCH - 3000];
+  d += H('Seiteninformation') + TAB(B2, [
+    PAAR(B2, 'Seitenbezeichnung', P(R(titel, { b: true }), { nach: 0 })),
+    PAAR(B2, 'Freigabestatus', P(R('Entwurf'), { nach: 0 })),
+    PAAR(B2, 'Vorlage', P(R('VORLAGE Prozesse SSH360'), { nach: 0 })),
+    PAAR(B2, 'Seitentyp', P(R('Strukturseite, 3. Ebene: Prozessbeschreibung'), { nach: 0 }))]
+    .concat(pi.ober ? [PAAR(B2, 'Übergeordnete Seite', P(R(pi.ober + ' (Prozessübersicht)'), { nach: 0 }))] : [])
+    .concat([PAAR(B2, 'Geltungsbereich', liste(sb.geltung)),
+      PAAR(B2, 'Autor (letzte Überarbeitung)', P(OFFEN(), { nach: 0 })),
+      PAAR(B2, 'Prozessverantwortung', P(pi.verantwortlich ? R(pi.verantwortlich) : OFFEN(), { nach: 0 })),
+      PAAR(B2, 'Prozesseigner (inhaltliche Freigabe)', P(pi.eigner ? R(pi.eigner) : OFFEN(), { nach: 0 })),
+      PAAR(B2, 'Freigabe durch und Datum', P(OFFEN(), { nach: 0 })),
+      PAAR(B2, 'Aktuelle Version', P(R('Entwurf, noch keine freigegebene Version'), { nach: 0 }))]));
+  d += P(R((luecken.length ? 'Noch offen: ' + luecken.join(', ') + '. ' : '') + 'Die Attribute des Prozesseigners sind Entwürfe und von ihm zu bestätigen.', { i: true, farbe: GRAU, pt: 9 }));
+  /* Prozessstruktur als Kette, Farbe wie in der Prozesslandkarte (Handbuch 5.4) */
+  const n = Math.max(1, s.phases.length), bw = Math.floor(HOCH / n), BK = s.phases.map((ph, i) => i === n - 1 ? HOCH - bw * (n - 1) : bw);
+  d += H('Prozessstruktur') + TAB(BK.length ? BK : [HOCH], [ZEILE((s.phases.length ? s.phases : [{ name: '' }]).map((ph, i) => Z(P([R((i + 1) + '  ', { b: true, farbe: 'FFFFFF', pt: 9 }), R(ph.name || '', { b: true, farbe: 'FFFFFF', pt: 9 })], { mitte: true, nach: 0 }), { w: BK[i] || HOCH, fill: KF, mitteV: true })))], 'FFFFFF');
+  /* Pflichtangaben: Reihenfolge und Bezeichnungen wie im Handbuch 4.2 */
+  const abs = (lab, a) => P([R(lab + ': ', { b: true, farbe: GRAU, pt: 9 })].concat(a.length ? [R(a.join('; '))] : [OFFEN()]), { nach: 40 });
+  const B3 = [2300, HOCH - 2300 - 2250, 2250];
+  const attr = [['Prozessziele', liste(sb.ziele), 'Prozesseigner'],
+    ['Schnittstellen und Verweise', liste(sb.schnittstellen), 'Prozessverantwortlicher'],
+    ['Prozesseingabe und Prozessausgabe, Prozessergebnisse', abs('Prozesseingabe', sb.eingaben) + abs('Prozessausgabe', sb.ausgaben) + abs('Prozessergebnisse', sb.ergebnisse), 'Prozessverantwortlicher'],
+    ['Mitgeltende Dokumente', liste(sb.dokumente), 'Prozessverantwortlicher'],
+    ['Rollen und Verantwortlichkeiten', L.length ? P(R(L.map(l => laneTitle(l)).join(', ')), { nach: 30 }) + P(R('Aufgaben je Rolle: siehe Tabelle unten.', { i: true, farbe: GRAU, pt: 9 }), { nach: 0 }) : P(OFFEN()), 'Prozessverantwortlicher'],
+    ['Prozesskennzahlen', liste(sb.kennzahlen), 'Prozesseigner'], ['Prozessqualität und Prozessreife', liste(sb.reife), 'Prozesseigner'],
+    ['Prozessrisiken', liste(sb.risiken), 'Prozesseigner'], ['Gesetzliche Grundlagen und Reglemente', liste(sb.grundlagen), 'Prozesseigner']];
+  d += H('Prozessattribute (Pflichtangaben)') + TAB(B3, [KOPF(B3, ['Prozessattribute', 'Beschreibung', 'Zuständig'])].concat(attr.map(a =>
+    ZEILE([Z(P(R(a[0], { b: true }), { nach: 0 }), { w: B3[0], fill: V.label }), Z(a[1], { w: B3[1] }), Z(P(R(a[2], { i: true, farbe: GRAU }), { nach: 0 }), { w: B3[2] })]))));
+  /* Rollen */
+  const BR = [2900, HOCH - 2900];
+  d += H('Rollen und Verantwortlichkeiten im Ablauf') + TAB(BR, [KOPF(BR, ['Rolle', 'Aufgaben im Prozess'])].concat(L.map(l => {
+    const t = s.postits.filter(p => p.bpmn === 'aufgabe' && bpmnLaneKeyVon(p, s) === l.key).sort((a, b) => a.x - b.x).map(p => (nr[p.id] ? nr[p.id] + '  ' : '') + cleanTxt(p.text || ''));
+    return ZEILE([Z(P(R(laneTitle(l), { b: true }), { nach: 0 }), { w: BR[0], fill: V.label }), Z(t.length ? t.map(z => P(R(z), { nach: 30 })).join('') : P(OFFEN(), { nach: 0 }), { w: BR[1] })]); })));
+  d += H('Prozess-Flowchart') + P(R('Grafik nach BPMN 2.0 mit Bahnen: Dateien «' + titel + '.pptx» (A4 quer, zum Zeigen und Drucken), «' + titel + '.bpmn» und «' + titel + '.vsdx» aus derselben Wand.'));
+  d += P('', { nach: 0, abschnitt: seite(false) });
+  /* Arbeitsschritte im Querformat, nach Abschnitt gegliedert */
+  const BA = [1050, 3650, 3150, 2150, 2400, QUER - 12400];
+  const zelleText = p => { const a = A(p), t = cleanTxt(p.text || '');
+    if (p.bpmn === 'start') return P(R('Vorgänger / Auslöser', { b: true, farbe: GRAU, pt: 9 }), { nach: 0 }) + P(R(t, { b: true }), { nach: 0 });
+    if (p.bpmn === 'ende') return P(R('Folgeschritt / Ende', { b: true, farbe: GRAU, pt: 9 }), { nach: 0 }) + P(R(t, { b: true }), { nach: 0 });
+    return P(p.bpmn === 'gateway' ? [R('Entscheid: ', { b: true, farbe: '8A6D00' }), R(t, { b: true })] : R(t, { b: true }), { nach: 30 })
+      + (p.bpmn === 'gateway' ? ziele(p.id).map(z => P(R(z, { pt: 9 }), { nach: 20 })).join('') : '')
+      + (a.frist ? P(R('Frist: ' + a.frist, { i: true, farbe: GRAU, pt: 9 }), { nach: 0 }) : ''); };
+  const zelleEin = p => { const a = A(p);
+    if (p.bpmn === 'start') return sb.eingaben.length ? sb.eingaben.map(t => P(R(t, { pt: 9 }), { nach: 20 })).join('') : P(OFFEN(), { nach: 0 });
+    if (p.bpmn === 'ende') return sb.ergebnisse.length ? sb.ergebnisse.map(t => P(R(t, { pt: 9 }), { nach: 20 })).join('') : P(OFFEN(), { nach: 0 });
+    const t = (a.eingabe ? P([R('Eingabe: ', { b: true, farbe: GRAU, pt: 9 }), R(a.eingabe)], { nach: 30 }) : '') + (a.ergebnis ? P([R('Ergebnis: ', { b: true, farbe: GRAU, pt: 9 }), R(a.ergebnis)], { nach: 0 }) : '');
+    return t || (p.bpmn === 'gateway' ? P('', { nach: 0 }) : P(OFFEN(), { nach: 0 })); };
+  const zeilen = [KOPF(BA, ['Nr.', 'Arbeitsschritte', 'Eingabe / Ergebnis', 'Hilfsmittel / Dokumente / Schnittstellen', 'Verantwortlich', 'Mitwirkend'])];
+  let letzte = -1;
+  reihe.forEach(p => {
+    const ph = phaseIndexOfX(p.x + PI_W / 2), a = A(p), knoten = p.bpmn === 'start' || p.bpmn === 'ende';
+    if (ph !== letzte) { letzte = ph; const f = s.phases[ph] || {};
+      zeilen.push(ZEILE([Z(P([R('Abschnitt ' + (ph + 1) + ': ' + (f.name || ''), { b: true, farbe: AKZ })].concat(f.ziel ? [R('   ' + f.ziel, { i: true, farbe: GRAU, pt: 9 })] : []), { nach: 0, halten: true }), { w: QUER, spanne: 6, fill: V.gruppe })])); }
+    zeilen.push(ZEILE([Z(P(R(nr[p.id] || '', { b: true, farbe: AKZ }), { nach: 0 }), { w: BA[0] }), Z(zelleText(p), { w: BA[1] }), Z(zelleEin(p), { w: BA[2] }),
+      Z(p.bpmn === 'start' && sb.schnittstellen.length ? P(R('Schnittstellen: ', { b: true, farbe: GRAU, pt: 9 }), { nach: 0 }) + sb.schnittstellen.map(t => P(R(t, { pt: 9 }), { nach: 20 })).join('')
+        : knoten ? P('', { nach: 0 }) : P(a.womit ? R(a.womit) : (p.bpmn === 'gateway' ? '' : OFFEN()), { nach: 0 }), { w: BA[3] }),
+      Z(P(R(rolleVon(p)), { nach: 0 }), { w: BA[4] }), Z(P(a.mitwirkend ? R(a.mitwirkend, { pt: 9 }) : '', { nach: 0 }), { w: BA[5] })]));
+  });
+  d += H('Arbeitsschritte') + TAB(BA, zeilen);
+  d += P('', { nach: 0, abschnitt: seite(true) });
+  /* Offene Fragen als Tabelle zum Ausfüllen, Hinweise, Ablage, Freigabe */
+  const BF = [600, 4700, HOCH - 5300];
+  d += H('Offene Fragen') + (fragen.length ? TAB(BF, [KOPF(BF, ['Nr.', 'Frage', 'Antwort'])].concat(fragen.map((t, i) =>
+    ZEILE([Z(P(R(String(i + 1)), { nach: 0 }), { w: BF[0] }), Z(P(R(t), { nach: 0 }), { w: BF[1] }), Z(P(OFFEN(), { nach: 0 }), { w: BF[2] })])))) : P(R('Keine.')));
+  if (hinweise.length) d += H('Hinweise') + hinweise.map(t => P(R(t), { punkt: true, nach: 30 })).join('');
+  d += H('Ablage in Prozesse4SSH') + TAB(B2, [
+    PAAR(B2, 'Ort in der Prozesslandkarte', P(R(ablagePfad(s).join(' → ')), { nach: 0 })),
+    PAAR(B2, 'Seitentyp und Vorlage', P(R('Wikiseite, VORLAGE Prozesse SSH360 (3. Ebene: Prozessbeschreibung)'), { nach: 0 })),
+    PAAR(B2, 'Titel der Seite', P(R(titel), { nach: 0 })),
+    PAAR(B2, 'Mitgeltende Dokumente', P(R('je als Dateiseite, Titel «' + (pi.nr || '[Nr.]') + ' ' + (pi.name || '[Prozess]') + '-Dokumenttitel»'), { nach: 0 })),
+    PAAR(B2, 'Arbeitsanweisungen (4. Ebene)', P(R('VORLAGE Arbeitsanweisungen, dem Prozess untergeordnet'), { nach: 0 }))]);
+  /* Freigabe in zwei Stufen mit Prüfpunkten (Handbuch 6) */
+  const BP = [1900, 2300, 3400, HOCH - 7600];
+  d += H('Prüfung und Freigabe') + TAB(BP, [KOPF(BP, ['Schritt', 'Wer', 'Geprüft wird', 'Datum, Visum'])].concat([
+    ['Prozessentwurf geprüft', 'Prozessverantwortliche/r' + (pi.verantwortlich ? ': ' + pi.verantwortlich : ''), 'Vollständig, verständlich und so, wie im Alltag gearbeitet wird'],
+    ['Inhaltliche Freigabe', 'Prozesseigner' + (pi.eigner ? ': ' + pi.eigner : ' (SL)'), 'Betriebliche Anforderungen, Schnittstellen, Verantwortlichkeiten, Risiken, Wirtschaftlichkeit, gesetzliche Grundlagen'],
+    ['Formelle Freigabe', 'Prozessmanager', 'Struktur- und Gestaltungsvorgaben, Compliance, Qualitätskriterien, Überschneidungen mit anderen Prozessen, Einbindung im QMS']]
+    .map(z => ZEILE([Z(P(R(z[0], { b: true }), { nach: 0 }), { w: BP[0], fill: V.label }), Z(P(R(z[1]), { nach: 0 }), { w: BP[1] }), Z(P(R(z[2], { pt: 9 }), { nach: 0 }), { w: BP[2] }), Z(P('', { vor: 300, nach: 0 }), { w: BP[3] })]))));
+  /* Paket */
+  const H1 = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n';
+  const NW = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"';
+  const NB = ' xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"';
+  const REL = 'http://schemas.openxmlformats.org/package/2006/relationships', OR = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/', CT = 'application/vnd.openxmlformats-officedocument.wordprocessingml.';
+  const klein = '<w:rPr><w:sz w:val="16"/><w:szCs w:val="16"/></w:rPr>';
+  const feld = t => '<w:r>' + klein + '<w:fldChar w:fldCharType="begin"/></w:r><w:r>' + klein + '<w:instrText xml:space="preserve"> ' + t + ' </w:instrText></w:r><w:r>' + klein + '<w:fldChar w:fldCharType="separate"/></w:r><w:r>' + klein + '<w:t>1</w:t></w:r><w:r>' + klein + '<w:fldChar w:fldCharType="end"/></w:r>';
+  const lh = 306000, lb = V.logo ? Math.round(lh * V.logo.b / V.logo.h) : 0;
+  const bild = V.logo ? '<w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="' + lb + '" cy="' + lh + '"/><wp:docPr id="1" name="Logo"/><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic><pic:nvPicPr><pic:cNvPr id="0" name="Logo"/><pic:cNvPicPr/></pic:nvPicPr>'
+    + '<pic:blipFill><a:blip r:embed="rId1"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="' + lb + '" cy="' + lh + '"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r>' : '';
+  const kopf = tab => H1 + '<w:hdr ' + NW + NB + '>' + P([R(titel + '  |  Prozessseite', { b: true, pt: 8 }), '<w:r><w:tab/></w:r>', bild || R('Entwurf', { pt: 8, farbe: GRAU })], { rand: 'bottom', tab: tab, nach: 0 }) + '</w:hdr>';
+  const fuss = tab => H1 + '<w:ftr ' + NW + '>' + P([R((V.fuss || 'Prozesswand ' + APP_VERSION) + ' · Stand ' + heute(), { pt: 8 }), '<w:r><w:tab/></w:r>', R('Seite ', { pt: 8 }), feld('PAGE'), R(' von ', { pt: 8 }), feld('NUMPAGES')], { rand: 'top', tab: tab, nach: 0 }) + '</w:ftr>';
+  const bildRel = H1 + '<Relationships xmlns="' + REL + '">' + (V.logo ? '<Relationship Id="rId1" Type="' + OR + 'image" Target="media/logo.' + V.logo.typ + '"/>' : '') + '</Relationships>';
+  const jetzt = new Date().toISOString().replace(/\.\d+Z$/, 'Z'), g = Math.round(V.pt * 2), hg = V.eigen ? 26 : 28;
+  return [
+    { name: '[Content_Types].xml', data: H1 + '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/>'
+      + '<Default Extension="png" ContentType="image/png"/><Default Extension="jpeg" ContentType="image/jpeg"/>'
+      + '<Override PartName="/word/document.xml" ContentType="' + CT + 'document.main+xml"/><Override PartName="/word/styles.xml" ContentType="' + CT + 'styles+xml"/><Override PartName="/word/numbering.xml" ContentType="' + CT + 'numbering+xml"/>'
+      + [1, 2].map(i => '<Override PartName="/word/footer' + i + '.xml" ContentType="' + CT + 'footer+xml"/><Override PartName="/word/header' + i + '.xml" ContentType="' + CT + 'header+xml"/>').join('')
+      + '<Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/>'
+      + '<Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/></Types>' },
+    { name: '_rels/.rels', data: H1 + '<Relationships xmlns="' + REL + '"><Relationship Id="rId1" Type="' + OR + 'officeDocument" Target="word/document.xml"/>'
+      + '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/><Relationship Id="rId3" Type="' + OR + 'extended-properties" Target="docProps/app.xml"/></Relationships>' },
+    { name: 'docProps/core.xml', data: H1 + '<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">'
+      + '<dc:title>' + x(titel) + '</dc:title><dc:creator>Prozesswand</dc:creator><dcterms:created xsi:type="dcterms:W3CDTF">' + jetzt + '</dcterms:created></cp:coreProperties>' },
+    { name: 'docProps/app.xml', data: H1 + '<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties"><Application>Prozesswand ' + APP_VERSION + '</Application></Properties>' },
+    { name: 'word/_rels/document.xml.rels', data: H1 + '<Relationships xmlns="' + REL + '"><Relationship Id="rId1" Type="' + OR + 'styles" Target="styles.xml"/><Relationship Id="rId2" Type="' + OR + 'numbering" Target="numbering.xml"/>'
+      + '<Relationship Id="rId3" Type="' + OR + 'footer" Target="footer1.xml"/><Relationship Id="rId4" Type="' + OR + 'footer" Target="footer2.xml"/><Relationship Id="rId5" Type="' + OR + 'header" Target="header1.xml"/><Relationship Id="rId6" Type="' + OR + 'header" Target="header2.xml"/></Relationships>' },
+    { name: 'word/styles.xml', data: H1 + '<w:styles ' + NW + '><w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="' + V.schrift + '" w:hAnsi="' + V.schrift + '" w:eastAsia="' + V.schrift + '" w:cs="' + V.schrift + '"/><w:color w:val="' + (V.eigen ? '000000' : '1B2430') + '"/><w:sz w:val="' + g + '"/><w:szCs w:val="' + g + '"/><w:lang w:val="de-CH"/></w:rPr></w:rPrDefault>'
+      + '<w:pPrDefault><w:pPr><w:spacing w:after="60" w:line="252" w:lineRule="auto"/></w:pPr></w:pPrDefault></w:docDefaults>'
+      + '<w:style w:type="paragraph" w:default="1" w:styleId="Standard"><w:name w:val="Normal"/><w:qFormat/></w:style>'
+      + '<w:style w:type="paragraph" w:styleId="Titel1"><w:name w:val="heading 1"/><w:basedOn w:val="Standard"/><w:next w:val="Standard"/><w:qFormat/><w:pPr><w:keepNext/><w:spacing w:before="280" w:after="100"/><w:outlineLvl w:val="0"/></w:pPr><w:rPr><w:b/><w:color w:val="' + AKZ + '"/><w:sz w:val="' + hg + '"/><w:szCs w:val="' + hg + '"/></w:rPr></w:style></w:styles>' },
+    { name: 'word/numbering.xml', data: H1 + '<w:numbering ' + NW + '><w:abstractNum w:abstractNumId="0"><w:multiLevelType w:val="singleLevel"/><w:lvl w:ilvl="0"><w:start w:val="1"/><w:numFmt w:val="bullet"/><w:lvlText w:val="•"/><w:lvlJc w:val="left"/>'
+      + '<w:pPr><w:ind w:left="255" w:hanging="255"/></w:pPr><w:rPr><w:rFonts w:ascii="Calibri" w:hAnsi="Calibri" w:hint="default"/></w:rPr></w:lvl></w:abstractNum><w:num w:numId="1"><w:abstractNumId w:val="0"/></w:num></w:numbering>' },
+    { name: 'word/header1.xml', data: kopf(HOCH) }, { name: 'word/header2.xml', data: kopf(QUER) },
+    { name: 'word/footer1.xml', data: fuss(HOCH) }, { name: 'word/footer2.xml', data: fuss(QUER) },
+    { name: 'word/_rels/header1.xml.rels', data: bildRel }, { name: 'word/_rels/header2.xml.rels', data: bildRel },
+    { name: 'word/document.xml', data: H1 + '<w:document ' + NW + '><w:body>' + d + seite(false) + '</w:body></w:document>' }
+  ].concat(V.logo ? [{ name: 'word/media/logo.' + V.logo.typ, data: V.logo.daten }] : []);
+}
 function downloadProzessseite() {
   if (!istBpmnWand(state)) { sysMsg('Die Prozessseite gibt es nur von einer BPMN-Wand.', true); return; }
-  downloadDoc(seitenTitel().replace(/[\\/:*?"<>|]+/g, ' ').trim().slice(0, 80) + '.doc', genProzessseite());
+  const fn = seitenTitel().replace(/[\\/:*?"<>|]+/g, ' ').trim().slice(0, 80) + '.docx';
+  const dl = document.createElement('a'); dl.href = URL.createObjectURL(new Blob([makeZip(genProzessseiteDocx())], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' })); dl.download = fn; dl.click(); URL.revokeObjectURL(dl.href);
+  downloadGemeldet(fn);
   const l = steckbriefLuecken().length;
   if (l) sysMsg('Hinweis: ' + l + (l === 1 ? ' Pflichtangabe fehlt' : ' Pflichtangaben fehlen') + ' noch – sie stehen als [offen] in der Datei. Ergänzen: «Pflichtangaben».', true);
 }
@@ -6149,7 +6338,7 @@ function makeZip(files) {
   const crc32 = u => { let c = 0xFFFFFFFF; for (let i = 0; i < u.length; i++) c = T[(c ^ u[i]) & 0xFF] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; };
   const parts = [], cdir = []; let off = 0, cdSize = 0;
   files.forEach(f => {
-    const name = enc.encode(f.name), data = enc.encode(f.data), crc = crc32(data);
+    const name = enc.encode(f.name), data = f.data instanceof Uint8Array ? f.data : enc.encode(f.data), crc = crc32(data); /* V96: auch Bilder (Logo in der Word-Datei) */
     const h = new DataView(new ArrayBuffer(30));
     h.setUint32(0, 0x04034b50, true);           /* Signatur */
     h.setUint16(4, 20, true);                    /* Version */
